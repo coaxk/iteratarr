@@ -10,7 +10,7 @@ import FileBrowserModal from '../forms/FileBrowserModal';
  * Props:
  *   iterationId — the iteration UUID to fetch/extract frames for
  */
-export default function FrameStrip({ iterationId }) {
+export default function FrameStrip({ iterationId, renderPath: renderPathProp }) {
   const [frames, setFrames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [extracting, setExtracting] = useState(false);
@@ -30,13 +30,25 @@ export default function FrameStrip({ iterationId }) {
     setExpandedFrame(null);
 
     api.listFrames(iterationId)
-      .then(data => {
-        setFrames(data.frames || []);
-        if (data.frames_dir) setFramesDir(data.frames_dir);
+      .then(async (data) => {
+        if (data.frames?.length > 0) {
+          setFrames(data.frames);
+          if (data.frames_dir) setFramesDir(data.frames_dir);
+        } else if (renderPathProp) {
+          // No frames yet but render path is known — auto-extract
+          try {
+            const result = await api.extractFrames(renderPathProp, iterationId, frameCount);
+            setFrames(result.frames || []);
+            if (result.frames_dir) setFramesDir(result.frames_dir);
+            if (renderPathProp) setVideoPath(renderPathProp);
+          } catch {
+            // Render file doesn't exist yet — that's fine, user hasn't rendered
+          }
+        }
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
-  }, [iterationId]);
+  }, [iterationId, renderPathProp]);
 
   const handleExtract = async (path) => {
     const target = path || videoPath.trim();

@@ -222,7 +222,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
       </div>
 
       {/* Render frame thumbnails */}
-      <FrameStrip iterationId={iteration.id} />
+      <FrameStrip iterationId={iteration.id} renderPath={currentVideoPath || iteration.render_path} />
 
       {/* Input JSON */}
       <JsonViewer

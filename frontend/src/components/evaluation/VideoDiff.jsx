@@ -13,26 +13,50 @@ function VideoPanel({ label, path, side, onBrowse }) {
 
   const videoSrc = path ? `/api/video?path=${encodeURIComponent(path)}` : null;
 
-  // Poll for render file when path is set but video hasn't loaded
+  // Check if file exists at path by hitting the video endpoint with HEAD-like request
+  const checkExists = async () => {
+    if (!path) return false;
+    try {
+      const res = await fetch(`/api/video?path=${encodeURIComponent(path)}`, { method: 'HEAD' });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  };
+
+  // On mount and path change — check immediately, then poll
   useEffect(() => {
-    if (!path || loaded) return;
-    setWaiting(true);
-
-    const interval = setInterval(() => {
-      setPollCount(c => c + 1);
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [path, loaded]);
-
-  // Reset state when path changes
-  useEffect(() => {
+    if (!path) return;
     setLoaded(false);
     setWaiting(false);
     setPollCount(0);
+
+    let cancelled = false;
+
+    // Initial check
+    checkExists().then(exists => {
+      if (cancelled) return;
+      if (exists) {
+        setLoaded(true);
+      } else {
+        setWaiting(true);
+      }
+    });
+
+    // Poll every 10s
+    const interval = setInterval(async () => {
+      if (cancelled) return;
+      setPollCount(c => c + 1);
+      const exists = await checkExists();
+      if (exists && !cancelled) {
+        setLoaded(true);
+        setWaiting(false);
+      }
+    }, 10000);
+
+    return () => { cancelled = true; clearInterval(interval); };
   }, [path]);
 
-  // Cache-bust URL on poll to re-check if file exists
   const src = videoSrc ? `${videoSrc}&_t=${pollCount}` : null;
 
   return (
@@ -48,17 +72,17 @@ function VideoPanel({ label, path, side, onBrowse }) {
       </div>
       {path ? (
         <>
-          <video
-            key={src}
-            src={src}
-            controls
-            loop
-            muted
-            className={`w-full rounded border border-gray-700 bg-black ${loaded ? '' : 'hidden'}`}
-            style={{ maxHeight: '240px' }}
-            onLoadedData={() => { setLoaded(true); setWaiting(false); }}
-            onError={() => setLoaded(false)}
-          />
+          {loaded && (
+            <video
+              key={src}
+              src={src}
+              controls
+              loop
+              muted
+              className="w-full rounded border border-gray-700 bg-black"
+              style={{ maxHeight: '240px' }}
+            />
+          )}
           {!loaded && (
             <div className="flex items-center justify-center h-32 rounded border border-dashed border-gray-700 bg-surface flex-col gap-1">
               {waiting ? (

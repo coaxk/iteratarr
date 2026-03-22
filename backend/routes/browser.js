@@ -10,7 +10,7 @@ import { join, resolve, dirname, extname, relative } from 'path';
  * Rejects any path containing ".." segments to prevent traversal.
  */
 
-const ALLOWED_EXTENSIONS = new Set(['.mp4', '.json', '.png']);
+const ALLOWED_EXTENSIONS = new Set(['.mp4', '.json', '.png', '.safetensors']);
 
 /**
  * Validates that the given path is within one of the allowed root directories.
@@ -50,6 +50,7 @@ export function createBrowserRoutes(config) {
     config.project_base_dir,
     config.production_lock_dir,
     config.production_queue_dir,
+    config.wan2gp_lora_dir,
   ].filter(Boolean);
 
   router.get('/', async (req, res) => {

@@ -18,6 +18,11 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '0.1.0' }));
+app.get('/api/config/paths', (req, res) => res.json({
+  wan2gp_lora_dir: config.wan2gp_lora_dir,
+  project_base_dir: config.project_base_dir,
+  wan2gp_json_dir: config.wan2gp_json_dir
+}));
 app.use('/api/projects', createProjectRoutes(store));
 app.use('/api/clips', createClipRoutes(store));
 app.use('/api/iterations', createIterationRoutes(store, config));

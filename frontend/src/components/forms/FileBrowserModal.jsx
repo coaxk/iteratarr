@@ -10,8 +10,9 @@ import { api } from '../../api';
  *   onClose            -- called to dismiss the modal
  *   title              -- modal header text (default: "Browse Files")
  *   filter             -- file extension filter like ".mp4" (optional)
+ *   initialPath        -- starting directory path (optional, defaults to project_base_dir)
  */
-export default function FileBrowserModal({ onSelect, onClose, title = 'Browse Files', filter }) {
+export default function FileBrowserModal({ onSelect, onClose, title = 'Browse Files', filter, initialPath }) {
   const [currentPath, setCurrentPath] = useState(null);
   const [parentPath, setParentPath] = useState(null);
   const [entries, setEntries] = useState([]);
@@ -45,7 +46,7 @@ export default function FileBrowserModal({ onSelect, onClose, title = 'Browse Fi
   };
 
   useEffect(() => {
-    loadDirectory(null); // Load default directory (project_base_dir)
+    loadDirectory(initialPath || null); // Load initialPath or default (project_base_dir)
   }, []);
 
   const handleEntryClick = (entry) => {

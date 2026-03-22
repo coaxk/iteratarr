@@ -45,6 +45,9 @@ export const api = {
   // Production Queue
   listQueue: () => request('/queue'),
 
+  // Config
+  getConfigPaths: () => request('/config/paths'),
+
   // File Browser
   browseFiles: (path) => request(`/browser?path=${encodeURIComponent(path || '')}`),
 

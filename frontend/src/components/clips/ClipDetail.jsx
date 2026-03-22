@@ -20,6 +20,25 @@ export default function ClipDetail({ clip, onBack }) {
     ? iterations.find(i => i.id === selectedIteration.parent_iteration_id)
     : null;
 
+  // Build ancestor chain for ghost markers — walk up parent_iteration_id, max 3 + baseline
+  const ancestorChain = (() => {
+    if (!selectedIteration || !iterations) return [];
+    const chain = [];
+    let current = selectedIteration;
+    while (current?.parent_iteration_id && chain.length < 3) {
+      const parent = iterations.find(i => i.id === current.parent_iteration_id);
+      if (!parent?.evaluation) break;
+      chain.push(parent);
+      current = parent;
+    }
+    // Add iteration #1 as baseline if not already in chain
+    const first = iterations.find(i => i.iteration_number === 1);
+    if (first?.evaluation && !chain.find(c => c.id === first.id)) {
+      chain.push(first);
+    }
+    return chain;
+  })();
+
   return (
     <div className="space-y-4">
       {/* Back button */}
@@ -61,6 +80,7 @@ export default function ClipDetail({ clip, onBack }) {
           iteration={selectedIteration}
           childIteration={childIteration}
           parentIteration={parentIteration}
+          ancestorChain={ancestorChain}
           onSaved={refetch}
           onLocked={refetch}
           onGoToIteration={(iter) => setSelectedIteration(iter)}

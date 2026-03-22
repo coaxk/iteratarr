@@ -13,7 +13,7 @@ import { IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, SCORE_LOCK_THRESHOLD, 
 
 const defaultScores = (fields) => Object.fromEntries(fields.map(f => [f.key, 3]));
 
-export default function EvaluationPanel({ iteration, childIteration, parentIteration, onSaved, onNext, onLocked, onGoToIteration }) {
+export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], onSaved, onNext, onLocked, onGoToIteration }) {
   const [identity, setIdentity] = useState(defaultScores(IDENTITY_FIELDS));
   const [location, setLocation] = useState(defaultScores(LOCATION_FIELDS));
   const [motion, setMotion] = useState(defaultScores(MOTION_FIELDS));
@@ -74,6 +74,40 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     MOTION_FIELDS.reduce((s, f) => s + (motion[f.key] || 1), 0);
 
   const canLock = grandTotal >= SCORE_LOCK_THRESHOLD;
+
+  // Build history scores for ghost markers from ancestor chain
+  const buildHistory = (group) => ancestorChain
+    .filter(a => a.evaluation?.scores?.[group])
+    .map(a => ({ iterNum: a.iteration_number, scores: a.evaluation.scores[group] }));
+  const identityHistory = buildHistory('identity');
+  const locationHistory = buildHistory('location');
+  const motionHistory = buildHistory('motion');
+
+  // Combined Save & Generate action
+  const handleSaveAndGenerate = async () => {
+    setSaving(true);
+    try {
+      await api.evaluate(iteration.id, {
+        scores: { identity, location, motion },
+        ai_scores: aiScores,
+        attribution,
+        qualitative_notes: notes,
+        scoring_source: scoringSource
+      });
+      const next = await api.generateNext(iteration.id);
+      setGeneratedPath(next.json_path || next.json_filename);
+      setRenderPath(next.render_path || null);
+      setOutputJson(next.json_contents);
+      setGeneratedIterNum(next.iteration_number);
+      setGeneratedChild(next);
+      setShowGenerated(true);
+      onSaved?.();
+    } catch (err) {
+      alert(`Save & Generate failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleImport = (imported) => {
     // Store AI's original scores for delta tracking
@@ -254,13 +288,13 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
       {/* Score sliders */}
       <ScoreGroup title="Identity" fields={IDENTITY_FIELDS} scores={identity}
         onChange={isReadOnly ? undefined : (key, val) => setIdentity(prev => ({ ...prev, [key]: val }))}
-        readOnly={isReadOnly} />
+        readOnly={isReadOnly} historyScores={identityHistory} />
       <ScoreGroup title="Location" fields={LOCATION_FIELDS} scores={location}
         onChange={isReadOnly ? undefined : (key, val) => setLocation(prev => ({ ...prev, [key]: val }))}
-        readOnly={isReadOnly} />
+        readOnly={isReadOnly} historyScores={locationHistory} />
       <ScoreGroup title="Motion" fields={MOTION_FIELDS} scores={motion}
         onChange={isReadOnly ? undefined : (key, val) => setMotion(prev => ({ ...prev, [key]: val }))}
-        readOnly={isReadOnly} />
+        readOnly={isReadOnly} historyScores={motionHistory} />
 
       {/* Grand total */}
       <div className="border-t border-gray-700 pt-3 flex items-center justify-between">
@@ -311,16 +345,22 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
 
       {/* Action buttons */}
       {!isReadOnly && (
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {!isEvaluated && (
-            <button onClick={handleSave} disabled={saving}
-              className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50">
-              Save Evaluation
-            </button>
+            <>
+              <button onClick={handleSave} disabled={saving}
+                className="px-4 py-2 bg-surface-overlay text-gray-200 text-sm font-mono rounded hover:bg-gray-600 disabled:opacity-50 border border-gray-600">
+                Save Evaluation
+              </button>
+              <button onClick={handleSaveAndGenerate} disabled={saving || !attribution.rope}
+                className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50">
+                Save &amp; Generate Next
+              </button>
+            </>
           )}
           {isEvaluated && !hasChild && (
             <button onClick={handleNext} disabled={saving || !attribution.rope}
-              className="px-4 py-2 bg-surface-overlay text-gray-200 text-sm font-mono rounded hover:bg-gray-600 disabled:opacity-50 border border-gray-600">
+              className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50">
               Generate Next Iteration
             </button>
           )}

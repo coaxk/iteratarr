@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import FileBrowserModal from '../forms/FileBrowserModal';
+import { api } from '../../api';
 
 /**
  * VideoDiff — side-by-side video comparison display.
@@ -17,6 +18,7 @@ import FileBrowserModal from '../forms/FileBrowserModal';
 export default function VideoDiff({
   currentVideoPath, previousVideoPath,
   currentLabel = 'Current', previousLabel = 'Previous',
+  currentIterationId, previousIterationId,
   onCurrentPathSet, onPreviousPathSet
 }) {
   const [browsing, setBrowsing] = useState(null); // 'current' | 'previous' | null
@@ -82,8 +84,15 @@ export default function VideoDiff({
           title={`Select ${browsing === 'current' ? 'Current' : 'Previous'} Render`}
           filter=".mp4"
           onSelect={(path) => {
-            if (browsing === 'current' && onCurrentPathSet) onCurrentPathSet(path);
-            if (browsing === 'previous' && onPreviousPathSet) onPreviousPathSet(path);
+            // Persist the render path on the iteration record
+            if (browsing === 'current') {
+              if (onCurrentPathSet) onCurrentPathSet(path);
+              if (currentIterationId) api.updateIteration(currentIterationId, { render_path: path }).catch(() => {});
+            }
+            if (browsing === 'previous') {
+              if (onPreviousPathSet) onPreviousPathSet(path);
+              if (previousIterationId) api.updateIteration(previousIterationId, { render_path: path }).catch(() => {});
+            }
             setBrowsing(null);
           }}
           onClose={() => setBrowsing(null)}

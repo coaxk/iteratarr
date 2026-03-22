@@ -32,6 +32,7 @@ export const api = {
   // Iterations
   createIteration: (data) => request('/iterations', { method: 'POST', body: data }),
   getIteration: (id) => request(`/iterations/${id}`),
+  updateIteration: (id, data) => request(`/iterations/${id}`, { method: 'PATCH', body: data }),
   evaluate: (id, data) => request(`/iterations/${id}/evaluate`, { method: 'POST', body: data }),
   lock: (id) => request(`/iterations/${id}/lock`, { method: 'POST' }),
   generateNext: (id) => request(`/iterations/${id}/next`, { method: 'POST' }),

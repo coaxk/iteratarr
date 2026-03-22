@@ -13,6 +13,16 @@ import { IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, SCORE_LOCK_THRESHOLD, 
 
 const defaultScores = (fields) => Object.fromEntries(fields.map(f => [f.key, 3]));
 
+function CopyBtn({ text }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button onClick={async () => { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+      className={`px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 ${copied ? 'bg-score-high/20 text-score-high' : 'bg-surface-overlay text-gray-600 hover:text-gray-400'}`}>
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
+}
+
 export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], onSaved, onNext, onLocked, onGoToIteration }) {
   const [identity, setIdentity] = useState(defaultScores(IDENTITY_FIELDS));
   const [location, setLocation] = useState(defaultScores(LOCATION_FIELDS));
@@ -207,6 +217,8 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         previousVideoPath={previousVideoPath}
         currentLabel={`Iteration #${iteration.iteration_number}`}
         previousLabel={parentIteration ? `Iteration #${parentIteration.iteration_number}` : 'Previous'}
+        currentIterationId={iteration.id}
+        previousIterationId={parentIteration?.id}
         onCurrentPathSet={(path) => setCurrentVideoPath(path)}
         onPreviousPathSet={(path) => setPreviousVideoPath(path)}
       />
@@ -331,12 +343,31 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         />
       </div>
 
-      {/* Generated JSON output */}
-      {generatedPath && (
+      {/* Generated output info — persistent, shows on revisit via childIteration */}
+      {(generatedPath || childIteration) && (
         <div className="border border-score-high/50 bg-score-high/10 rounded p-3 space-y-2">
-          <p className="text-sm font-mono text-score-high font-bold">Next iteration JSON generated</p>
-          <p className="text-xs font-mono text-gray-300 break-all select-all">{generatedPath}</p>
-          <p className="text-xs font-mono text-gray-500">Load this file in Wan2GP to render the next iteration.</p>
+          <p className="text-sm font-mono text-score-high font-bold">
+            Next iteration {childIteration ? `#${childIteration.iteration_number}` : ''} generated
+          </p>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-gray-500 shrink-0">JSON:</span>
+              <span className="text-xs font-mono text-gray-300 break-all select-all flex-1">
+                {generatedPath || childIteration?.json_path || childIteration?.json_filename}
+              </span>
+              <CopyBtn text={generatedPath || childIteration?.json_path || childIteration?.json_filename || ''} />
+            </div>
+            {(renderPath || childIteration?.render_path) && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-gray-500 shrink-0">Render:</span>
+                <span className="text-xs font-mono text-accent break-all select-all flex-1">
+                  {renderPath || childIteration?.render_path}
+                </span>
+                <CopyBtn text={renderPath || childIteration?.render_path || ''} />
+              </div>
+            )}
+          </div>
+          <p className="text-xs font-mono text-gray-600">Load JSON in Wan2GP. Save render to the path above.</p>
           {onGoToIteration && childIteration && (
             <button
               onClick={() => onGoToIteration(childIteration)}

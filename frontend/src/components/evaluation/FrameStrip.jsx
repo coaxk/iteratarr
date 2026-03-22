@@ -28,6 +28,22 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
     api.getConfigPaths().then(p => setOutputDir(p.wan2gp_output_dir)).catch(() => {});
   }, []);
 
+  const tryExtract = async () => {
+    if (!renderPathProp || !iterationId) return false;
+    try {
+      const result = await api.extractFrames(renderPathProp, iterationId, frameCount);
+      if (result.frames?.length > 0) {
+        setFrames(result.frames);
+        if (result.frames_dir) setFramesDir(result.frames_dir);
+        setVideoPath(renderPathProp);
+        return true;
+      }
+    } catch {
+      // File doesn't exist yet — that's fine
+    }
+    return false;
+  };
+
   useEffect(() => {
     if (!iterationId) return;
     setLoading(true);
@@ -35,25 +51,31 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
     setFrames([]);
     setExpandedFrame(null);
 
+    let cancelled = false;
+    let interval = null;
+
     api.listFrames(iterationId)
       .then(async (data) => {
+        if (cancelled) return;
         if (data.frames?.length > 0) {
           setFrames(data.frames);
           if (data.frames_dir) setFramesDir(data.frames_dir);
         } else if (renderPathProp) {
-          // No frames yet but render path is known — auto-extract
-          try {
-            const result = await api.extractFrames(renderPathProp, iterationId, frameCount);
-            setFrames(result.frames || []);
-            if (result.frames_dir) setFramesDir(result.frames_dir);
-            if (renderPathProp) setVideoPath(renderPathProp);
-          } catch {
-            // Render file doesn't exist yet — that's fine, user hasn't rendered
+          const extracted = await tryExtract();
+          if (!extracted && !cancelled) {
+            // Render not ready yet — poll every 15s until it appears
+            interval = setInterval(async () => {
+              if (cancelled) return;
+              const done = await tryExtract();
+              if (done) clearInterval(interval);
+            }, 15000);
           }
         }
       })
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch(err => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; if (interval) clearInterval(interval); };
   }, [iterationId, renderPathProp]);
 
   const handleExtract = async (path) => {

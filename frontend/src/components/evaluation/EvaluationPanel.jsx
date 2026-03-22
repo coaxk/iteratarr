@@ -17,7 +17,7 @@ function CopyBtn({ text }) {
   const [copied, setCopied] = useState(false);
   return (
     <button onClick={async () => { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-      className={`px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 ${copied ? 'bg-score-high/20 text-score-high' : 'bg-surface-overlay text-gray-600 hover:text-gray-400'}`}>
+      className={`px-1.5 py-0.5 rounded text-xs font-mono shrink-0 ${copied ? 'bg-score-high/20 text-score-high' : 'bg-surface-overlay text-gray-600 hover:text-gray-400'}`}>
       {copied ? 'Copied' : 'Copy'}
     </button>
   );
@@ -304,7 +304,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
 
         {/* Ghost marker legend */}
         {(identityHistory.length > 0 || locationHistory.length > 0 || motionHistory.length > 0) && (
-          <div className="flex items-center gap-4 text-[10px] font-mono text-gray-600">
+          <div className="flex items-center gap-4 text-xs font-mono text-gray-600">
             <span>Previous scores:</span>
             <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:'#22c55e40',border:'1px solid #22c55e80'}} /> improved</span>
             <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:'#66666660',border:'1px solid #66666680'}} /> same</span>

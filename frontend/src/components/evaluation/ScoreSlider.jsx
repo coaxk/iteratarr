@@ -55,7 +55,7 @@ export default function ScoreSlider({ label, value, onChange, readOnly, ghosts }
               />
               {/* Hover tooltip */}
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10">
-                <div className="bg-surface-overlay border border-gray-600 rounded px-1.5 py-0.5 text-[10px] font-mono text-gray-300 whitespace-nowrap">
+                <div className="bg-surface-overlay border border-gray-600 rounded px-1.5 py-0.5 text-xs font-mono text-gray-300 whitespace-nowrap">
                   iter_{String(ghost.iterNum).padStart(2, '0')}: {ghost.score}
                 </div>
               </div>

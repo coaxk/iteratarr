@@ -26,7 +26,7 @@ function CopyButton({ text }) {
   return (
     <button
       onClick={handleCopy}
-      className="text-[10px] font-mono text-gray-500 hover:text-accent transition-colors"
+      className="text-xs font-mono text-gray-500 hover:text-accent transition-colors"
       title="Copy path to clipboard"
     >
       {copied ? 'copied' : 'copy'}
@@ -51,7 +51,7 @@ function QueueCard({ item }) {
 
       {/* Seed */}
       <div className="flex items-center gap-1.5">
-        <span className="text-[10px] font-mono text-gray-500">SEED</span>
+        <span className="text-xs font-mono text-gray-500">SEED</span>
         <span className="text-xs font-mono text-gray-300">{item.seed}</span>
       </div>
 
@@ -59,7 +59,7 @@ function QueueCard({ item }) {
       {loras.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {loras.map((lora, i) => (
-            <span key={i} className="text-[10px] font-mono bg-surface-overlay text-gray-400 px-1.5 py-0.5 rounded">
+            <span key={i} className="text-xs font-mono bg-surface-overlay text-gray-400 px-1.5 py-0.5 rounded">
               {typeof lora === 'string' ? lora.split('/').pop().replace('.safetensors', '') : String(lora)}
             </span>
           ))}
@@ -68,14 +68,14 @@ function QueueCard({ item }) {
 
       {/* Iteration number */}
       <div className="flex items-center gap-1.5">
-        <span className="text-[10px] font-mono text-gray-500">ITER</span>
+        <span className="text-xs font-mono text-gray-500">ITER</span>
         <span className="text-xs font-mono text-gray-300">#{item.iteration_number}</span>
       </div>
 
       {/* Production JSON path */}
       {item.production_json_path && (
         <div className="flex items-center gap-1 mt-1">
-          <span className="text-[10px] font-mono text-gray-600 truncate flex-1" title={item.production_json_path}>
+          <span className="text-xs font-mono text-gray-600 truncate flex-1" title={item.production_json_path}>
             {item.production_json_path}
           </span>
           <CopyButton text={item.production_json_path} />
@@ -108,7 +108,7 @@ export default function ProductionQueue() {
 
       {!loading && queueItems && queueItems.length > 0 && (
         <div className="space-y-2">
-          <span className="text-[10px] font-mono text-gray-500">
+          <span className="text-xs font-mono text-gray-500">
             {queueItems.length} clip{queueItems.length !== 1 ? 's' : ''} queued
           </span>
           {queueItems.map(item => (

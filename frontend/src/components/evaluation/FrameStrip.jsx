@@ -136,7 +136,7 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
                     : 'border-gray-700 group-hover:border-gray-500'
                 }`}
               />
-              <span className="absolute bottom-0.5 right-1 text-[10px] font-mono text-gray-400 bg-black/70 px-1 rounded">
+              <span className="absolute bottom-0.5 right-1 text-xs font-mono text-gray-400 bg-black/70 px-1 rounded">
                 {idx + 1}
               </span>
             </button>

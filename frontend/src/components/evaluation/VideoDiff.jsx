@@ -88,14 +88,14 @@ function VideoPanel({ label, path, side, onBrowse }) {
               {waiting ? (
                 <>
                   <span className="text-xs font-mono text-accent animate-pulse">Waiting for render to complete...</span>
-                  <span className="text-[10px] font-mono text-gray-700 break-all px-2 text-center">{path.split(/[/\\]/).pop()}</span>
-                  <span className="text-[10px] font-mono text-gray-600">Checking every 10s — will auto-load when ready</span>
-                  {pollCount > 0 && <span className="text-[10px] font-mono text-gray-700">checked {pollCount}x</span>}
+                  <span className="text-xs font-mono text-gray-700 break-all px-2 text-center">{path.split(/[/\\]/).pop()}</span>
+                  <span className="text-xs font-mono text-gray-600">Checking every 10s — will auto-load when ready</span>
+                  {pollCount > 0 && <span className="text-xs font-mono text-gray-700">checked {pollCount}x</span>}
                 </>
               ) : (
                 <>
                   <span className="text-xs font-mono text-gray-600">Render not found yet</span>
-                  <span className="text-[10px] font-mono text-gray-700 break-all px-2 text-center">{path.split(/[/\\]/).pop()}</span>
+                  <span className="text-xs font-mono text-gray-700 break-all px-2 text-center">{path.split(/[/\\]/).pop()}</span>
                 </>
               )}
               <button onClick={onBrowse} className="text-xs font-mono text-gray-600 hover:text-accent mt-1">Browse</button>

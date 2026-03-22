@@ -98,7 +98,7 @@ export default function CharacterCard({ character }) {
               <span className="text-xs font-mono text-gray-500 block mb-1">LoRA Files</span>
               {character.lora_dir && (
                 <div className="flex items-center gap-2 mb-1.5 bg-surface rounded border border-gray-700/50 px-3 py-1.5">
-                  <span className="text-[10px] font-mono text-gray-600 shrink-0">DIR:</span>
+                  <span className="text-xs font-mono text-gray-600 shrink-0">DIR:</span>
                   <span className="text-xs font-mono text-gray-400 truncate flex-1 select-all">{character.lora_dir}</span>
                   <CopyButton text={character.lora_dir} />
                 </div>

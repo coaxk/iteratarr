@@ -339,14 +339,10 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         nextFilename = `${baseName}${String(nextNum).padStart(2, '0')}.json`;
       }
 
-      // Set output_filename in the JSON so Wan2GP names/places the render correctly
-      // Try full path first (if Wan2GP respects it, render lands exactly where we want)
-      // If Wan2GP only uses the basename, the naming still matches our convention
-      if (renderPath) {
-        nextJson.output_filename = renderPath.replace(/\\/g, '/');
-      } else {
-        nextJson.output_filename = nextFilename.replace(/\.json$/, '.mp4');
-      }
+      // Set output_filename in the JSON so Wan2GP names the render to match our convention
+      // Wan2GP does NOT respect full paths — it sanitizes them into flat filenames
+      // So we just set the clean basename. User copies render to structured path after.
+      nextJson.output_filename = nextFilename.replace(/\.json$/, '');
 
       await mkdir(saveDir, { recursive: true });
       const savePath = join(saveDir, nextFilename);

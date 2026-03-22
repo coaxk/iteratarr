@@ -92,16 +92,28 @@ export default function CharacterCard({ character }) {
             <span className="text-sm font-mono text-accent font-bold">{character.trigger_word}</span>
           </div>
 
-          {/* LoRA files */}
+          {/* LoRA files with directory path */}
           {loraCount > 0 && (
             <div>
               <span className="text-xs font-mono text-gray-500 block mb-1">LoRA Files</span>
+              {character.lora_dir && (
+                <div className="flex items-center gap-2 mb-1.5 bg-surface rounded border border-gray-700/50 px-3 py-1.5">
+                  <span className="text-[10px] font-mono text-gray-600 shrink-0">DIR:</span>
+                  <span className="text-xs font-mono text-gray-400 truncate flex-1 select-all">{character.lora_dir}</span>
+                  <CopyButton text={character.lora_dir} />
+                </div>
+              )}
               <div className="space-y-1">
-                {character.lora_files.map((file, i) => (
-                  <div key={i} className="text-xs font-mono text-gray-400 bg-surface rounded px-3 py-1.5 border border-gray-700/50 truncate">
-                    {file}
-                  </div>
-                ))}
+                {character.lora_files.map((file, i) => {
+                  // Show just filename, full path on hover
+                  const filename = file.includes('/') || file.includes('\\') ? file.split(/[/\\]/).pop() : file;
+                  return (
+                    <div key={i} className="flex items-center gap-2 text-xs font-mono text-gray-400 bg-surface rounded px-3 py-1.5 border border-gray-700/50" title={file}>
+                      <span className="truncate flex-1">{filename}</span>
+                      <CopyButton text={file} />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

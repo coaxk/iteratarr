@@ -56,6 +56,7 @@ export default function CreateCharacterModal({ onCreated, onClose }) {
         name: name.trim(),
         trigger_word: triggerWord.trim(),
         lora_files: loraFiles,
+        lora_dir: loraDir || undefined,
         identity_block: identityBlock.trim() || undefined,
         negative_block: negativeBlock.trim() || undefined,
         notes: notes.trim() || undefined,

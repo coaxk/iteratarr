@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import FileBrowserModal from '../forms/FileBrowserModal';
 import { api } from '../../api';
 
@@ -22,6 +22,12 @@ export default function VideoDiff({
   onCurrentPathSet, onPreviousPathSet
 }) {
   const [browsing, setBrowsing] = useState(null); // 'current' | 'previous' | null
+  const [outputDir, setOutputDir] = useState(null);
+
+  // Fetch Wan2GP output directory for browse starting point
+  useEffect(() => {
+    api.getConfigPaths().then(p => setOutputDir(p.wan2gp_output_dir)).catch(() => {});
+  }, []);
 
   // Serve video via backend — encode the path as a query param
   const videoSrc = (path) => path ? `/api/video?path=${encodeURIComponent(path)}` : null;
@@ -83,6 +89,7 @@ export default function VideoDiff({
         <FileBrowserModal
           title={`Select ${browsing === 'current' ? 'Current' : 'Previous'} Render`}
           filter=".mp4"
+          initialPath={outputDir}
           onSelect={(path) => {
             // Persist the render path on the iteration record
             if (browsing === 'current') {

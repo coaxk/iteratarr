@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../api';
-import { CLIP_STATUSES } from '../../constants';
+import { CLIP_STATUSES, SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constants';
 import IterationLineage from './IterationLineage';
+import ScoreRing from '../evaluation/ScoreRing';
 import EvaluationPanel from '../evaluation/EvaluationPanel';
 
 export default function ClipDetail({ clip, onBack }) {
   const { data: iterations, loading, refetch } = useApi(() => api.getClipIterations(clip.id), [clip.id]);
   const [selectedIteration, setSelectedIteration] = useState(null);
+  const [liveScore, setLiveScore] = useState(null);
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
   // Find the child iteration (the one whose parent_iteration_id matches the selected)
@@ -60,17 +62,28 @@ export default function ClipDetail({ clip, onBack }) {
         </div>
       </div>
 
-      {/* Iteration lineage — horizontal chain */}
-      <div>
-        <h3 className="text-xs font-mono text-gray-500 uppercase tracking-wider mb-2">Iteration History</h3>
-        {loading ? (
-          <p className="text-gray-500 text-xs font-mono">Loading...</p>
-        ) : (
-          <IterationLineage
-            iterations={iterations || []}
-            selectedId={selectedIteration?.id}
-            onSelect={setSelectedIteration}
-          />
+      {/* Iteration lineage + score ring — persistent top bar */}
+      <div className="flex items-center gap-4">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xs font-mono text-gray-500 uppercase tracking-wider mb-1">Iteration History</h3>
+          {loading ? (
+            <p className="text-gray-500 text-xs font-mono">Loading...</p>
+          ) : (
+            <IterationLineage
+              iterations={iterations || []}
+              selectedId={selectedIteration?.id}
+              onSelect={setSelectedIteration}
+            />
+          )}
+        </div>
+        {selectedIteration && (
+          <div className="shrink-0">
+            <ScoreRing
+              score={liveScore ?? selectedIteration.evaluation?.scores?.grand_total ?? 0}
+              max={GRAND_MAX}
+              threshold={SCORE_LOCK_THRESHOLD}
+            />
+          </div>
         )}
       </div>
 
@@ -84,6 +97,7 @@ export default function ClipDetail({ clip, onBack }) {
           onSaved={refetch}
           onLocked={refetch}
           onGoToIteration={(iter) => setSelectedIteration(iter)}
+          onScoreChange={setLiveScore}
         />
       )}
     </div>

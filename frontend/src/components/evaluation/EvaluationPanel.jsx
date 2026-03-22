@@ -23,7 +23,7 @@ function CopyBtn({ text }) {
   );
 }
 
-export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], onSaved, onNext, onLocked, onGoToIteration }) {
+export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange }) {
   const [identity, setIdentity] = useState(defaultScores(IDENTITY_FIELDS));
   const [location, setLocation] = useState(defaultScores(LOCATION_FIELDS));
   const [motion, setMotion] = useState(defaultScores(MOTION_FIELDS));
@@ -84,6 +84,11 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     MOTION_FIELDS.reduce((s, f) => s + (motion[f.key] || 1), 0);
 
   const canLock = grandTotal >= SCORE_LOCK_THRESHOLD;
+
+  // Push live score up to parent for the persistent score ring
+  useEffect(() => {
+    onScoreChange?.(grandTotal);
+  }, [grandTotal]);
 
   // Build history scores for ghost markers from ancestor chain
   const buildHistory = (group) => ancestorChain
@@ -240,27 +245,21 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
       )}
 
       {/* Header with iteration info */}
-      <div className="flex items-start justify-between gap-6">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-mono text-gray-200">{iteration.json_filename}</h3>
-            {scoringSource !== 'manual' && (
-              <span className="px-1.5 py-0.5 text-xs font-mono bg-accent/10 text-accent rounded">
-                {scoringSource === 'ai_assisted' ? 'AI-Assisted' : scoringSource}
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-gray-500 font-mono mt-1">
-            Iteration {iteration.iteration_number} — Seed: {iteration.seed_used || 'none'}
-          </p>
-          {iteration.change_from_parent && (
-            <p className="text-xs text-accent font-mono mt-1 break-words">Changed: {iteration.change_from_parent}</p>
+      <div>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-mono text-gray-200">{iteration.json_filename}</h3>
+          {scoringSource !== 'manual' && (
+            <span className="px-1.5 py-0.5 text-xs font-mono bg-accent/10 text-accent rounded">
+              {scoringSource === 'ai_assisted' ? 'AI-Assisted' : scoringSource}
+            </span>
           )}
         </div>
-        {/* Score ring — prominent, breathing room */}
-        <div className="shrink-0 pt-1">
-          <ScoreRing score={grandTotal} max={GRAND_MAX} threshold={SCORE_LOCK_THRESHOLD} />
-        </div>
+        <p className="text-xs text-gray-500 font-mono mt-1">
+          Iteration {iteration.iteration_number} — Seed: {iteration.seed_used || 'none'}
+        </p>
+        {iteration.change_from_parent && (
+          <p className="text-xs text-accent font-mono mt-1 break-words">Changed: {iteration.change_from_parent}</p>
+        )}
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════

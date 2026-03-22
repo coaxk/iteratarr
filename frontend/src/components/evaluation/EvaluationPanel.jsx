@@ -287,7 +287,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         />
 
         {/* Render frame thumbnails */}
-        <FrameStrip iterationId={iteration.id} renderPath={currentVideoPath || iteration.render_path} />
+        <FrameStrip iterationId={iteration.id} renderPath={iteration.render_path} />
 
         {/* Score sliders */}
         <ScoreGroup title="Identity" fields={IDENTITY_FIELDS} scores={identity}

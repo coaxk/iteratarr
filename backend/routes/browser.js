@@ -90,9 +90,12 @@ export function createBrowserRoutes(config) {
         }
       }
 
-      // Sort: directories first, then files, alphabetical within each group
+      // Sort: directories first, then files by modified date (newest first)
       entries.sort((a, b) => {
         if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+        if (a.type === 'file' && a.modified && b.modified) {
+          return new Date(b.modified) - new Date(a.modified);
+        }
         return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
       });
 

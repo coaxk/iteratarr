@@ -20,7 +20,7 @@ function VideoPanel({ label, path, side, onBrowse }) {
 
     const interval = setInterval(() => {
       setPollCount(c => c + 1);
-    }, 30000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [path, loaded]);
@@ -63,9 +63,10 @@ function VideoPanel({ label, path, side, onBrowse }) {
             <div className="flex items-center justify-center h-32 rounded border border-dashed border-gray-700 bg-surface flex-col gap-1">
               {waiting ? (
                 <>
-                  <span className="text-xs font-mono text-accent animate-pulse">Waiting for render...</span>
+                  <span className="text-xs font-mono text-accent animate-pulse">Waiting for render to complete...</span>
                   <span className="text-[10px] font-mono text-gray-700 break-all px-2 text-center">{path.split(/[/\\]/).pop()}</span>
-                  <span className="text-[10px] font-mono text-gray-600">Auto-checking every 30s. Or browse to load manually.</span>
+                  <span className="text-[10px] font-mono text-gray-600">Checking every 10s — will auto-load when ready</span>
+                  {pollCount > 0 && <span className="text-[10px] font-mono text-gray-700">checked {pollCount}x</span>}
                 </>
               ) : (
                 <>

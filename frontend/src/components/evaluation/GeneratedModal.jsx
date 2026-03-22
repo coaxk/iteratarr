@@ -39,15 +39,15 @@ export default function GeneratedModal({ jsonPath, renderPath, iterationNumber, 
             <p className="text-xs font-mono text-gray-600 mt-1">Load this file in Wan2GP to render.</p>
           </div>
 
-          {/* Render save path */}
+          {/* Render output path */}
           {renderPath && (
             <div>
-              <label className="text-xs font-mono text-accent block mb-1">Save your render to:</label>
+              <label className="text-xs font-mono text-accent block mb-1">Your render will save to:</label>
               <div className="flex items-center gap-2 bg-surface rounded border border-accent/30 px-2 py-1.5">
                 <span className="text-xs font-mono text-accent break-all flex-1 select-all">{renderPath}</span>
                 <CopyButton text={renderPath} />
               </div>
-              <p className="text-xs font-mono text-gray-600 mt-1">Copy this path into Wan2GP's output filename so everything stays organised.</p>
+              <p className="text-xs font-mono text-gray-600 mt-1">Wan2GP will output here automatically. Iteratarr will find it.</p>
             </div>
           )}
         </div>

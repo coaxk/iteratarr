@@ -96,6 +96,13 @@ export default function FileBrowserModal({ onSelect, onClose, title = 'Browse Fi
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const formatDate = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }) + ' ' +
+           d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
       <div
@@ -179,9 +186,14 @@ export default function FileBrowserModal({ onSelect, onClose, title = 'Browse Fi
                 {entry.name}
               </span>
 
-              {/* Size (files only) */}
+              {/* Date + Size (files only) */}
+              {entry.type === 'file' && entry.modified && (
+                <span className="text-xs font-mono text-gray-600 flex-shrink-0">
+                  {formatDate(entry.modified)}
+                </span>
+              )}
               {entry.type === 'file' && entry.size != null && (
-                <span className="text-xs font-mono text-gray-500 flex-shrink-0">
+                <span className="text-xs font-mono text-gray-500 flex-shrink-0 w-16 text-right">
                   {formatSize(entry.size)}
                 </span>
               )}

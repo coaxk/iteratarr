@@ -2,10 +2,12 @@ import { Router } from 'express';
 import { mkdir, readdir, stat } from 'fs/promises';
 import { join, resolve, basename, extname } from 'path';
 import ffmpegStatic from 'ffmpeg-static';
+import ffprobeStatic from '@ffprobe-installer/ffprobe';
 import ffmpeg from 'fluent-ffmpeg';
 
-// Point fluent-ffmpeg at the bundled binary
+// Point fluent-ffmpeg at the bundled binaries
 ffmpeg.setFfmpegPath(ffmpegStatic);
+ffmpeg.setFfprobePath(ffprobeStatic.path);
 
 /**
  * Frame extraction routes for Iteratarr.

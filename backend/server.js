@@ -31,6 +31,32 @@ app.use('/api/export', createExportRoutes(store, config));
 app.use('/api/frames', createFrameRoutes(config.iteratarr_data_dir));
 app.use('/api/browser', createBrowserRoutes(config));
 
+// Video file serving — streams MP4 files from allowed directories
+import { resolve, relative, extname } from 'path';
+import { stat as fsStat } from 'fs/promises';
+app.get('/api/video', async (req, res) => {
+  const videoPath = req.query.path;
+  if (!videoPath || typeof videoPath !== 'string') return res.status(400).json({ error: 'path required' });
+  if (videoPath.includes('..')) return res.status(403).json({ error: 'Invalid path' });
+  if (extname(videoPath).toLowerCase() !== '.mp4') return res.status(400).json({ error: 'Only .mp4 files' });
+
+  // Validate path is within allowed directories
+  const resolved = resolve(videoPath);
+  const allowedRoots = [config.project_base_dir, config.iteration_save_dir, config.wan2gp_json_dir].filter(Boolean);
+  const isAllowed = allowedRoots.some(root => {
+    const r = resolve(root);
+    return resolved.startsWith(r);
+  });
+  if (!isAllowed) return res.status(403).json({ error: 'Path outside allowed directories' });
+
+  try {
+    await fsStat(resolved);
+    res.sendFile(resolved);
+  } catch {
+    res.status(404).json({ error: 'File not found' });
+  }
+});
+
 // Production queue endpoint — lists all queued items from the production_queue collection
 app.get('/api/queue', async (req, res) => {
   try {

@@ -6,6 +6,7 @@ import JsonViewer from './JsonViewer';
 import ImportEvalModal from './ImportEvalModal';
 import JsonDiffPanel from './JsonDiffPanel';
 import FrameStrip from './FrameStrip';
+import VideoDiff from './VideoDiff';
 import GeneratedModal from './GeneratedModal';
 import { api } from '../../api';
 import { IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constants';
@@ -28,6 +29,8 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [generatedChild, setGeneratedChild] = useState(null);
   const [aiScores, setAiScores] = useState(null); // Tenzing/Claude's original scores before human adjustment
   const [scoringSource, setScoringSource] = useState('manual');
+  const [currentVideoPath, setCurrentVideoPath] = useState(null);
+  const [previousVideoPath, setPreviousVideoPath] = useState(null);
 
   const isEvaluated = !!iteration.evaluation;
   const hasChild = !!childIteration;
@@ -59,6 +62,9 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
       setOutputJson(null);
       setGeneratedPath(null);
     }
+    // Try to derive video paths from iteration data (render_path stored on iteration)
+    setCurrentVideoPath(iteration.render_path || null);
+    setPreviousVideoPath(parentIteration?.render_path || null);
   }, [iteration.id]);
 
   const grandTotal =
@@ -157,6 +163,16 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           } : null}
         />
       )}
+
+      {/* Video diff — side by side comparison with previous iteration */}
+      <VideoDiff
+        currentVideoPath={currentVideoPath}
+        previousVideoPath={previousVideoPath}
+        currentLabel={`Iteration #${iteration.iteration_number}`}
+        previousLabel={parentIteration ? `Iteration #${parentIteration.iteration_number}` : 'Previous'}
+        onCurrentPathSet={(path) => setCurrentVideoPath(path)}
+        onPreviousPathSet={(path) => setPreviousVideoPath(path)}
+      />
 
       {/* Read-only banner */}
       {isReadOnly && (

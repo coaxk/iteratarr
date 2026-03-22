@@ -161,7 +161,7 @@ export function createFrameRoutes(dataDir) {
         .filter(f => /^frame_\d{3}\.png$/.test(f))
         .sort();
 
-      res.json({ frames });
+      res.json({ frames, frames_dir: frames.length > 0 ? dir : null });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

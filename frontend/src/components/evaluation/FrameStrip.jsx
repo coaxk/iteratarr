@@ -30,7 +30,10 @@ export default function FrameStrip({ iterationId }) {
     setExpandedFrame(null);
 
     api.listFrames(iterationId)
-      .then(data => setFrames(data.frames || []))
+      .then(data => {
+        setFrames(data.frames || []);
+        if (data.frames_dir) setFramesDir(data.frames_dir);
+      })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, [iterationId]);
@@ -74,7 +77,15 @@ export default function FrameStrip({ iterationId }) {
           Render Frames
         </span>
         {frames.length > 0 && (
-          <span className="text-xs font-mono text-gray-600">{frames.length} frames</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-gray-600">{frames.length} frames</span>
+            <button
+              onClick={() => { setFrames([]); setFramesDir(null); setShowBrowser(true); }}
+              className="text-xs font-mono text-gray-600 hover:text-accent"
+            >
+              Re-extract
+            </button>
+          </div>
         )}
       </div>
 
@@ -111,7 +122,7 @@ export default function FrameStrip({ iterationId }) {
         </div>
       )}
 
-      {/* Expanded frame view */}
+      {/* Expanded frame view with navigation */}
       {expandedFrame && (
         <div className="relative">
           <img
@@ -119,12 +130,37 @@ export default function FrameStrip({ iterationId }) {
             alt="Expanded frame"
             className="w-full rounded border border-gray-700"
           />
-          <button
-            onClick={() => setExpandedFrame(null)}
-            className="absolute top-2 right-2 bg-black/70 text-gray-400 hover:text-gray-200 rounded px-2 py-0.5 text-xs font-mono"
-          >
-            Close
-          </button>
+          <div className="absolute top-2 right-2 flex gap-1">
+            <button
+              onClick={() => {
+                const idx = frames.indexOf(expandedFrame);
+                if (idx > 0) setExpandedFrame(frames[idx - 1]);
+              }}
+              disabled={frames.indexOf(expandedFrame) === 0}
+              className="bg-black/70 text-gray-400 hover:text-gray-200 disabled:text-gray-600 rounded px-2 py-0.5 text-xs font-mono"
+            >
+              ← Prev
+            </button>
+            <span className="bg-black/70 text-gray-400 rounded px-2 py-0.5 text-xs font-mono">
+              {frames.indexOf(expandedFrame) + 1}/{frames.length}
+            </span>
+            <button
+              onClick={() => {
+                const idx = frames.indexOf(expandedFrame);
+                if (idx < frames.length - 1) setExpandedFrame(frames[idx + 1]);
+              }}
+              disabled={frames.indexOf(expandedFrame) === frames.length - 1}
+              className="bg-black/70 text-gray-400 hover:text-gray-200 disabled:text-gray-600 rounded px-2 py-0.5 text-xs font-mono"
+            >
+              Next →
+            </button>
+            <button
+              onClick={() => setExpandedFrame(null)}
+              className="bg-black/70 text-gray-400 hover:text-gray-200 rounded px-2 py-0.5 text-xs font-mono"
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
 

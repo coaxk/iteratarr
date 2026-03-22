@@ -114,6 +114,23 @@ export default function AttributionPanel({ attribution, onChange, readOnly }) {
           />
         </div>
       )}
+
+      {/* Multi-field changes (next_changes object) — shows when imported */}
+      {attribution.next_changes && typeof attribution.next_changes === 'object' && (
+        <div>
+          <label className="text-xs text-gray-400 font-mono block mb-1">
+            Fields to change ({Object.keys(attribution.next_changes).length})
+          </label>
+          <div className="space-y-1.5">
+            {Object.entries(attribution.next_changes).map(([field, value]) => (
+              <div key={field} className="bg-surface rounded border border-gray-700/50 px-3 py-1.5">
+                <span className="text-xs font-mono text-accent block mb-0.5">{field}</span>
+                <p className="text-xs font-mono text-gray-400 break-words whitespace-pre-wrap">{typeof value === 'string' ? value : JSON.stringify(value)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

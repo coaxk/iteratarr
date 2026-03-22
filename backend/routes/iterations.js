@@ -348,10 +348,23 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         attribution = evaluation.attribution || {};
       }
 
-      // Apply the change from attribution
+      // Apply changes from attribution
       const nextJson = { ...parent.json_contents };
-      if (attribution.next_change_json_field && attribution.next_change_value !== undefined) {
-        nextJson[attribution.next_change_json_field] = attribution.next_change_value;
+
+      // Priority 1: next_changes object — multi-field changes (e.g. prompt + alt_prompt + negative_prompt)
+      if (attribution.next_changes && typeof attribution.next_changes === 'object') {
+        for (const [field, value] of Object.entries(attribution.next_changes)) {
+          if (field in nextJson) {
+            nextJson[field] = value;
+          }
+        }
+      }
+      // Priority 2: legacy single-field change (backward compatible)
+      else if (attribution.next_change_json_field && attribution.next_change_value !== undefined) {
+        // Only apply if it's a single field name (not comma-separated)
+        if (!attribution.next_change_json_field.includes(',') && attribution.next_change_json_field in nextJson) {
+          nextJson[attribution.next_change_json_field] = attribution.next_change_value;
+        }
       }
       // Ensure iteration mode
       nextJson.seed = parent.json_contents.seed || parent.seed_used;
@@ -361,9 +374,16 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
       const existing = await store.list('iterations', i => i.clip_id === parent.clip_id);
       const nextNum = existing.reduce((max, i) => Math.max(max, i.iteration_number || 0), 0) + 1;
 
-      const change_from_parent = attribution.next_change_json_field
-        ? `${attribution.next_change_json_field}: ${JSON.stringify(parent.json_contents[attribution.next_change_json_field])} -> ${JSON.stringify(attribution.next_change_value)}`
-        : req.body?.change_from_parent || 'manual change';
+      // Build change description
+      let change_from_parent;
+      if (attribution.next_changes && typeof attribution.next_changes === 'object') {
+        const fields = Object.keys(attribution.next_changes);
+        change_from_parent = `${fields.length} field(s) changed: ${fields.join(', ')}`;
+      } else if (attribution.next_change_json_field && attribution.next_change_value !== undefined) {
+        change_from_parent = `${attribution.next_change_json_field}: ${JSON.stringify(parent.json_contents[attribution.next_change_json_field])} -> ${JSON.stringify(attribution.next_change_value)}`;
+      } else {
+        change_from_parent = req.body?.change_from_parent || 'manual change';
+      }
 
       // Determine save path using clip paths if clip + scene are available,
       // otherwise fall back to flat iteration_save_dir

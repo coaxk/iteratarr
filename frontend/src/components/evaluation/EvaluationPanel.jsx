@@ -239,9 +239,9 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         </div>
       )}
 
-      {/* Header with iteration info, import button, and score ring */}
-      <div className="flex items-center justify-between">
-        <div>
+      {/* Header with iteration info */}
+      <div className="flex items-start justify-between gap-6">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-mono text-gray-200">{iteration.json_filename}</h3>
             {scoringSource !== 'manual' && (
@@ -250,14 +250,17 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-500 font-mono">
+          <p className="text-xs text-gray-500 font-mono mt-1">
             Iteration {iteration.iteration_number} — Seed: {iteration.seed_used || 'none'}
           </p>
           {iteration.change_from_parent && (
-            <p className="text-xs text-accent font-mono mt-1">Changed: {iteration.change_from_parent}</p>
+            <p className="text-xs text-accent font-mono mt-1 break-words">Changed: {iteration.change_from_parent}</p>
           )}
         </div>
-        <ScoreRing score={grandTotal} max={GRAND_MAX} threshold={SCORE_LOCK_THRESHOLD} />
+        {/* Score ring — prominent, breathing room */}
+        <div className="shrink-0 pt-1">
+          <ScoreRing score={grandTotal} max={GRAND_MAX} threshold={SCORE_LOCK_THRESHOLD} />
+        </div>
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════

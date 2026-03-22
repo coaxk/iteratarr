@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../../api';
 import FileBrowserModal from '../forms/FileBrowserModal';
 
@@ -21,6 +21,12 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
   const [showBrowser, setShowBrowser] = useState(false);
   const [framesDir, setFramesDir] = useState(null);
   const [copiedDir, setCopiedDir] = useState(false);
+  const [outputDir, setOutputDir] = useState(null);
+
+  // Fetch Wan2GP output dir for browse starting point
+  useEffect(() => {
+    api.getConfigPaths().then(p => setOutputDir(p.wan2gp_output_dir)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!iterationId) return;
@@ -92,7 +98,11 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-gray-600">{frames.length} frames</span>
             <button
-              onClick={() => { setFrames([]); setFramesDir(null); setShowBrowser(true); }}
+              onClick={async () => {
+                // Delete old frames from server, then browse for new render
+                try { await fetch(`/api/frames/${iterationId}`, { method: 'DELETE' }); } catch {}
+                setFrames([]); setFramesDir(null); setShowBrowser(true);
+              }}
               className="text-xs font-mono text-gray-600 hover:text-accent"
             >
               Re-extract
@@ -219,6 +229,7 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
         <FileBrowserModal
           title="Select Render File"
           filter=".mp4"
+          initialPath={outputDir}
           onSelect={handleBrowseSelect}
           onClose={() => setShowBrowser(false)}
         />

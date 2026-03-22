@@ -168,6 +168,22 @@ export function createFrameRoutes(dataDir) {
   });
 
   /**
+   * DELETE /api/frames/:iteration_id
+   * Removes all extracted frames for an iteration.
+   */
+  router.delete('/:iteration_id', async (req, res) => {
+    try {
+      const iterationId = validateIterationId(req.params.iteration_id);
+      const dir = join(framesRoot, iterationId);
+      const { rm } = await import('fs/promises');
+      await rm(dir, { recursive: true, force: true });
+      res.json({ deleted: true });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  /**
    * GET /api/frames/:iteration_id/:filename
    * Serves an individual frame PNG.
    */

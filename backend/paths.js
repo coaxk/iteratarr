@@ -17,7 +17,13 @@ import { join } from 'path';
  */
 export function getClipPaths(config, clip, scene) {
   const safeName = (name) =>
-    name.replace(/[^a-zA-Z0-9_\-. ]/g, '_').replace(/\s+/g, '-').toLowerCase();
+    name
+      .replace(/[—–]/g, '-')           // em-dash/en-dash to hyphen
+      .replace(/[^a-zA-Z0-9\-. ]/g, '') // strip everything else except alphanumeric, hyphen, dot, space
+      .replace(/\s+/g, '-')             // spaces to hyphens
+      .replace(/-+/g, '-')              // collapse multiple hyphens
+      .replace(/^-|-$/g, '')            // trim leading/trailing hyphens
+      .toLowerCase();
 
   const base = config.project_base_dir || config.iteration_save_dir;
   const episodeDir = `episode-${String(scene.episode || 1).padStart(2, '0')}`;

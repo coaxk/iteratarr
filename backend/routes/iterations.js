@@ -257,6 +257,15 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
     }
   });
 
+  router.delete('/:id', async (req, res) => {
+    try {
+      await store.delete('iterations', req.params.id);
+      res.json({ deleted: true });
+    } catch (err) {
+      res.status(404).json({ error: err.message });
+    }
+  });
+
   router.post('/:id/next', async (req, res) => {
     try {
       const parent = await store.get('iterations', req.params.id);

@@ -244,7 +244,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-mono text-gray-200">{iteration.json_filename}</h3>
-            {!isReadOnly && !isEvaluated && (
+            {!isReadOnly && !isEvaluated && !aiScores && (
               <button
                 onClick={() => setShowImport(true)}
                 className="px-2 py-0.5 text-xs font-mono bg-surface-overlay border border-gray-600 rounded text-gray-400 hover:text-accent hover:border-accent/50 transition-colors"
@@ -295,6 +295,17 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
       <ScoreGroup title="Motion" fields={MOTION_FIELDS} scores={motion}
         onChange={isReadOnly ? undefined : (key, val) => setMotion(prev => ({ ...prev, [key]: val }))}
         readOnly={isReadOnly} historyScores={motionHistory} />
+
+      {/* Ghost marker legend */}
+      {(identityHistory.length > 0 || locationHistory.length > 0 || motionHistory.length > 0) && (
+        <div className="flex items-center gap-4 text-[10px] font-mono text-gray-600">
+          <span>Previous scores:</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:'#22c55e40',border:'1px solid #22c55e80'}} /> improved</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:'#66666660',border:'1px solid #66666680'}} /> same</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:'#ef444440',border:'1px solid #ef444480'}} /> regressed</span>
+          <span className="text-gray-700">hover for details</span>
+        </div>
+      )}
 
       {/* Grand total */}
       <div className="border-t border-gray-700 pt-3 flex items-center justify-between">

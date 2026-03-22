@@ -1,0 +1,64 @@
+import { Router } from 'express';
+import { validateClip } from '../store/validators.js';
+
+export function createClipRoutes(store) {
+  const router = Router();
+
+  router.get('/', async (req, res) => {
+    const { status, scene_id, project_id } = req.query;
+    let clips = await store.list('clips');
+    if (status) clips = clips.filter(c => c.status === status);
+    if (scene_id) clips = clips.filter(c => c.scene_id === scene_id);
+    if (project_id) {
+      const scenes = await store.list('scenes', s => s.project_id === project_id);
+      const sceneIds = new Set(scenes.map(s => s.id));
+      clips = clips.filter(c => sceneIds.has(c.scene_id));
+    }
+    res.json(clips);
+  });
+
+  router.post('/', async (req, res) => {
+    try {
+      validateClip(req.body);
+      const clip = await store.create('clips', {
+        scene_id: req.body.scene_id,
+        name: req.body.name,
+        characters: req.body.characters || [],
+        location: req.body.location || '',
+        status: 'not_started',
+        locked_iteration_id: null,
+        production_json_path: null,
+        notes: req.body.notes || ''
+      });
+      res.status(201).json(clip);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  router.patch('/:id', async (req, res) => {
+    try {
+      if (req.body.status) validateClip({ scene_id: 'x', name: 'x', status: req.body.status });
+      const updated = await store.update('clips', req.params.id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(err.message.includes('not found') ? 404 : 400).json({ error: err.message });
+    }
+  });
+
+  router.get('/:id/iterations', async (req, res) => {
+    const iterations = await store.list('iterations', i => i.clip_id === req.params.id);
+    iterations.sort((a, b) => a.iteration_number - b.iteration_number);
+    // Enrich with evaluation data so UI can show scores and load existing evaluations
+    for (const iter of iterations) {
+      if (iter.evaluation_id) {
+        try {
+          iter.evaluation = await store.get('evaluations', iter.evaluation_id);
+        } catch { /* evaluation may have been deleted */ }
+      }
+    }
+    res.json(iterations);
+  });
+
+  return router;
+}

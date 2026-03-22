@@ -1,0 +1,72 @@
+import express from 'express';
+import cors from 'cors';
+import { createStore } from './store/index.js';
+import { createProjectRoutes } from './routes/projects.js';
+import { createClipRoutes } from './routes/clips.js';
+import { createIterationRoutes } from './routes/iterations.js';
+import { createCharacterRoutes } from './routes/characters.js';
+import { createExportRoutes } from './routes/export.js';
+import { createFrameRoutes } from './routes/frames.js';
+import { createBrowserRoutes } from './routes/browser.js';
+import { createWatcher } from './watcher.js';
+import config from './config.js';
+
+const store = createStore(config.iteratarr_data_dir);
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '0.1.0' }));
+app.use('/api/projects', createProjectRoutes(store));
+app.use('/api/clips', createClipRoutes(store));
+app.use('/api/iterations', createIterationRoutes(store, config));
+app.use('/api/characters', createCharacterRoutes(store));
+app.use('/api/export', createExportRoutes(store, config));
+app.use('/api/frames', createFrameRoutes(config.iteratarr_data_dir));
+app.use('/api/browser', createBrowserRoutes(config));
+
+// Production queue endpoint — lists all queued items from the production_queue collection
+app.get('/api/queue', async (req, res) => {
+  try {
+    const items = await store.list('production_queue');
+    items.sort((a, b) => new Date(b.queued_at) - new Date(a.queued_at));
+    res.json(items);
+  } catch {
+    res.json([]);
+  }
+});
+
+export { app, store };
+
+// Auto-ingest watcher
+const watcher = createWatcher(
+  [config.wan2gp_json_dir, config.iteration_save_dir].filter(Boolean),
+  async (filePath, contents) => {
+    console.log(`[Watcher] New JSON detected: ${filePath}`);
+    try {
+      await store.create('iterations', {
+        clip_id: '_unassigned',
+        iteration_number: 0,
+        json_filename: filePath.split(/[/\\]/).pop(),
+        json_path: filePath,
+        json_contents: contents,
+        seed_used: contents.seed || null,
+        status: 'pending',
+        evaluation_id: null,
+        parent_iteration_id: null,
+        change_from_parent: null
+      });
+    } catch (err) {
+      console.error('[Watcher] Failed to ingest:', err.message);
+    }
+  }
+);
+
+if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
+  watcher.start();
+  app.listen(config.port, () => {
+    console.log(`Iteratarr backend running on port ${config.port}`);
+    console.log(`Watching: ${config.wan2gp_json_dir}`);
+  });
+}

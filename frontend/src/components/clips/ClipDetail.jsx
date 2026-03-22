@@ -1,0 +1,71 @@
+import { useState } from 'react';
+import { useApi } from '../../hooks/useApi';
+import { api } from '../../api';
+import { CLIP_STATUSES } from '../../constants';
+import IterationLineage from './IterationLineage';
+import EvaluationPanel from '../evaluation/EvaluationPanel';
+
+export default function ClipDetail({ clip, onBack }) {
+  const { data: iterations, loading, refetch } = useApi(() => api.getClipIterations(clip.id), [clip.id]);
+  const [selectedIteration, setSelectedIteration] = useState(null);
+  const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
+
+  // Find the child iteration (the one whose parent_iteration_id matches the selected)
+  const childIteration = selectedIteration && iterations
+    ? iterations.find(i => i.parent_iteration_id === selectedIteration.id)
+    : null;
+
+  // Find the parent iteration (the one this iteration was derived from)
+  const parentIteration = selectedIteration?.parent_iteration_id && iterations
+    ? iterations.find(i => i.id === selectedIteration.parent_iteration_id)
+    : null;
+
+  return (
+    <div className="space-y-4">
+      {/* Back button */}
+      <button onClick={onBack} className="text-xs font-mono text-gray-500 hover:text-accent transition-colors">
+        &larr; Back to Episode Tracker
+      </button>
+
+      {/* Clip info header */}
+      <div className="border border-gray-700 rounded p-3">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-mono text-gray-200">{clip.name}</h2>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${status.color} text-black font-bold`}>
+            {status.label}
+          </span>
+        </div>
+        <div className="flex gap-4 text-xs font-mono text-gray-400">
+          {clip.location && <span>Location: {clip.location}</span>}
+          {clip.characters?.length > 0 && <span>Characters: {clip.characters.join(', ')}</span>}
+        </div>
+      </div>
+
+      {/* Iteration lineage — horizontal chain */}
+      <div>
+        <h3 className="text-xs font-mono text-gray-500 uppercase tracking-wider mb-2">Iteration History</h3>
+        {loading ? (
+          <p className="text-gray-500 text-xs font-mono">Loading...</p>
+        ) : (
+          <IterationLineage
+            iterations={iterations || []}
+            selectedId={selectedIteration?.id}
+            onSelect={setSelectedIteration}
+          />
+        )}
+      </div>
+
+      {/* Evaluation panel for the selected iteration */}
+      {selectedIteration && (
+        <EvaluationPanel
+          iteration={selectedIteration}
+          childIteration={childIteration}
+          parentIteration={parentIteration}
+          onSaved={refetch}
+          onLocked={refetch}
+          onGoToIteration={(iter) => setSelectedIteration(iter)}
+        />
+      )}
+    </div>
+  );
+}

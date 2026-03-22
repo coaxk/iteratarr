@@ -1,0 +1,285 @@
+import { useState, useEffect } from 'react';
+import ScoreGroup from './ScoreGroup';
+import ScoreRing from './ScoreRing';
+import AttributionPanel from './AttributionPanel';
+import JsonViewer from './JsonViewer';
+import ImportEvalModal from './ImportEvalModal';
+import JsonDiffPanel from './JsonDiffPanel';
+import FrameStrip from './FrameStrip';
+import { api } from '../../api';
+import { IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constants';
+
+const defaultScores = (fields) => Object.fromEntries(fields.map(f => [f.key, 3]));
+
+export default function EvaluationPanel({ iteration, childIteration, parentIteration, onSaved, onNext, onLocked, onGoToIteration }) {
+  const [identity, setIdentity] = useState(defaultScores(IDENTITY_FIELDS));
+  const [location, setLocation] = useState(defaultScores(LOCATION_FIELDS));
+  const [motion, setMotion] = useState(defaultScores(MOTION_FIELDS));
+  const [attribution, setAttribution] = useState({});
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [generatedPath, setGeneratedPath] = useState(null);
+  const [outputJson, setOutputJson] = useState(null);
+  const [showImport, setShowImport] = useState(false);
+  const [aiScores, setAiScores] = useState(null); // Tenzing/Claude's original scores before human adjustment
+  const [scoringSource, setScoringSource] = useState('manual');
+
+  const isEvaluated = !!iteration.evaluation;
+  const hasChild = !!childIteration;
+  const isReadOnly = isEvaluated && hasChild;
+
+  useEffect(() => {
+    if (iteration.evaluation) {
+      const ev = iteration.evaluation;
+      if (ev.scores?.identity) setIdentity(ev.scores.identity);
+      if (ev.scores?.location) setLocation(ev.scores.location);
+      if (ev.scores?.motion) setMotion(ev.scores.motion);
+      setAttribution(ev.attribution || {});
+      setNotes(ev.qualitative_notes || '');
+      setAiScores(ev.ai_scores || null);
+      setScoringSource(ev.scoring_source || 'manual');
+    } else {
+      setIdentity(defaultScores(IDENTITY_FIELDS));
+      setLocation(defaultScores(LOCATION_FIELDS));
+      setMotion(defaultScores(MOTION_FIELDS));
+      setAttribution({});
+      setNotes('');
+      setAiScores(null);
+      setScoringSource('manual');
+    }
+    if (childIteration) {
+      setOutputJson(childIteration.json_contents);
+      setGeneratedPath(childIteration.json_path || childIteration.json_filename);
+    } else {
+      setOutputJson(null);
+      setGeneratedPath(null);
+    }
+  }, [iteration.id]);
+
+  const grandTotal =
+    IDENTITY_FIELDS.reduce((s, f) => s + (identity[f.key] || 1), 0) +
+    LOCATION_FIELDS.reduce((s, f) => s + (location[f.key] || 1), 0) +
+    MOTION_FIELDS.reduce((s, f) => s + (motion[f.key] || 1), 0);
+
+  const canLock = grandTotal >= SCORE_LOCK_THRESHOLD;
+
+  const handleImport = (imported) => {
+    // Store AI's original scores for delta tracking
+    setAiScores({
+      identity: { ...imported.scores.identity },
+      location: { ...imported.scores.location },
+      motion: { ...imported.scores.motion }
+    });
+    // Pre-fill sliders with imported scores
+    setIdentity(prev => ({ ...prev, ...imported.scores.identity }));
+    setLocation(prev => ({ ...prev, ...imported.scores.location }));
+    setMotion(prev => ({ ...prev, ...imported.scores.motion }));
+    // Pre-fill attribution and notes
+    if (imported.attribution) setAttribution(imported.attribution);
+    if (imported.qualitative_notes) setNotes(imported.qualitative_notes);
+    setScoringSource(imported.scoring_source || 'ai_assisted');
+    setShowImport(false);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.evaluate(iteration.id, {
+        scores: { identity, location, motion },
+        ai_scores: aiScores,
+        attribution,
+        qualitative_notes: notes,
+        scoring_source: scoringSource
+      });
+      onSaved?.();
+    } catch (err) {
+      alert(`Save failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleNext = async () => {
+    setSaving(true);
+    try {
+      const next = await api.generateNext(iteration.id);
+      setGeneratedPath(next.json_path || next.json_filename);
+      setOutputJson(next.json_contents);
+      onSaved?.();
+    } catch (err) {
+      alert(`Generate failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLock = async () => {
+    setSaving(true);
+    try {
+      await api.lock(iteration.id);
+      onLocked?.();
+    } catch (err) {
+      alert(`Lock failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Import modal */}
+      {showImport && (
+        <ImportEvalModal
+          onImport={handleImport}
+          onClose={() => setShowImport(false)}
+        />
+      )}
+
+      {/* Read-only banner */}
+      {isReadOnly && (
+        <div className="border border-gray-600 bg-surface-overlay rounded px-3 py-2">
+          <p className="text-xs font-mono text-gray-400">
+            This iteration has been evaluated and its next iteration generated. Viewing in read-only mode.
+          </p>
+        </div>
+      )}
+
+      {/* AI-assisted banner */}
+      {aiScores && !isReadOnly && (
+        <div className="border border-accent/30 bg-accent/5 rounded px-3 py-2">
+          <p className="text-xs font-mono text-accent">
+            AI-assisted scoring imported. Adjust any scores you disagree with before saving.
+          </p>
+        </div>
+      )}
+
+      {/* Header with iteration info, import button, and score ring */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-mono text-gray-200">{iteration.json_filename}</h3>
+            {!isReadOnly && !isEvaluated && (
+              <button
+                onClick={() => setShowImport(true)}
+                className="px-2 py-0.5 text-xs font-mono bg-surface-overlay border border-gray-600 rounded text-gray-400 hover:text-accent hover:border-accent/50 transition-colors"
+              >
+                Import Evaluation
+              </button>
+            )}
+            {scoringSource !== 'manual' && (
+              <span className="px-1.5 py-0.5 text-xs font-mono bg-accent/10 text-accent rounded">
+                {scoringSource === 'ai_assisted' ? 'AI-Assisted' : scoringSource}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 font-mono">
+            Iteration {iteration.iteration_number} — Seed: {iteration.seed_used || 'none'}
+          </p>
+          {iteration.change_from_parent && (
+            <p className="text-xs text-accent font-mono mt-1">Changed: {iteration.change_from_parent}</p>
+          )}
+        </div>
+        <ScoreRing score={grandTotal} max={GRAND_MAX} threshold={SCORE_LOCK_THRESHOLD} />
+      </div>
+
+      {/* Render frame thumbnails */}
+      <FrameStrip iterationId={iteration.id} />
+
+      {/* Input JSON */}
+      <JsonViewer
+        label={`Input JSON — settings that produced this render (${iteration.json_filename})`}
+        json={iteration.json_contents}
+      />
+
+      {/* JSON diff from parent iteration */}
+      {parentIteration && (
+        <JsonDiffPanel
+          previousJson={parentIteration.json_contents}
+          currentJson={iteration.json_contents}
+        />
+      )}
+
+      {/* Score sliders */}
+      <ScoreGroup title="Identity" fields={IDENTITY_FIELDS} scores={identity}
+        onChange={isReadOnly ? undefined : (key, val) => setIdentity(prev => ({ ...prev, [key]: val }))}
+        readOnly={isReadOnly} />
+      <ScoreGroup title="Location" fields={LOCATION_FIELDS} scores={location}
+        onChange={isReadOnly ? undefined : (key, val) => setLocation(prev => ({ ...prev, [key]: val }))}
+        readOnly={isReadOnly} />
+      <ScoreGroup title="Motion" fields={MOTION_FIELDS} scores={motion}
+        onChange={isReadOnly ? undefined : (key, val) => setMotion(prev => ({ ...prev, [key]: val }))}
+        readOnly={isReadOnly} />
+
+      {/* Grand total */}
+      <div className="border-t border-gray-700 pt-3 flex items-center justify-between">
+        <span className="text-sm font-mono text-gray-400 uppercase">Grand Total</span>
+        <span className={`text-3xl font-mono font-bold ${
+          canLock ? 'text-score-high' : grandTotal / GRAND_MAX < 0.5 ? 'text-score-low' : 'text-score-mid'
+        }`}>
+          {grandTotal}/{GRAND_MAX}
+        </span>
+      </div>
+
+      {/* Attribution */}
+      <AttributionPanel attribution={attribution} onChange={isReadOnly ? undefined : setAttribution} readOnly={isReadOnly} />
+
+      {/* Qualitative notes */}
+      <div>
+        <label className="text-xs font-mono text-gray-500 block mb-1">Qualitative Notes</label>
+        <textarea
+          value={notes} onChange={isReadOnly ? undefined : (e) => setNotes(e.target.value)}
+          readOnly={isReadOnly}
+          rows={3} placeholder="What did you notice?"
+          className={`w-full bg-surface border border-gray-600 rounded px-2 py-1.5 text-sm font-mono text-gray-200 placeholder:text-gray-600 resize-none ${isReadOnly ? 'opacity-70 cursor-not-allowed' : ''}`}
+        />
+      </div>
+
+      {/* Generated JSON output */}
+      {generatedPath && (
+        <div className="border border-score-high/50 bg-score-high/10 rounded p-3 space-y-2">
+          <p className="text-sm font-mono text-score-high font-bold">Next iteration JSON generated</p>
+          <p className="text-xs font-mono text-gray-300 break-all select-all">{generatedPath}</p>
+          <p className="text-xs font-mono text-gray-500">Load this file in Wan2GP to render the next iteration.</p>
+          {onGoToIteration && childIteration && (
+            <button
+              onClick={() => onGoToIteration(childIteration)}
+              className="mt-1 px-3 py-1.5 bg-accent text-black text-xs font-mono font-bold rounded hover:bg-accent/90"
+            >
+              Go to Iteration #{childIteration.iteration_number} &rarr;
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Output JSON */}
+      <JsonViewer
+        label="Output JSON — settings for the next iteration"
+        json={outputJson}
+      />
+
+      {/* Action buttons */}
+      {!isReadOnly && (
+        <div className="flex gap-2">
+          {!isEvaluated && (
+            <button onClick={handleSave} disabled={saving}
+              className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50">
+              Save Evaluation
+            </button>
+          )}
+          {isEvaluated && !hasChild && (
+            <button onClick={handleNext} disabled={saving || !attribution.rope}
+              className="px-4 py-2 bg-surface-overlay text-gray-200 text-sm font-mono rounded hover:bg-gray-600 disabled:opacity-50 border border-gray-600">
+              Generate Next Iteration
+            </button>
+          )}
+          {canLock && !hasChild && (
+            <button onClick={handleLock} disabled={saving}
+              className="px-4 py-2 bg-score-high text-black text-sm font-mono font-bold rounded hover:bg-green-400 disabled:opacity-50">
+              Lock as Production
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

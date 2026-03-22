@@ -51,6 +51,7 @@ export function createBrowserRoutes(config) {
     config.production_lock_dir,
     config.production_queue_dir,
     config.wan2gp_lora_dir,
+    config.wan2gp_output_dir,
   ].filter(Boolean);
 
   router.get('/', async (req, res) => {

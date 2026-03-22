@@ -329,9 +329,6 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         const paths = getClipPaths(config, clip, scene);
         saveDir = paths.iterations;
         nextFilename = basename(paths.iterationFile(nextNum));
-        renderPath = paths.renderFile(nextNum);
-        // Ensure renders directory exists
-        await mkdir(paths.renders, { recursive: true });
       } catch {
         // Clip or scene not found — fall back to flat directory
         saveDir = config.iteration_save_dir || './iterations';
@@ -339,10 +336,14 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         nextFilename = `${baseName}${String(nextNum).padStart(2, '0')}.json`;
       }
 
-      // Set output_filename in the JSON so Wan2GP names the render to match our convention
-      // Wan2GP does NOT respect full paths — it sanitizes them into flat filenames
-      // So we just set the clean basename. User copies render to structured path after.
-      nextJson.output_filename = nextFilename.replace(/\.json$/, '');
+      // Set output_filename so Wan2GP names the render to match our convention
+      // Wan2GP outputs to its own outputs/ folder with this basename
+      const renderBasename = nextFilename.replace(/\.json$/, '');
+      nextJson.output_filename = renderBasename;
+
+      // Render path points to where Wan2GP will actually put the file
+      const outputDir = config.wan2gp_output_dir || join(config.wan2gp_json_dir, 'outputs');
+      renderPath = join(outputDir, `${renderBasename}.mp4`);
 
       await mkdir(saveDir, { recursive: true });
       const savePath = join(saveDir, nextFilename);

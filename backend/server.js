@@ -30,6 +30,7 @@ app.patch('/api/admin/:collection/:id', async (req, res) => {
 });
 app.get('/api/config/paths', (req, res) => res.json({
   wan2gp_lora_dir: config.wan2gp_lora_dir,
+  wan2gp_output_dir: config.wan2gp_output_dir,
   project_base_dir: config.project_base_dir,
   wan2gp_json_dir: config.wan2gp_json_dir
 }));
@@ -52,7 +53,7 @@ app.get('/api/video', async (req, res) => {
 
   // Validate path is within allowed directories
   const resolved = resolve(videoPath);
-  const allowedRoots = [config.project_base_dir, config.iteration_save_dir, config.wan2gp_json_dir].filter(Boolean);
+  const allowedRoots = [config.project_base_dir, config.iteration_save_dir, config.wan2gp_json_dir, config.wan2gp_output_dir].filter(Boolean);
   const isAllowed = allowedRoots.some(root => {
     const r = resolve(root);
     return resolved.startsWith(r);

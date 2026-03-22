@@ -3,6 +3,7 @@ import EpisodeTracker from './components/kanban/EpisodeTracker';
 import ClipDetail from './components/clips/ClipDetail';
 import CharacterRegistry from './components/characters/CharacterRegistry';
 import ScoreTrendChart from './components/trends/ScoreTrendChart';
+import RopeEffectivenessChart from './components/trends/RopeEffectivenessChart';
 import CreateProjectModal from './components/forms/CreateProjectModal';
 import ProductionQueue from './components/queue/ProductionQueue';
 import { useApi } from './hooks/useApi';
@@ -40,7 +41,12 @@ function TrendsView() {
       {selectedClipId && (
         itersLoading
           ? <p className="text-gray-500 font-mono text-sm">Loading iterations...</p>
-          : <ScoreTrendChart iterations={iterations || []} />
+          : <>
+              <ScoreTrendChart iterations={iterations || []} />
+              <div className="mt-6">
+                <RopeEffectivenessChart iterations={iterations || []} />
+              </div>
+            </>
       )}
     </div>
   );

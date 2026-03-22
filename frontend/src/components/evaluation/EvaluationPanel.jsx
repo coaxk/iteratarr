@@ -211,18 +211,6 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         />
       )}
 
-      {/* Video diff — side by side comparison with previous iteration */}
-      <VideoDiff
-        currentVideoPath={currentVideoPath}
-        previousVideoPath={previousVideoPath}
-        currentLabel={`Iteration #${iteration.iteration_number}`}
-        previousLabel={parentIteration ? `Iteration #${parentIteration.iteration_number}` : 'Previous'}
-        currentIterationId={iteration.id}
-        previousIterationId={parentIteration?.id}
-        onCurrentPathSet={(path) => setCurrentVideoPath(path)}
-        onPreviousPathSet={(path) => setPreviousVideoPath(path)}
-      />
-
       {/* Read-only banner */}
       {isReadOnly && (
         <div className="border border-gray-600 bg-surface-overlay rounded px-3 py-2">
@@ -280,8 +268,74 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         <ScoreRing score={grandTotal} max={GRAND_MAX} threshold={SCORE_LOCK_THRESHOLD} />
       </div>
 
-      {/* Render frame thumbnails */}
-      <FrameStrip iterationId={iteration.id} renderPath={currentVideoPath || iteration.render_path} />
+      {/* ════════════════════════════════════════════════════════════════════
+         STAGE 1: EVALUATE — what did you see?
+         ════════════════════════════════════════════════════════════════════ */}
+      <div className="space-y-4">
+        <h4 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Evaluate</h4>
+
+        {/* Video diff — side by side comparison with previous iteration */}
+        <VideoDiff
+          currentVideoPath={currentVideoPath}
+          previousVideoPath={previousVideoPath}
+          currentLabel={`Iteration #${iteration.iteration_number}`}
+          previousLabel={parentIteration ? `Iteration #${parentIteration.iteration_number}` : 'Previous'}
+          currentIterationId={iteration.id}
+          previousIterationId={parentIteration?.id}
+          onCurrentPathSet={(path) => setCurrentVideoPath(path)}
+          onPreviousPathSet={(path) => setPreviousVideoPath(path)}
+        />
+
+        {/* Render frame thumbnails */}
+        <FrameStrip iterationId={iteration.id} renderPath={currentVideoPath || iteration.render_path} />
+
+        {/* Score sliders */}
+        <ScoreGroup title="Identity" fields={IDENTITY_FIELDS} scores={identity}
+          onChange={isReadOnly ? undefined : (key, val) => setIdentity(prev => ({ ...prev, [key]: val }))}
+          readOnly={isReadOnly} historyScores={identityHistory} />
+        <ScoreGroup title="Location" fields={LOCATION_FIELDS} scores={location}
+          onChange={isReadOnly ? undefined : (key, val) => setLocation(prev => ({ ...prev, [key]: val }))}
+          readOnly={isReadOnly} historyScores={locationHistory} />
+        <ScoreGroup title="Motion" fields={MOTION_FIELDS} scores={motion}
+          onChange={isReadOnly ? undefined : (key, val) => setMotion(prev => ({ ...prev, [key]: val }))}
+          readOnly={isReadOnly} historyScores={motionHistory} />
+
+        {/* Ghost marker legend */}
+        {(identityHistory.length > 0 || locationHistory.length > 0 || motionHistory.length > 0) && (
+          <div className="flex items-center gap-4 text-[10px] font-mono text-gray-600">
+            <span>Previous scores:</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:'#22c55e40',border:'1px solid #22c55e80'}} /> improved</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:'#66666660',border:'1px solid #66666680'}} /> same</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:'#ef444440',border:'1px solid #ef444480'}} /> regressed</span>
+            <span className="text-gray-700">hover for details</span>
+          </div>
+        )}
+
+        {/* Grand total */}
+        <div className="border-t border-gray-700 pt-3 flex items-center justify-between">
+          <span className="text-sm font-mono text-gray-400 uppercase">Grand Total</span>
+          <span className={`text-3xl font-mono font-bold ${
+            canLock ? 'text-score-high' : grandTotal / GRAND_MAX < 0.5 ? 'text-score-low' : 'text-score-mid'
+          }`}>
+            {grandTotal}/{GRAND_MAX}
+          </span>
+        </div>
+
+        {/* Qualitative notes */}
+        <div>
+          <label className="text-xs font-mono text-gray-500 block mb-1">Qualitative Notes</label>
+          <textarea
+            value={notes} onChange={isReadOnly ? undefined : (e) => setNotes(e.target.value)}
+            readOnly={isReadOnly}
+            rows={3} placeholder="What did you notice?"
+            className={`w-full bg-surface border border-gray-600 rounded px-2 py-1.5 text-sm font-mono text-gray-200 placeholder:text-gray-600 resize-none ${isReadOnly ? 'opacity-70 cursor-not-allowed' : ''}`}
+          />
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════════════
+         REFERENCE MATERIAL — input JSON and diff (between stages)
+         ════════════════════════════════════════════════════════════════════ */}
 
       {/* Input JSON */}
       <JsonViewer
@@ -297,123 +351,87 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         />
       )}
 
-      {/* Score sliders */}
-      <ScoreGroup title="Identity" fields={IDENTITY_FIELDS} scores={identity}
-        onChange={isReadOnly ? undefined : (key, val) => setIdentity(prev => ({ ...prev, [key]: val }))}
-        readOnly={isReadOnly} historyScores={identityHistory} />
-      <ScoreGroup title="Location" fields={LOCATION_FIELDS} scores={location}
-        onChange={isReadOnly ? undefined : (key, val) => setLocation(prev => ({ ...prev, [key]: val }))}
-        readOnly={isReadOnly} historyScores={locationHistory} />
-      <ScoreGroup title="Motion" fields={MOTION_FIELDS} scores={motion}
-        onChange={isReadOnly ? undefined : (key, val) => setMotion(prev => ({ ...prev, [key]: val }))}
-        readOnly={isReadOnly} historyScores={motionHistory} />
+      {/* ════════════════════════════════════════════════════════════════════
+         STAGE 2: ACT — what do you do about it?
+         ════════════════════════════════════════════════════════════════════ */}
+      <div className="border-t border-gray-700 pt-4 space-y-4">
+        <h4 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Act</h4>
 
-      {/* Ghost marker legend */}
-      {(identityHistory.length > 0 || locationHistory.length > 0 || motionHistory.length > 0) && (
-        <div className="flex items-center gap-4 text-[10px] font-mono text-gray-600">
-          <span>Previous scores:</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:'#22c55e40',border:'1px solid #22c55e80'}} /> improved</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:'#66666660',border:'1px solid #66666680'}} /> same</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:'#ef444440',border:'1px solid #ef444480'}} /> regressed</span>
-          <span className="text-gray-700">hover for details</span>
-        </div>
-      )}
+        {/* Attribution */}
+        <AttributionPanel attribution={attribution} onChange={isReadOnly ? undefined : setAttribution} readOnly={isReadOnly} />
 
-      {/* Grand total */}
-      <div className="border-t border-gray-700 pt-3 flex items-center justify-between">
-        <span className="text-sm font-mono text-gray-400 uppercase">Grand Total</span>
-        <span className={`text-3xl font-mono font-bold ${
-          canLock ? 'text-score-high' : grandTotal / GRAND_MAX < 0.5 ? 'text-score-low' : 'text-score-mid'
-        }`}>
-          {grandTotal}/{GRAND_MAX}
-        </span>
-      </div>
-
-      {/* Attribution */}
-      <AttributionPanel attribution={attribution} onChange={isReadOnly ? undefined : setAttribution} readOnly={isReadOnly} />
-
-      {/* Qualitative notes */}
-      <div>
-        <label className="text-xs font-mono text-gray-500 block mb-1">Qualitative Notes</label>
-        <textarea
-          value={notes} onChange={isReadOnly ? undefined : (e) => setNotes(e.target.value)}
-          readOnly={isReadOnly}
-          rows={3} placeholder="What did you notice?"
-          className={`w-full bg-surface border border-gray-600 rounded px-2 py-1.5 text-sm font-mono text-gray-200 placeholder:text-gray-600 resize-none ${isReadOnly ? 'opacity-70 cursor-not-allowed' : ''}`}
-        />
-      </div>
-
-      {/* Generated output info — persistent, shows on revisit via childIteration */}
-      {(generatedPath || childIteration) && (
-        <div className="border border-score-high/50 bg-score-high/10 rounded p-3 space-y-2">
-          <p className="text-sm font-mono text-score-high font-bold">
-            Next iteration {childIteration ? `#${childIteration.iteration_number}` : ''} generated
-          </p>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-gray-500 shrink-0">JSON:</span>
-              <span className="text-xs font-mono text-gray-300 break-all select-all flex-1">
-                {generatedPath || childIteration?.json_path || childIteration?.json_filename}
-              </span>
-              <CopyBtn text={generatedPath || childIteration?.json_path || childIteration?.json_filename || ''} />
-            </div>
-            {(renderPath || childIteration?.render_path) && (
+        {/* Generated output info — persistent, shows on revisit via childIteration */}
+        {(generatedPath || childIteration) && (
+          <div className="border border-score-high/50 bg-score-high/10 rounded p-3 space-y-2">
+            <p className="text-sm font-mono text-score-high font-bold">
+              Next iteration {childIteration ? `#${childIteration.iteration_number}` : ''} generated
+            </p>
+            <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-gray-500 shrink-0">Render:</span>
-                <span className="text-xs font-mono text-accent break-all select-all flex-1">
-                  {renderPath || childIteration?.render_path}
+                <span className="text-xs font-mono text-gray-500 shrink-0">JSON:</span>
+                <span className="text-xs font-mono text-gray-300 break-all select-all flex-1">
+                  {generatedPath || childIteration?.json_path || childIteration?.json_filename}
                 </span>
-                <CopyBtn text={renderPath || childIteration?.render_path || ''} />
+                <CopyBtn text={generatedPath || childIteration?.json_path || childIteration?.json_filename || ''} />
               </div>
+              {(renderPath || childIteration?.render_path) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-gray-500 shrink-0">Render:</span>
+                  <span className="text-xs font-mono text-accent break-all select-all flex-1">
+                    {renderPath || childIteration?.render_path}
+                  </span>
+                  <CopyBtn text={renderPath || childIteration?.render_path || ''} />
+                </div>
+              )}
+            </div>
+            <p className="text-xs font-mono text-gray-600">Load JSON in Wan2GP. Save render to the path above.</p>
+            {onGoToIteration && childIteration && (
+              <button
+                onClick={() => onGoToIteration(childIteration)}
+                className="mt-1 px-3 py-1.5 bg-accent text-black text-xs font-mono font-bold rounded hover:bg-accent/90"
+              >
+                Go to Iteration #{childIteration.iteration_number} &rarr;
+              </button>
             )}
           </div>
-          <p className="text-xs font-mono text-gray-600">Load JSON in Wan2GP. Save render to the path above.</p>
-          {onGoToIteration && childIteration && (
-            <button
-              onClick={() => onGoToIteration(childIteration)}
-              className="mt-1 px-3 py-1.5 bg-accent text-black text-xs font-mono font-bold rounded hover:bg-accent/90"
-            >
-              Go to Iteration #{childIteration.iteration_number} &rarr;
-            </button>
-          )}
-        </div>
-      )}
+        )}
 
-      {/* Output JSON */}
-      <JsonViewer
-        label="Output JSON — settings for the next iteration"
-        json={outputJson}
-      />
+        {/* Output JSON */}
+        <JsonViewer
+          label="Output JSON — settings for the next iteration"
+          json={outputJson}
+        />
 
-      {/* Action buttons */}
-      {!isReadOnly && (
-        <div className="flex gap-2 flex-wrap">
-          {!isEvaluated && (
-            <>
-              <button onClick={handleSave} disabled={saving}
-                className="px-4 py-2 bg-surface-overlay text-gray-200 text-sm font-mono rounded hover:bg-gray-600 disabled:opacity-50 border border-gray-600">
-                Save Evaluation
-              </button>
-              <button onClick={handleSaveAndGenerate} disabled={saving || !attribution.rope}
+        {/* Action buttons */}
+        {!isReadOnly && (
+          <div className="flex gap-2 flex-wrap">
+            {!isEvaluated && (
+              <>
+                <button onClick={handleSave} disabled={saving}
+                  className="px-4 py-2 bg-surface-overlay text-gray-200 text-sm font-mono rounded hover:bg-gray-600 disabled:opacity-50 border border-gray-600">
+                  Save Evaluation
+                </button>
+                <button onClick={handleSaveAndGenerate} disabled={saving || !attribution.rope}
+                  className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50">
+                  Save &amp; Generate Next
+                </button>
+              </>
+            )}
+            {isEvaluated && !hasChild && (
+              <button onClick={handleNext} disabled={saving || !attribution.rope}
                 className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50">
-                Save &amp; Generate Next
+                Generate Next Iteration
               </button>
-            </>
-          )}
-          {isEvaluated && !hasChild && (
-            <button onClick={handleNext} disabled={saving || !attribution.rope}
-              className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50">
-              Generate Next Iteration
-            </button>
-          )}
-          {canLock && !hasChild && (
-            <button onClick={handleLock} disabled={saving}
-              className="px-4 py-2 bg-score-high text-black text-sm font-mono font-bold rounded hover:bg-green-400 disabled:opacity-50">
-              Lock as Production
-            </button>
-          )}
-        </div>
-      )}
+            )}
+            {canLock && !hasChild && (
+              <button onClick={handleLock} disabled={saving}
+                className="px-4 py-2 bg-score-high text-black text-sm font-mono font-bold rounded hover:bg-green-400 disabled:opacity-50">
+                Lock as Production
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

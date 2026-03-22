@@ -41,7 +41,7 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
     try {
       validateIteration(req.body);
       const existing = await store.list('iterations', i => i.clip_id === req.body.clip_id);
-      const iteration_number = existing.length + 1;
+      const iteration_number = existing.reduce((max, i) => Math.max(max, i.iteration_number || 0), 0) + 1;
 
       const iteration = await store.create('iterations', {
         clip_id: req.body.clip_id,
@@ -266,9 +266,33 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
     }
   });
 
+  router.patch('/:id', async (req, res) => {
+    try {
+      const updated = await store.update('iterations', req.params.id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(err.message.includes('not found') ? 404 : 400).json({ error: err.message });
+    }
+  });
+
   router.post('/:id/next', async (req, res) => {
     try {
       const parent = await store.get('iterations', req.params.id);
+
+      // Guardrail: check this iteration hasn't already generated a child
+      const allIterations = await store.list('iterations', i => i.clip_id === parent.clip_id);
+      const existingChild = allIterations.find(i => i.parent_iteration_id === parent.id);
+      if (existingChild) {
+        return res.status(409).json({
+          error: `Iteration #${parent.iteration_number} has already generated iteration #${existingChild.iteration_number}. Each iteration can only generate one child.`,
+          existing_child_id: existingChild.id
+        });
+      }
+
+      // Guardrail: must be evaluated before generating next
+      if (!parent.evaluation_id) {
+        return res.status(400).json({ error: 'Iteration must be evaluated before generating the next iteration' });
+      }
 
       // Get evaluation for attribution
       let attribution = {};
@@ -288,7 +312,7 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
 
       // Count existing iterations for this clip to get correct number
       const existing = await store.list('iterations', i => i.clip_id === parent.clip_id);
-      const nextNum = existing.length + 1;
+      const nextNum = existing.reduce((max, i) => Math.max(max, i.iteration_number || 0), 0) + 1;
 
       const change_from_parent = attribution.next_change_json_field
         ? `${attribution.next_change_json_field}: ${JSON.stringify(parent.json_contents[attribution.next_change_json_field])} -> ${JSON.stringify(attribution.next_change_value)}`

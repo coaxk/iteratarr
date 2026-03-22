@@ -289,12 +289,16 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
       // otherwise fall back to flat iteration_save_dir
       let saveDir;
       let nextFilename;
+      let renderPath = null;
       try {
         const clip = await store.get('clips', parent.clip_id);
         const scene = await store.get('scenes', clip.scene_id);
         const paths = getClipPaths(config, clip, scene);
         saveDir = paths.iterations;
         nextFilename = basename(paths.iterationFile(nextNum));
+        renderPath = paths.renderFile(nextNum);
+        // Ensure renders directory exists
+        await mkdir(paths.renders, { recursive: true });
       } catch {
         // Clip or scene not found — fall back to flat directory
         saveDir = config.iteration_save_dir || './iterations';
@@ -319,7 +323,7 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         change_from_parent
       });
 
-      res.status(201).json(nextIteration);
+      res.status(201).json({ ...nextIteration, render_path: renderPath });
     } catch (err) {
       res.status(err.message.includes('not found') ? 404 : 400).json({ error: err.message });
     }

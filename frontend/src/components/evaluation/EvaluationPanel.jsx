@@ -6,6 +6,7 @@ import JsonViewer from './JsonViewer';
 import ImportEvalModal from './ImportEvalModal';
 import JsonDiffPanel from './JsonDiffPanel';
 import FrameStrip from './FrameStrip';
+import GeneratedModal from './GeneratedModal';
 import { api } from '../../api';
 import { IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constants';
 
@@ -21,6 +22,10 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [generatedPath, setGeneratedPath] = useState(null);
   const [outputJson, setOutputJson] = useState(null);
   const [showImport, setShowImport] = useState(false);
+  const [showGenerated, setShowGenerated] = useState(false);
+  const [renderPath, setRenderPath] = useState(null);
+  const [generatedIterNum, setGeneratedIterNum] = useState(null);
+  const [generatedChild, setGeneratedChild] = useState(null);
   const [aiScores, setAiScores] = useState(null); // Tenzing/Claude's original scores before human adjustment
   const [scoringSource, setScoringSource] = useState('manual');
 
@@ -104,7 +109,11 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     try {
       const next = await api.generateNext(iteration.id);
       setGeneratedPath(next.json_path || next.json_filename);
+      setRenderPath(next.render_path || null);
       setOutputJson(next.json_contents);
+      setGeneratedIterNum(next.iteration_number);
+      setGeneratedChild(next);
+      setShowGenerated(true);
       onSaved?.();
     } catch (err) {
       alert(`Generate failed: ${err.message}`);
@@ -132,6 +141,20 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         <ImportEvalModal
           onImport={handleImport}
           onClose={() => setShowImport(false)}
+        />
+      )}
+
+      {/* Generated iteration modal */}
+      {showGenerated && generatedPath && (
+        <GeneratedModal
+          jsonPath={generatedPath}
+          renderPath={renderPath}
+          iterationNumber={generatedIterNum}
+          onClose={() => setShowGenerated(false)}
+          onGoToIteration={generatedChild && onGoToIteration ? () => {
+            setShowGenerated(false);
+            onGoToIteration(generatedChild);
+          } : null}
         />
       )}
 

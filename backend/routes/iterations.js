@@ -317,13 +317,14 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         json_path: savePath,
         json_contents: nextJson,
         seed_used: nextJson.seed,
+        render_path: renderPath,
         status: 'pending',
         evaluation_id: null,
         parent_iteration_id: parent.id,
         change_from_parent
       });
 
-      res.status(201).json({ ...nextIteration, render_path: renderPath });
+      res.status(201).json(nextIteration);
     } catch (err) {
       res.status(err.message.includes('not found') ? 404 : 400).json({ error: err.message });
     }

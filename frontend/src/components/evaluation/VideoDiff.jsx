@@ -45,12 +45,17 @@ export default function VideoDiff({
           muted
           className="w-full rounded border border-gray-700 bg-black"
           style={{ maxHeight: '240px' }}
+          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
         />
-      ) : (
-        <div className="flex items-center justify-center h-32 rounded border border-dashed border-gray-700 bg-surface">
-          <span className="text-xs font-mono text-gray-600">No render loaded</span>
-        </div>
-      )}
+      ) : null}
+      {/* Fallback / empty state — also shown if video fails to load */}
+      <div
+        className={`items-center justify-center h-32 rounded border border-dashed border-gray-700 bg-surface flex-col gap-1 ${path ? 'hidden' : 'flex'}`}
+      >
+        <span className="text-xs font-mono text-gray-600">{path ? 'Render not found yet' : 'No render loaded'}</span>
+        {path && <span className="text-[10px] font-mono text-gray-700 break-all px-2 text-center">{path}</span>}
+        <button onClick={onBrowse} className="text-xs font-mono text-gray-600 hover:text-accent mt-1">Browse</button>
+      </div>
     </div>
   );
 

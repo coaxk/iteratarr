@@ -244,14 +244,6 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-mono text-gray-200">{iteration.json_filename}</h3>
-            {!isReadOnly && !isEvaluated && !aiScores && (
-              <button
-                onClick={() => setShowImport(true)}
-                className="px-2 py-0.5 text-xs font-mono bg-surface-overlay border border-gray-600 rounded text-gray-400 hover:text-accent hover:border-accent/50 transition-colors"
-              >
-                Import Evaluation
-              </button>
-            )}
             {scoringSource !== 'manual' && (
               <span className="px-1.5 py-0.5 text-xs font-mono bg-accent/10 text-accent rounded">
                 {scoringSource === 'ai_assisted' ? 'AI-Assisted' : scoringSource}
@@ -288,6 +280,16 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
 
         {/* Render frame thumbnails */}
         <FrameStrip iterationId={iteration.id} renderPath={iteration.render_path} />
+
+        {/* Import evaluation — between frames and scoring */}
+        {!isReadOnly && !isEvaluated && !aiScores && (
+          <button
+            onClick={() => setShowImport(true)}
+            className="w-full py-2.5 border border-dashed border-accent/40 rounded text-sm font-mono text-accent hover:bg-accent/5 hover:border-accent/60 transition-colors"
+          >
+            Import Evaluation from Tenzing / Claude
+          </button>
+        )}
 
         {/* Score sliders */}
         <ScoreGroup title="Identity" fields={IDENTITY_FIELDS} scores={identity}

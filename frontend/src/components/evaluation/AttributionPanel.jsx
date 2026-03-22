@@ -95,7 +95,7 @@ export default function AttributionPanel({ attribution, onChange, readOnly }) {
         />
       </div>
 
-      {attribution.rope && ROPES.find(r => r.id === attribution.rope)?.field && (
+      {attribution.rope && ROPES.find(r => r.id === attribution.rope)?.field && !attribution.next_changes && (
         <div>
           <label className="text-xs text-gray-400 font-mono block mb-1">
             JSON Field: <code className="text-accent">{ROPES.find(r => r.id === attribution.rope).field}</code>

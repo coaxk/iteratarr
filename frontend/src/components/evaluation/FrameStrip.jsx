@@ -19,6 +19,8 @@ export default function FrameStrip({ iterationId }) {
   const [frameCount, setFrameCount] = useState(4);
   const [expandedFrame, setExpandedFrame] = useState(null);
   const [showBrowser, setShowBrowser] = useState(false);
+  const [framesDir, setFramesDir] = useState(null);
+  const [copiedDir, setCopiedDir] = useState(false);
 
   useEffect(() => {
     if (!iterationId) return;
@@ -41,6 +43,7 @@ export default function FrameStrip({ iterationId }) {
     try {
       const result = await api.extractFrames(target, iterationId, frameCount);
       setFrames(result.frames || []);
+      if (result.frames_dir) setFramesDir(result.frames_dir);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -121,6 +124,26 @@ export default function FrameStrip({ iterationId }) {
             className="absolute top-2 right-2 bg-black/70 text-gray-400 hover:text-gray-200 rounded px-2 py-0.5 text-xs font-mono"
           >
             Close
+          </button>
+        </div>
+      )}
+
+      {/* Frames directory — copyable path for Claude web upload */}
+      {framesDir && frames.length > 0 && (
+        <div className="flex items-center gap-2 bg-surface rounded border border-accent/30 px-2 py-1.5">
+          <span className="text-xs font-mono text-gray-400 flex-shrink-0">Frames saved to:</span>
+          <span className="text-xs font-mono text-accent break-all flex-1 select-all">{framesDir}</span>
+          <button
+            onClick={async () => {
+              await navigator.clipboard.writeText(framesDir);
+              setCopiedDir(true);
+              setTimeout(() => setCopiedDir(false), 1500);
+            }}
+            className={`px-2 py-0.5 rounded text-xs font-mono flex-shrink-0 ${
+              copiedDir ? 'bg-score-high/20 text-score-high' : 'bg-surface-overlay text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {copiedDir ? 'Copied' : 'Copy'}
           </button>
         </div>
       )}

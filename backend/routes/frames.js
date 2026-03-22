@@ -134,7 +134,7 @@ export function createFrameRoutes(dataDir) {
         frames.push(filename);
       }
 
-      res.json({ frames, iteration_id: iterationId });
+      res.json({ frames, iteration_id: iterationId, frames_dir: outDir });
     } catch (err) {
       console.error('[Frames] Extraction error:', err.message);
       res.status(400).json({ error: err.message });

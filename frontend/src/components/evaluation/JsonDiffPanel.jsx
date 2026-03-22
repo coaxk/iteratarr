@@ -146,9 +146,9 @@ export default function JsonDiffPanel({ previousJson, currentJson }) {
         className="w-full flex items-center justify-between px-3 py-2 text-xs font-mono text-gray-400 hover:text-gray-200 transition-colors"
       >
         <span className="text-gray-500 uppercase tracking-wider">
-          Changes from previous iteration
+          Generation settings changed from previous iteration
           <span className="ml-2 text-accent normal-case tracking-normal">
-            {diffs.length} field{diffs.length !== 1 ? 's' : ''} changed
+            {diffs.length} setting{diffs.length !== 1 ? 's' : ''} differ
           </span>
         </span>
         <span className="text-gray-600">{open ? '\u25BC' : '\u25B6'}</span>

@@ -23,6 +23,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [generatedPath, setGeneratedPath] = useState(null);
   const [outputJson, setOutputJson] = useState(null);
   const [showImport, setShowImport] = useState(false);
+  const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [showGenerated, setShowGenerated] = useState(false);
   const [renderPath, setRenderPath] = useState(null);
   const [generatedIterNum, setGeneratedIterNum] = useState(null);
@@ -90,6 +91,8 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     if (imported.qualitative_notes) setNotes(imported.qualitative_notes);
     setScoringSource(imported.scoring_source || 'ai_assisted');
     setShowImport(false);
+    setShowImportConfirm(true);
+    setTimeout(() => setShowImportConfirm(false), 8000);
   };
 
   const handleSave = async () => {
@@ -183,11 +186,21 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         </div>
       )}
 
-      {/* AI-assisted banner */}
-      {aiScores && !isReadOnly && (
+      {/* Import confirmation banner — shows briefly after import */}
+      {showImportConfirm && (
+        <div className="border border-score-high/50 bg-score-high/10 rounded px-3 py-2">
+          <p className="text-sm font-mono text-score-high font-bold">Evaluation imported successfully</p>
+          <p className="text-xs font-mono text-gray-400 mt-1">
+            Scores, attribution, and notes have been pre-filled. Review and adjust anything you disagree with before saving.
+          </p>
+        </div>
+      )}
+
+      {/* AI-assisted persistent banner */}
+      {aiScores && !isReadOnly && !showImportConfirm && (
         <div className="border border-accent/30 bg-accent/5 rounded px-3 py-2">
           <p className="text-xs font-mono text-accent">
-            AI-assisted scoring imported. Adjust any scores you disagree with before saving.
+            AI-assisted scoring active — adjust any scores before saving. Your final scores are what gets recorded.
           </p>
         </div>
       )}

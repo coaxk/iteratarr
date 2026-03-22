@@ -76,15 +76,23 @@ export default function ClipDetail({ clip, onBack }) {
             />
           )}
         </div>
-        {selectedIteration && (
-          <div className="shrink-0">
-            <ScoreRing
-              score={liveScore ?? selectedIteration.evaluation?.scores?.grand_total ?? 0}
-              max={GRAND_MAX}
-              threshold={SCORE_LOCK_THRESHOLD}
-            />
-          </div>
-        )}
+        {selectedIteration && (() => {
+          const savedScore = selectedIteration.evaluation?.scores?.grand_total;
+          const hasBeenScored = savedScore !== undefined || (liveScore !== null && liveScore !== 45);
+          const displayScore = liveScore ?? savedScore ?? 0;
+          return (
+            <div className="shrink-0 flex flex-col items-center">
+              <ScoreRing
+                score={hasBeenScored ? displayScore : 0}
+                max={GRAND_MAX}
+                threshold={SCORE_LOCK_THRESHOLD}
+              />
+              {!hasBeenScored && (
+                <span className="text-xs font-mono text-gray-600 mt-1">Not scored</span>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Evaluation panel for the selected iteration */}

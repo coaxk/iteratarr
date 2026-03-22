@@ -17,7 +17,8 @@ describe('Iterations API', () => {
       production_frame_count: 81,
       iteration_save_dir: iterSaveDir,
       production_lock_dir: join(tmpDir, 'finals'),
-      production_queue_dir: join(tmpDir, 'queue')
+      production_queue_dir: join(tmpDir, 'queue'),
+      wan2gp_output_dir: join(tmpDir, 'outputs')
     });
     request = supertest(testApp.app);
     store = testApp.store;

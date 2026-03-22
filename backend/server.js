@@ -8,10 +8,13 @@ import { createCharacterRoutes } from './routes/characters.js';
 import { createExportRoutes } from './routes/export.js';
 import { createFrameRoutes } from './routes/frames.js';
 import { createBrowserRoutes } from './routes/browser.js';
+import { createTelemetryRoutes } from './routes/telemetry.js';
 import { createWatcher } from './watcher.js';
+import { createTelemetry } from './telemetry/index.js';
 import config from './config.js';
 
 const store = createStore(config.iteratarr_data_dir);
+const telemetry = createTelemetry(store, config);
 
 const app = express();
 app.use(cors());
@@ -36,9 +39,10 @@ app.get('/api/config/paths', (req, res) => res.json({
 }));
 app.use('/api/projects', createProjectRoutes(store));
 app.use('/api/clips', createClipRoutes(store));
-app.use('/api/iterations', createIterationRoutes(store, config));
-app.use('/api/characters', createCharacterRoutes(store));
+app.use('/api/iterations', createIterationRoutes(store, config, telemetry));
+app.use('/api/characters', createCharacterRoutes(store, telemetry));
 app.use('/api/export', createExportRoutes(store, config));
+app.use('/api/telemetry', createTelemetryRoutes(telemetry, config));
 app.use('/api/frames', createFrameRoutes(config.iteratarr_data_dir));
 app.use('/api/browser', createBrowserRoutes(config));
 
@@ -79,7 +83,7 @@ app.get('/api/queue', async (req, res) => {
   }
 });
 
-export { app, store };
+export { app, store, telemetry };
 
 // Auto-ingest watcher
 const watcher = createWatcher(

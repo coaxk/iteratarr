@@ -13,6 +13,7 @@ const defaults = {
   score_lock_threshold: 65,
   iteration_frame_count: 32,
   production_frame_count: 81,
+  telemetry_enabled: false,
   port: 3847,
   project_base_dir: 'C:/Projects/kebbin-shop',
   wan2gp_lora_dir: 'C:/pinokio/api/wan2gp.git/app/loras/wan',

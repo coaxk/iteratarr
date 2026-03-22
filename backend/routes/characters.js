@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { validateCharacter } from '../store/validators.js';
+import { EVENTS } from '../telemetry/index.js';
 
-export function createCharacterRoutes(store) {
+export function createCharacterRoutes(store, telemetry = null) {
   const router = Router();
 
   router.get('/', async (req, res) => {
@@ -22,6 +23,17 @@ export function createCharacterRoutes(store) {
         best_iteration_id: null,
         notes: req.body.notes || ''
       });
+      // Telemetry: record character creation (name anonymized on export)
+      if (telemetry) {
+        telemetry.record(EVENTS.CHARACTER_CREATED, {
+          character_name: character.name,
+          lora_count: (character.lora_files || []).length,
+          has_identity_block: !!character.locked_identity_block,
+          has_negative_block: !!character.locked_negative_block,
+          has_proven_settings: Object.keys(character.proven_settings || {}).length > 0
+        });
+      }
+
       res.status(201).json(character);
     } catch (err) {
       res.status(400).json({ error: err.message });

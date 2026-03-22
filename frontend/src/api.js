@@ -56,4 +56,9 @@ export const api = {
   listFrames: (iterationId) => request(`/frames/${iterationId}`),
   extractFrames: (videoPath, iterationId, count = 4) =>
     request('/frames/extract', { method: 'POST', body: { video_path: videoPath, iteration_id: iterationId, count } }),
+
+  // Telemetry
+  getTelemetryStatus: () => request('/telemetry/status'),
+  toggleTelemetry: (enabled) => request('/telemetry/toggle', { method: 'POST', body: { enabled } }),
+  exportTelemetry: () => request('/telemetry/export'),
 };

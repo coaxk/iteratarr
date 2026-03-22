@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import EpisodeTracker from './components/kanban/EpisodeTracker';
 import ClipDetail from './components/clips/ClipDetail';
 import CharacterRegistry from './components/characters/CharacterRegistry';
@@ -52,6 +52,67 @@ function TrendsView() {
   );
 }
 
+function TelemetryToggle() {
+  const [enabled, setEnabled] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getTelemetryStatus()
+      .then(status => { setEnabled(status.enabled); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const handleToggle = async () => {
+    const newState = !enabled;
+    if (newState && !showInfo) {
+      // First time enabling — show explanation
+      setShowInfo(true);
+      return;
+    }
+    try {
+      const result = await api.toggleTelemetry(newState);
+      setEnabled(result.enabled);
+      setShowInfo(false);
+    } catch {
+      // Toggle failed — keep current state
+    }
+  };
+
+  const confirmEnable = async () => {
+    try {
+      const result = await api.toggleTelemetry(true);
+      setEnabled(result.enabled);
+      setShowInfo(false);
+    } catch {
+      setShowInfo(false);
+    }
+  };
+
+  if (loading) return null;
+
+  return (
+    <div className="px-3 py-2 border-t border-gray-700">
+      <button
+        onClick={handleToggle}
+        className="w-full flex items-center justify-between text-xs font-mono text-gray-500 hover:text-gray-400 transition-colors"
+      >
+        <span>Telemetry: {enabled ? 'On' : 'Off'}</span>
+        <span className={`w-2 h-2 rounded-full ${enabled ? 'bg-green-500' : 'bg-gray-600'}`} />
+      </button>
+      {showInfo && (
+        <div className="mt-2 p-2 rounded bg-surface text-xs text-gray-400 font-mono">
+          <p className="mb-2">Anonymous usage data helps improve recommendations for the community. No prompts, paths, or personal data collected.</p>
+          <div className="flex gap-2">
+            <button onClick={confirmEnable} className="px-2 py-1 rounded bg-accent text-black text-xs font-bold">Enable</button>
+            <button onClick={() => setShowInfo(false)} className="px-2 py-1 rounded bg-surface-overlay text-gray-400 text-xs">Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [view, setView] = useState('episodes');
   const [selectedClip, setSelectedClip] = useState(null);
@@ -91,6 +152,11 @@ export default function App() {
             >
               + New Project
             </button>
+          </div>
+
+          {/* Telemetry toggle — pushed to bottom of sidebar */}
+          <div className="mt-auto">
+            <TelemetryToggle />
           </div>
         </aside>
 

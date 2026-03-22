@@ -3,6 +3,7 @@ import { writeFile, mkdir, copyFile } from 'fs/promises';
 import { join, resolve, basename, relative } from 'path';
 import { validateIteration, validateEvaluation, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS } from '../store/validators.js';
 import { getClipPaths } from '../paths.js';
+import { EVENTS } from '../telemetry/index.js';
 
 /**
  * Validates that a resolved path is within the expected base directory.
@@ -34,7 +35,7 @@ function computeTotals(scores) {
   return { identity, location, motion, grand_total, grand_max };
 }
 
-export function createIterationRoutes(store, config = { score_lock_threshold: 65, iteration_frame_count: 32, production_frame_count: 81, iteration_save_dir: './iterations' }) {
+export function createIterationRoutes(store, config = { score_lock_threshold: 65, iteration_frame_count: 32, production_frame_count: 81, iteration_save_dir: './iterations' }, telemetry = null) {
   const router = Router();
 
   router.post('/', async (req, res) => {
@@ -123,6 +124,38 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         status: 'evaluated',
         evaluation_id: evaluation.id
       });
+
+      // Telemetry: record evaluation with scores, attribution, and generation settings
+      if (telemetry) {
+        const iterForTelemetry = await store.get('iterations', req.params.id);
+        telemetry.record(EVENTS.EVALUATION_SAVED, {
+          iteration_number: iterForTelemetry.iteration_number,
+          scores: evaluation.scores,
+          ai_scores: evaluation.ai_scores,
+          score_deltas: evaluation.score_deltas,
+          scoring_source: evaluation.scoring_source,
+          attribution: evaluation.attribution,
+          production_ready: evaluation.production_ready,
+          guidance_scale: iterForTelemetry.json_contents?.guidance_scale,
+          guidance2_scale: iterForTelemetry.json_contents?.guidance2_scale,
+          loras_multipliers: iterForTelemetry.json_contents?.loras_multipliers,
+          video_length: iterForTelemetry.json_contents?.video_length,
+          seed: iterForTelemetry.seed_used,
+          flow_shift: iterForTelemetry.json_contents?.flow_shift,
+          NAG_scale: iterForTelemetry.json_contents?.NAG_scale
+        });
+
+        // If rope attribution present, record a separate ROPE_ATTRIBUTED event
+        if (evaluation.attribution?.rope) {
+          telemetry.record(EVENTS.ROPE_ATTRIBUTED, {
+            rope: evaluation.attribution.rope,
+            confidence: evaluation.attribution.confidence,
+            lowest_element: evaluation.attribution.lowest_element,
+            scores: evaluation.scores,
+            iteration_number: iterForTelemetry.iteration_number
+          });
+        }
+      }
 
       res.status(201).json(evaluation);
     } catch (err) {
@@ -238,6 +271,20 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         locked_iteration_id: req.params.id,
         production_json_path: prodJsonPath
       });
+
+      // Telemetry: record iteration lock event
+      if (telemetry) {
+        telemetry.record(EVENTS.ITERATION_LOCKED, {
+          iteration_number: iteration.iteration_number,
+          final_score: evaluation.scores.grand_total,
+          seed: iteration.json_contents.seed || iteration.seed_used,
+          guidance_scale: iteration.json_contents?.guidance_scale,
+          guidance2_scale: iteration.json_contents?.guidance2_scale,
+          loras_multipliers: iteration.json_contents?.loras_multipliers,
+          video_length: config.production_frame_count,
+          production_ready: true
+        });
+      }
 
       res.json({
         locked: true,
@@ -362,6 +409,22 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         parent_iteration_id: parent.id,
         change_from_parent
       });
+
+      // Telemetry: record iteration generation
+      if (telemetry) {
+        telemetry.record(EVENTS.ITERATION_GENERATED, {
+          iteration_number: nextIteration.iteration_number,
+          parent_iteration_number: parent.iteration_number,
+          change_from_parent: nextIteration.change_from_parent,
+          seed: nextJson.seed,
+          guidance_scale: nextJson.guidance_scale,
+          guidance2_scale: nextJson.guidance2_scale,
+          loras_multipliers: nextJson.loras_multipliers,
+          video_length: nextJson.video_length,
+          flow_shift: nextJson.flow_shift,
+          NAG_scale: nextJson.NAG_scale
+        });
+      }
 
       res.status(201).json(nextIteration);
     } catch (err) {

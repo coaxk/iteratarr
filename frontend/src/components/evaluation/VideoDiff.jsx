@@ -24,7 +24,7 @@ function VideoPanel({ label, path, side, onBrowse }) {
     }
   };
 
-  // On mount and path change — check immediately, then poll
+  // On mount and path change — check immediately, only poll if not found
   useEffect(() => {
     if (!path) return;
     setLoaded(false);
@@ -32,29 +32,29 @@ function VideoPanel({ label, path, side, onBrowse }) {
     setPollCount(0);
 
     let cancelled = false;
+    let interval = null;
 
-    // Initial check
     checkExists().then(exists => {
       if (cancelled) return;
       if (exists) {
         setLoaded(true);
       } else {
+        // File doesn't exist yet — start polling
         setWaiting(true);
+        interval = setInterval(async () => {
+          if (cancelled) return;
+          setPollCount(c => c + 1);
+          const found = await checkExists();
+          if (found && !cancelled) {
+            setLoaded(true);
+            setWaiting(false);
+            clearInterval(interval);
+          }
+        }, 10000);
       }
     });
 
-    // Poll every 10s
-    const interval = setInterval(async () => {
-      if (cancelled) return;
-      setPollCount(c => c + 1);
-      const exists = await checkExists();
-      if (exists && !cancelled) {
-        setLoaded(true);
-        setWaiting(false);
-      }
-    }, 10000);
-
-    return () => { cancelled = true; clearInterval(interval); };
+    return () => { cancelled = true; if (interval) clearInterval(interval); };
   }, [path]);
 
   const src = videoSrc ? `${videoSrc}&_t=${pollCount}` : null;

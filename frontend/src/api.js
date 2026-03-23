@@ -64,4 +64,11 @@ export const api = {
 
   // Render tracking
   renderComplete: (id, detectedAt) => request(`/iterations/${id}/render-complete`, { method: 'POST', body: { detected_at: detectedAt } }),
+
+  // Templates
+  listTemplates: () => request('/templates'),
+  createTemplate: (data) => request('/templates', { method: 'POST', body: data }),
+  getTemplate: (id) => request(`/templates/${id}`),
+  deleteTemplate: (id) => request(`/templates/${id}`, { method: 'DELETE' }),
+  generateFromTemplate: (id, data) => request(`/templates/${id}/generate`, { method: 'POST', body: data }),
 };

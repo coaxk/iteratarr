@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { writeFile, mkdir, copyFile } from 'fs/promises';
 import { join, resolve, basename, relative } from 'path';
-import { validateIteration, validateEvaluation, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS } from '../store/validators.js';
+import { validateIteration, validateEvaluation, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, MODEL_TYPES } from '../store/validators.js';
 import { getClipPaths } from '../paths.js';
 import { EVENTS } from '../telemetry/index.js';
 
@@ -42,6 +42,22 @@ function isPathWithin(filePath, baseDir) {
   return !rel.startsWith('..') && !resolve(base, rel).includes('\0');
 }
 
+/**
+ * Normalizes model type from Wan2GP JSON fields into a canonical enum value.
+ * Wan2GP includes `model_type` (e.g. "t2v_2_2") and `type` (e.g. "WanGP v10.9875...")
+ * in its JSON. This function maps those to our MODEL_TYPES enum.
+ */
+export function normalizeModelType(jsonContents) {
+  const mt = jsonContents?.model_type || '';
+  const type = jsonContents?.type || '';
+  if (mt.includes('t2v_2_2') || type.includes('Wan2.2')) return 'wan2.2_t2v_14B';
+  if (mt.includes('t2v_2_1') || type.includes('Wan2.1')) return 'wan2.1_t2v_14B';
+  if (type.toLowerCase().includes('hunyuan')) return 'hunyuan_video';
+  if (type.toLowerCase().includes('ltx')) return 'ltx_2';
+  if (type.toLowerCase().includes('flux')) return 'flux';
+  return 'other';
+}
+
 function computeTotals(scores) {
   const identity = { ...scores.identity };
   identity.total = IDENTITY_FIELDS.reduce((sum, f) => sum + (identity[f] || 0), 0);
@@ -77,6 +93,7 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         json_path: req.body.json_path || null,
         json_contents: req.body.json_contents || {},
         seed_used: req.body.json_contents?.seed || null,
+        model_type: normalizeModelType(req.body.json_contents),
         status: 'pending',
         evaluation_id: null,
         parent_iteration_id: req.body.parent_iteration_id || null,
@@ -156,6 +173,7 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         const iterForTelemetry = await store.get('iterations', req.params.id);
         telemetry.record(EVENTS.EVALUATION_SAVED, {
           iteration_number: iterForTelemetry.iteration_number,
+          model_type: iterForTelemetry.model_type || null,
           scores: evaluation.scores,
           ai_scores: evaluation.ai_scores,
           score_deltas: evaluation.score_deltas,
@@ -178,6 +196,7 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
             confidence: evaluation.attribution.confidence,
             lowest_element: evaluation.attribution.lowest_element,
             scores: evaluation.scores,
+            model_type: iterForTelemetry.model_type || null,
             iteration_number: iterForTelemetry.iteration_number
           });
         }
@@ -528,6 +547,7 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         json_path: savePath,
         json_contents: nextJson,
         seed_used: nextJson.seed,
+        model_type: parent.model_type || normalizeModelType(nextJson),
         render_path: renderPath,
         status: 'pending',
         evaluation_id: null,

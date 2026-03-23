@@ -9,6 +9,7 @@ import { createExportRoutes } from './routes/export.js';
 import { createFrameRoutes } from './routes/frames.js';
 import { createBrowserRoutes } from './routes/browser.js';
 import { createTelemetryRoutes } from './routes/telemetry.js';
+import { createTemplateRoutes } from './routes/templates.js';
 import { createWatcher } from './watcher.js';
 import { createTelemetry } from './telemetry/index.js';
 import config from './config.js';
@@ -45,6 +46,7 @@ app.use('/api/export', createExportRoutes(store, config));
 app.use('/api/telemetry', createTelemetryRoutes(telemetry, config));
 app.use('/api/frames', createFrameRoutes(config.iteratarr_data_dir));
 app.use('/api/browser', createBrowserRoutes(config));
+app.use('/api/templates', createTemplateRoutes(store));
 
 // Video file serving — streams MP4 files from allowed directories
 import { resolve, relative, extname } from 'path';

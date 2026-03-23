@@ -7,12 +7,14 @@ import RopeEffectivenessChart from './components/trends/RopeEffectivenessChart';
 import ParameterScatterChart from './components/trends/ParameterScatterChart';
 import CreateProjectModal from './components/forms/CreateProjectModal';
 import ProductionQueue from './components/queue/ProductionQueue';
+import TemplateLibrary from './components/templates/TemplateLibrary';
 import { useApi } from './hooks/useApi';
 import { api } from './api';
 
 const VIEWS = {
   episodes: 'Episode Tracker',
   characters: 'Character Registry',
+  templates: 'Templates',
   trends: 'Score Trends'
 };
 
@@ -173,6 +175,7 @@ export default function App() {
             <ClipDetail clip={selectedClip} onBack={() => setSelectedClip(null)} />
           )}
           {view === 'characters' && <CharacterRegistry />}
+          {view === 'templates' && <TemplateLibrary />}
           {view === 'trends' && <TrendsView />}
         </main>
 

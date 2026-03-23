@@ -14,6 +14,39 @@ export const ROPES = [
   { id: 'multiple', label: 'Multiple ropes', field: null, description: 'Multiple parameters changed.' }
 ];
 
+// Model types — which AI video model produced the generation.
+export const MODEL_TYPES = [
+  { id: 'wan2.2_t2v_14B', label: 'Wan 2.2 T2V 14B' },
+  { id: 'wan2.1_t2v_14B', label: 'Wan 2.1 T2V 14B' },
+  { id: 'hunyuan_video', label: 'HunyuanVideo' },
+  { id: 'ltx_2', label: 'LTX 2' },
+  { id: 'flux', label: 'Flux' },
+  { id: 'other', label: 'Other' }
+];
+
+// Model-aware rope availability — which ropes apply per model architecture.
+// Wan2.2 has dual-DiT with phase-aware LoRA and alt_prompt for the low noise pass.
+// Wan2.1 is single-DiT: no alt_prompt, no guidance2_scale, single LoRA file.
+// Other models get a generic subset until we learn their rope mappings.
+export const MODEL_ROPE_CONFIG = {
+  'wan2.2_t2v_14B': {
+    availableRopes: ['rope_1_prompt_position', 'rope_2_attention_weighting', 'rope_3_lora_multipliers', 'rope_4a_cfg_high', 'rope_4b_cfg_low', 'rope_5_steps_skipping', 'rope_6_alt_prompt', 'bonus_flow_shift', 'bonus_nag_scale', 'bonus_sample_solver', 'multiple'],
+    notes: 'Dual-DiT architecture. Phase-aware LoRA multipliers. Alt prompt drives low noise phase.'
+  },
+  'wan2.1_t2v_14B': {
+    availableRopes: ['rope_1_prompt_position', 'rope_2_attention_weighting', 'rope_3_lora_multipliers', 'rope_4a_cfg_high', 'rope_5_steps_skipping', 'bonus_flow_shift', 'bonus_nag_scale', 'multiple'],
+    notes: 'Single-DiT. No alt_prompt. Single LoRA file. No guidance2_scale.'
+  },
+  'hunyuan_video': {
+    availableRopes: ['rope_1_prompt_position', 'rope_2_attention_weighting', 'rope_3_lora_multipliers', 'rope_4a_cfg_high', 'rope_5_steps_skipping', 'multiple'],
+    notes: 'Different LoRA format. No phase-aware multipliers.'
+  },
+  'default': {
+    availableRopes: ['rope_1_prompt_position', 'rope_2_attention_weighting', 'rope_3_lora_multipliers', 'rope_4a_cfg_high', 'rope_5_steps_skipping', 'multiple'],
+    notes: 'Generic model. Basic rope set.'
+  }
+};
+
 // Score fields — grouped by category for the evaluation panel.
 export const IDENTITY_FIELDS = [
   { key: 'face_match', label: 'Face Match Overall' },

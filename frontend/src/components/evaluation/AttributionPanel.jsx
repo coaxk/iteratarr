@@ -1,8 +1,13 @@
-import { ROPES, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, ROPE_GUIDANCE } from '../../constants';
+import { ROPES, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, ROPE_GUIDANCE, MODEL_ROPE_CONFIG } from '../../constants';
 
 const ALL_SCORE_FIELDS = [...IDENTITY_FIELDS, ...LOCATION_FIELDS, ...MOTION_FIELDS];
 
-export default function AttributionPanel({ attribution, onChange, readOnly }) {
+export default function AttributionPanel({ attribution, onChange, readOnly, modelType }) {
+  // Filter ropes by model type — fall back to all ropes if no model config exists
+  const modelConfig = modelType ? (MODEL_ROPE_CONFIG[modelType] || MODEL_ROPE_CONFIG['default']) : null;
+  const availableRopes = modelConfig
+    ? ROPES.filter(r => modelConfig.availableRopes.includes(r.id))
+    : ROPES;
   const disabled = readOnly || !onChange;
   return (
     <div className={`border border-gray-700 rounded p-3 space-y-3 ${disabled ? 'opacity-70' : ''}`}>
@@ -52,7 +57,7 @@ export default function AttributionPanel({ attribution, onChange, readOnly }) {
           className={`w-full bg-surface border border-gray-600 rounded px-2 py-1.5 text-sm font-mono text-gray-200 ${disabled ? 'cursor-not-allowed' : ''}`}
         >
           <option value="">Select rope...</option>
-          {ROPES.map(r => (
+          {availableRopes.map(r => (
             <option key={r.id} value={r.id}>{r.label}</option>
           ))}
         </select>
@@ -60,6 +65,9 @@ export default function AttributionPanel({ attribution, onChange, readOnly }) {
           <p className="text-xs text-gray-500 mt-1 font-mono">
             {ROPES.find(r => r.id === attribution.rope)?.description}
           </p>
+        )}
+        {modelConfig && (
+          <p className="text-xs text-gray-600 mt-1 font-mono">{modelConfig.notes}</p>
         )}
       </div>
 

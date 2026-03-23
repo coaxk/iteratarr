@@ -1,4 +1,12 @@
 const CLIP_STATUSES = ['not_started', 'in_progress', 'evaluating', 'locked', 'in_queue'];
+const MODEL_TYPES = [
+  'wan2.2_t2v_14B',
+  'wan2.1_t2v_14B',
+  'hunyuan_video',
+  'ltx_2',
+  'flux',
+  'other'
+];
 const IDENTITY_FIELDS = ['face_match', 'head_shape', 'jaw', 'cheekbones', 'eyes_brow', 'skin_texture', 'hair', 'frame_consistency'];
 const LOCATION_FIELDS = ['location_correct', 'lighting_correct', 'wardrobe_correct', 'geometry_correct'];
 const MOTION_FIELDS = ['action_executed', 'smoothness', 'camera_movement'];
@@ -46,4 +54,4 @@ export function validateCharacter(data) {
   requireField(data, 'trigger_word', 'trigger_word');
 }
 
-export { CLIP_STATUSES, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS };
+export { CLIP_STATUSES, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, MODEL_TYPES };

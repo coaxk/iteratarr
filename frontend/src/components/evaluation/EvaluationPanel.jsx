@@ -11,7 +11,7 @@ import VideoDiff from './VideoDiff';
 import GeneratedModal from './GeneratedModal';
 import TagInput from '../clips/TagInput';
 import { api } from '../../api';
-import { IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, SCORE_LOCK_THRESHOLD, GRAND_MAX, ROPE_CATEGORY_MAP, ROPES } from '../../constants';
+import { IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, SCORE_LOCK_THRESHOLD, GRAND_MAX, ROPE_CATEGORY_MAP, ROPES, MODEL_TYPES } from '../../constants';
 
 const defaultScores = (fields) => Object.fromEntries(fields.map(f => [f.key, 3]));
 
@@ -276,6 +276,11 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         </div>
         <p className="text-xs text-gray-500 font-mono mt-1">
           Iteration {iteration.iteration_number} — Seed: {iteration.seed_used || 'none'}
+          {iteration.model_type && iteration.model_type !== 'other' && (
+            <span className="ml-2 px-1.5 py-0.5 text-xs font-mono bg-surface-overlay text-gray-400 rounded border border-gray-700">
+              {MODEL_TYPES.find(m => m.id === iteration.model_type)?.label || iteration.model_type}
+            </span>
+          )}
         </p>
         {iteration.change_from_parent && (
           <p className="text-xs text-accent font-mono mt-1 break-words">Changed: {iteration.change_from_parent}</p>
@@ -444,7 +449,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         <h4 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Act</h4>
 
         {/* Attribution */}
-        <AttributionPanel attribution={attribution} onChange={isReadOnly ? undefined : setAttribution} readOnly={isReadOnly} />
+        <AttributionPanel attribution={attribution} onChange={isReadOnly ? undefined : setAttribution} readOnly={isReadOnly} modelType={iteration.model_type} />
 
         {/* Generated output info — persistent, shows on revisit via childIteration */}
         {(generatedPath || childIteration) && (

@@ -487,9 +487,14 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
           nextJson[attribution.next_change_json_field] = attribution.next_change_value;
         }
       }
-      // Ensure iteration mode
-      nextJson.seed = parent.json_contents.seed || parent.seed_used;
-      nextJson.video_length = config.iteration_frame_count;
+      // Ensure iteration mode — but don't overwrite if next_changes explicitly set these
+      const changedFields = attribution.next_changes ? Object.keys(attribution.next_changes) : [];
+      if (!changedFields.includes('seed')) {
+        nextJson.seed = parent.json_contents.seed || parent.seed_used;
+      }
+      if (!changedFields.includes('video_length')) {
+        nextJson.video_length = config.iteration_frame_count;
+      }
 
       // Count existing iterations for this clip to get correct number
       const existing = await store.list('iterations', i => i.clip_id === parent.clip_id);

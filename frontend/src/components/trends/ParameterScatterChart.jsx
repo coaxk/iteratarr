@@ -10,7 +10,8 @@ const X_PARAMS = [
   { key: 'flow_shift', label: 'Flow Shift' },
   { key: 'NAG_scale', label: 'NAG Scale' },
   { key: 'num_inference_steps', label: 'Steps' },
-  { key: 'video_length', label: 'Video Length' }
+  { key: 'video_length', label: 'Video Length' },
+  { key: 'render_duration', label: 'Render Duration (s)' }
 ];
 
 // Score categories available for Y axis
@@ -26,7 +27,12 @@ const Y_SCORES = [
  * For loras_multipliers, parses the first number before the semicolon.
  * Returns null if unavailable or unparseable.
  */
-function extractXValue(jsonContents, paramKey) {
+function extractXValue(jsonContents, paramKey, iteration) {
+  // render_duration lives on the iteration record, not json_contents
+  if (paramKey === 'render_duration') {
+    const dur = iteration?.render_duration_seconds;
+    return dur != null ? Math.round(dur) : null;
+  }
   if (!jsonContents) return null;
   const raw = jsonContents[paramKey];
   if (raw == null) return null;
@@ -106,7 +112,7 @@ export default function ParameterScatterChart({ iterations }) {
     const points = [];
     for (const iter of iterations) {
       if (!iter.evaluation) continue;
-      const x = extractXValue(iter.json_contents, xParam);
+      const x = extractXValue(iter.json_contents, xParam, iter);
       const y = extractYValue(iter.evaluation, yScore);
       if (x == null || y == null) continue;
       points.push({

@@ -142,6 +142,11 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
   };
 
   const handleSelectSeed = async (seed) => {
+    // Unselect — just clear local state, no API call
+    if (seed === null) {
+      setSelectedSeed(null);
+      return;
+    }
     setSelecting(true);
     try {
       const iteration = await api.selectSeed(clip.id, { seed });
@@ -333,17 +338,32 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
       {/* Guidance — where are the JSONs, what to do next */}
       {screenRecords.length > 0 && screenRecords.some(r => !r.frames || r.frames.length === 0) && (
         <div className="border border-accent/30 bg-accent/5 rounded p-3 space-y-2">
-          <p className="text-xs font-mono text-accent font-bold">Load these JSONs into Wan2GP to render:</p>
-          <div className="space-y-1 max-h-32 overflow-y-auto">
+          <p className="text-xs font-mono text-accent font-bold">Pending renders — load in Wan2GP or use Render buttons:</p>
+          <div className="space-y-1.5 max-h-40 overflow-y-auto">
             {screenRecords.filter(r => !r.frames || r.frames.length === 0).map(r => (
               <div key={r.id} className="flex items-center gap-2">
                 <span className="text-xs font-mono text-gray-400 shrink-0">Seed {r.seed}:</span>
-                <span className="text-xs font-mono text-gray-300 break-all select-all flex-1">{r.json_path}</span>
+                <span className="text-xs font-mono text-gray-300 break-all select-all flex-1 truncate" title={r.json_path}>{r.json_path}</span>
                 <button
                   onClick={async () => { await navigator.clipboard.writeText(r.json_path); }}
                   className="px-1.5 py-0.5 rounded text-xs font-mono bg-surface-overlay text-gray-600 hover:text-gray-400 shrink-0"
+                  title="Copy JSON path to clipboard"
                 >
                   Copy
+                </button>
+                <button
+                  onClick={() => handleRender(r.json_path, r.id)}
+                  className="px-1.5 py-0.5 rounded text-xs font-mono bg-accent text-black hover:bg-accent/90 shrink-0"
+                  title="Submit this seed to Wan2GP for rendering"
+                >
+                  Render
+                </button>
+                <button
+                  onClick={() => handleDelete(r.id)}
+                  className="px-1 py-0.5 rounded text-xs font-mono text-gray-600 hover:text-score-low shrink-0"
+                  title="Remove this seed from screening"
+                >
+                  ×
                 </button>
               </div>
             ))}

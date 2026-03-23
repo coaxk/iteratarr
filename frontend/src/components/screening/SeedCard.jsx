@@ -102,6 +102,7 @@ export default function SeedCard({ record, onSelect, onRate, onExpand, onDelete,
             <img
               key={filename}
               src={frameSrc(record.id, filename)}
+              title={`Frame ${idx + 1} — click to expand`}
               alt={`Frame ${idx + 1}`}
               className="h-10 w-auto rounded border border-gray-700 flex-shrink-0 cursor-pointer hover:border-gray-500 transition-colors"
               onClick={(e) => { e.stopPropagation(); }}

@@ -5,6 +5,7 @@ import { CLIP_STATUSES, SCORE_LOCK_THRESHOLD, GRAND_MAX, ROPES, IDENTITY_FIELDS,
 import IterationLineage from './IterationLineage';
 import IterationTable from './IterationTable';
 import IterationFilter, { DEFAULT_FILTERS } from './IterationFilter';
+import ComparisonView from './ComparisonView';
 import ScoreRing from '../evaluation/ScoreRing';
 import EvaluationPanel from '../evaluation/EvaluationPanel';
 
@@ -14,6 +15,9 @@ export default function ClipDetail({ clip, onBack }) {
   const [liveScore, setLiveScore] = useState(null);
   const [viewMode, setViewMode] = useState('lineage'); // 'lineage' | 'table'
   const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparedIds, setComparedIds] = useState([]);
+  const [comparisonPreselect, setComparisonPreselect] = useState(null);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalDraft, setGoalDraft] = useState(clip.goal || '');
   const [goalSaving, setGoalSaving] = useState(false);
@@ -226,6 +230,12 @@ export default function ClipDetail({ clip, onBack }) {
                 Table
               </button>
             </div>
+            <button
+              onClick={() => setShowComparison(true)}
+              className="px-2 py-0.5 text-xs font-mono border border-gray-700 rounded text-gray-500 hover:text-accent hover:border-accent/30 transition-colors"
+            >
+              Compare
+            </button>
           </div>
           {loading ? (
             <p className="text-gray-500 text-xs font-mono">Loading...</p>
@@ -241,6 +251,12 @@ export default function ClipDetail({ clip, onBack }) {
                 iterations={filteredIterations}
                 selectedId={selectedIteration?.id}
                 onSelect={setSelectedIteration}
+                comparedIds={comparedIds}
+                onComparedChange={setComparedIds}
+                onCompareSelected={(ids) => {
+                  setComparisonPreselect(ids);
+                  setShowComparison(true);
+                }}
               />
             </div>
           ) : (
@@ -281,6 +297,18 @@ export default function ClipDetail({ clip, onBack }) {
           onLocked={refetch}
           onGoToIteration={(iter) => setSelectedIteration(iter)}
           onScoreChange={setLiveScore}
+        />
+      )}
+
+      {/* Comparison modal */}
+      {showComparison && iterations && (
+        <ComparisonView
+          iterations={iterations}
+          preselect={comparisonPreselect}
+          onClose={() => {
+            setShowComparison(false);
+            setComparisonPreselect(null);
+          }}
         />
       )}
     </div>

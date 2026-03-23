@@ -51,7 +51,7 @@ const COLUMNS = [
   { key: 'created_at', label: 'Date', width: 'w-28' },
 ];
 
-export default function IterationTable({ iterations, selectedId, onSelect }) {
+export default function IterationTable({ iterations, selectedId, onSelect, comparedIds = [], onComparedChange, onCompareSelected }) {
   const [sortKey, setSortKey] = useState('iteration_number');
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -112,6 +112,9 @@ export default function IterationTable({ iterations, selectedId, onSelect }) {
       <table className="w-full text-xs font-mono border-collapse">
         <thead>
           <tr className="border-b border-gray-700">
+            {onComparedChange && (
+              <th className="w-8 px-2 py-1.5"></th>
+            )}
             {COLUMNS.map(col => (
               <th
                 key={col.key}
@@ -138,6 +141,24 @@ export default function IterationTable({ iterations, selectedId, onSelect }) {
                   isSelected ? 'bg-accent/10 border-l-2 border-l-accent/30' : ''
                 }`}
               >
+                {/* Compare checkbox */}
+                {onComparedChange && (
+                  <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={comparedIds.includes(row.iter.id)}
+                      disabled={!comparedIds.includes(row.iter.id) && comparedIds.length >= 2}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          onComparedChange([...comparedIds, row.iter.id].slice(-2));
+                        } else {
+                          onComparedChange(comparedIds.filter(id => id !== row.iter.id));
+                        }
+                      }}
+                      className="accent-accent w-3 h-3 cursor-pointer"
+                    />
+                  </td>
+                )}
                 {/* # */}
                 <td className="px-2 py-1.5 text-gray-400">#{row.iteration_number}</td>
 
@@ -186,6 +207,16 @@ export default function IterationTable({ iterations, selectedId, onSelect }) {
           })}
         </tbody>
       </table>
+      {onCompareSelected && comparedIds.length === 2 && (
+        <div className="mt-2 flex justify-end">
+          <button
+            onClick={() => onCompareSelected(comparedIds)}
+            className="px-3 py-1 text-xs font-mono font-bold bg-accent/20 text-accent border border-accent/30 rounded hover:bg-accent/30 transition-colors"
+          >
+            Compare Selected
+          </button>
+        </div>
+      )}
     </div>
   );
 }

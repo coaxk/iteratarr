@@ -298,6 +298,47 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         production_json_path: prodJsonPath
       });
 
+      // --- Step 8: Update character proven settings from locked iteration ---
+      // When an iteration is locked as production, its generation settings become
+      // the new proven baseline for each character in the clip. This closes the
+      // feedback loop: iterate -> evaluate -> lock -> proven settings auto-update.
+      const updatedCharacters = [];
+      if (clip.characters && Array.isArray(clip.characters)) {
+        for (const triggerWord of clip.characters) {
+          const matches = await store.list('characters', c => c.trigger_word === triggerWord);
+          if (matches.length > 0) {
+            const character = matches[0];
+            const provenSettings = {
+              guidance_scale: iteration.json_contents.guidance_scale,
+              guidance2_scale: iteration.json_contents.guidance2_scale,
+              loras_multipliers: iteration.json_contents.loras_multipliers || '',
+              film_grain_intensity: iteration.json_contents.film_grain_intensity,
+              film_grain_saturation: iteration.json_contents.film_grain_saturation,
+              flow_shift: iteration.json_contents.flow_shift,
+              NAG_scale: iteration.json_contents.NAG_scale,
+              num_inference_steps: iteration.json_contents.num_inference_steps,
+              seed: iteration.json_contents.seed
+            };
+
+            const characterUpdate = {
+              proven_settings: provenSettings,
+              best_iteration_id: iteration.id,
+              best_score: evaluation.scores.grand_total
+            };
+
+            // If the iteration has an alt_prompt, update the character's locked
+            // identity block — the alt_prompt that scored production-ready is the
+            // proven identity description for this character.
+            if (iteration.json_contents.alt_prompt) {
+              characterUpdate.locked_identity_block = iteration.json_contents.alt_prompt;
+            }
+
+            await store.update('characters', character.id, characterUpdate);
+            updatedCharacters.push({ id: character.id, name: character.name, trigger_word: triggerWord });
+          }
+        }
+      }
+
       // Telemetry: record iteration lock event
       if (telemetry) {
         telemetry.record(EVENTS.ITERATION_LOCKED, {
@@ -322,7 +363,8 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
           davinci_sidecar: sidecarPath
         },
         queue_record_id: queueRecord.id,
-        davinci_metadata: davinciMeta
+        davinci_metadata: davinciMeta,
+        updated_characters: updatedCharacters
       });
     } catch (err) {
       const status = err.message.includes('not found') ? 404 : 400;

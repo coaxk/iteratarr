@@ -44,6 +44,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [scoringSource, setScoringSource] = useState('manual');
   const [currentVideoPath, setCurrentVideoPath] = useState(null);
   const [previousVideoPath, setPreviousVideoPath] = useState(null);
+  const [lockCharacterUpdates, setLockCharacterUpdates] = useState(null);
 
   const isEvaluated = !!iteration.evaluation;
   const hasChild = !!childIteration;
@@ -185,7 +186,12 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const handleLock = async () => {
     setSaving(true);
     try {
-      await api.lock(iteration.id);
+      const result = await api.lock(iteration.id);
+      // Show character proven settings update notification
+      if (result.updated_characters && result.updated_characters.length > 0) {
+        setLockCharacterUpdates(result.updated_characters);
+        setTimeout(() => setLockCharacterUpdates(null), 10000);
+      }
       onLocked?.();
     } catch (err) {
       alert(`Lock failed: ${err.message}`);
@@ -224,6 +230,18 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           <p className="text-xs font-mono text-gray-400">
             This iteration has been evaluated and its next iteration generated. Viewing in read-only mode.
           </p>
+        </div>
+      )}
+
+      {/* Character proven settings update banner — shows after lock */}
+      {lockCharacterUpdates && lockCharacterUpdates.length > 0 && (
+        <div className="border border-score-high/50 bg-score-high/10 rounded px-3 py-2">
+          <p className="text-sm font-mono text-score-high font-bold">Character proven settings updated</p>
+          {lockCharacterUpdates.map((ch, i) => (
+            <p key={i} className="text-xs font-mono text-gray-400 mt-1">
+              {ch.name} ({ch.trigger_word}) — proven settings updated with locked iteration values.
+            </p>
+          ))}
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../api';
 import { CLIP_STATUSES, SCORE_LOCK_THRESHOLD, GRAND_MAX, ROPES, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS } from '../../constants';
@@ -23,6 +23,15 @@ export default function ClipDetail({ clip, onBack }) {
   const [goalSaving, setGoalSaving] = useState(false);
   const [currentGoal, setCurrentGoal] = useState(clip.goal || '');
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
+
+  // Auto-select the latest iteration when data loads
+  useEffect(() => {
+    if (iterations?.length && !selectedIteration) {
+      const latest = iterations.reduce((max, i) =>
+        (i.iteration_number || 0) > (max.iteration_number || 0) ? i : max, iterations[0]);
+      setSelectedIteration(latest);
+    }
+  }, [iterations]);
 
   const handleGoalSave = async () => {
     setGoalSaving(true);

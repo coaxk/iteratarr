@@ -65,6 +65,11 @@ export const api = {
   // Render tracking
   renderComplete: (id, detectedAt) => request(`/iterations/${id}/render-complete`, { method: 'POST', body: { detected_at: detectedAt } }),
 
+  // Wan2GP render bridge
+  getRenderStatus: () => request('/render/status'),
+  submitRender: (jsonPath) => request('/render/single', { method: 'POST', body: { json_path: jsonPath } }),
+  submitBatchRender: (data) => request('/render/batch', { method: 'POST', body: data }),
+
   // Seed Screening
   generateSeedScreen: (clipId, data) => request(`/clips/${clipId}/seed-screen`, { method: 'POST', body: data }),
   getSeedScreen: (clipId) => request(`/clips/${clipId}/seed-screen`),

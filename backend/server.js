@@ -11,6 +11,7 @@ import { createBrowserRoutes } from './routes/browser.js';
 import { createTelemetryRoutes } from './routes/telemetry.js';
 import { createTemplateRoutes } from './routes/templates.js';
 import { createSeedScreenRoutes } from './routes/seedscreen.js';
+import { createRenderRoutes } from './routes/render.js';
 import { createWatcher } from './watcher.js';
 import { createTelemetry } from './telemetry/index.js';
 import config from './config.js';
@@ -48,6 +49,7 @@ app.use('/api/telemetry', createTelemetryRoutes(telemetry, config));
 app.use('/api/frames', createFrameRoutes(config.iteratarr_data_dir));
 app.use('/api/browser', createBrowserRoutes(config));
 app.use('/api/templates', createTemplateRoutes(store));
+app.use('/api/render', createRenderRoutes(store, config));
 app.use('/api/clips', createSeedScreenRoutes(store, config));
 
 // Video file serving — streams MP4 files from allowed directories

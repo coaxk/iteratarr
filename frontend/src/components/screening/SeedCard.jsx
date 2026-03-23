@@ -35,7 +35,7 @@ export default function SeedCard({ record, onSelect, onRate, onExpand, onDelete,
 
   const handleSelect = (e) => {
     e.stopPropagation();
-    if (onSelect) onSelect(record.seed);
+    if (onSelect) onSelect(isSelected ? null : record.seed);
   };
 
   const handleDelete = (e) => {
@@ -64,7 +64,7 @@ export default function SeedCard({ record, onSelect, onRate, onExpand, onDelete,
       {/* Delete button — top-right corner */}
       <button
         onClick={handleDelete}
-        className="absolute top-1 right-1 z-10 w-5 h-5 flex items-center justify-center rounded text-xs font-mono text-gray-600 hover:text-score-low opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-1 right-1 z-10 w-5 h-5 flex items-center justify-center rounded text-xs font-mono bg-surface-overlay text-gray-500 hover:text-score-low hover:bg-score-low/10 opacity-0 group-hover:opacity-100 transition-all"
         title="Delete seed screen"
       >
         x
@@ -164,14 +164,13 @@ export default function SeedCard({ record, onSelect, onRate, onExpand, onDelete,
         {/* Select button */}
         <button
           onClick={handleSelect}
-          disabled={isSelected}
           className={`flex-1 py-1 rounded text-xs font-mono font-bold transition-colors ${
             isSelected
-              ? 'bg-accent/20 text-accent cursor-default'
+              ? 'bg-accent/20 text-accent hover:bg-score-low/20 hover:text-score-low'
               : 'bg-surface-overlay text-gray-400 hover:bg-accent hover:text-black'
           }`}
         >
-          {isSelected ? 'Selected' : 'Select'}
+          {isSelected ? 'Unselect' : 'Select'}
         </button>
       </div>
     </div>

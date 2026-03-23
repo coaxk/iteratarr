@@ -40,6 +40,7 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
 
   // Reference images
   const [referenceImages, setReferenceImages] = useState([]);
+  const [showRefImages, setShowRefImages] = useState(false);
 
   // Polling
   const pollRef = useRef(null);
@@ -351,20 +352,22 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
         </div>
       )}
 
-      {/* Reference images */}
-      <div className="border border-gray-700 rounded p-3 space-y-2">
+      {/* Reference photos — collapsible, for comparing renders against the real person */}
+      <div className="border border-gray-700/50 rounded px-3 py-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-mono text-gray-500 uppercase tracking-wide">Reference Images</span>
-          <label className="text-xs font-mono text-gray-500 hover:text-accent cursor-pointer transition-colors">
+          <button onClick={() => setShowRefImages(!showRefImages)} className="text-xs font-mono text-gray-600 hover:text-gray-400 transition-colors">
+            {showRefImages ? '\u25BC' : '\u25B6'} Reference Photos {referenceImages.length > 0 ? `(${referenceImages.length})` : ''}
+          </button>
+          <label className="text-xs font-mono text-gray-600 hover:text-accent cursor-pointer transition-colors">
             + Add
             <input type="file" accept="image/*" multiple onChange={handleReferenceImage} className="hidden" />
           </label>
         </div>
-        {referenceImages.length > 0 ? (
-          <div className="flex gap-2 overflow-x-auto pb-1">
+        {showRefImages && referenceImages.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-1 mt-2">
             {referenceImages.map((img, idx) => (
               <div key={idx} className="flex-shrink-0 relative group">
-                <img src={img.src} alt={img.name} className="h-20 w-auto rounded border border-gray-700" />
+                <img src={img.src} alt={img.name} className="h-16 w-auto rounded border border-gray-700" />
                 <button
                   onClick={() => removeReference(idx)}
                   className="absolute -top-1 -right-1 w-4 h-4 bg-gray-800 border border-gray-600 rounded-full text-xs text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
@@ -374,8 +377,6 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
               </div>
             ))}
           </div>
-        ) : (
-          <p className="text-xs font-mono text-gray-600 italic">No reference images added. Optional — helps with visual comparison.</p>
         )}
       </div>
 

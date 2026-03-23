@@ -274,6 +274,28 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
         )}
       </div>
 
+      {/* Guidance — where are the JSONs, what to do next */}
+      {screenRecords.length > 0 && screenRecords.some(r => !r.frames || r.frames.length === 0) && (
+        <div className="border border-accent/30 bg-accent/5 rounded p-3 space-y-2">
+          <p className="text-xs font-mono text-accent font-bold">Load these JSONs into Wan2GP to render:</p>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {screenRecords.filter(r => !r.frames || r.frames.length === 0).map(r => (
+              <div key={r.id} className="flex items-center gap-2">
+                <span className="text-xs font-mono text-gray-400 shrink-0">Seed {r.seed}:</span>
+                <span className="text-xs font-mono text-gray-300 break-all select-all flex-1">{r.json_path}</span>
+                <button
+                  onClick={async () => { await navigator.clipboard.writeText(r.json_path); }}
+                  className="px-1.5 py-0.5 rounded text-xs font-mono bg-surface-overlay text-gray-600 hover:text-gray-400 shrink-0"
+                >
+                  Copy
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs font-mono text-gray-500">Renders will auto-detect when complete. Checking every 10 seconds.</p>
+        </div>
+      )}
+
       {/* Reference images */}
       <div className="border border-gray-700 rounded p-3 space-y-2">
         <div className="flex items-center justify-between">

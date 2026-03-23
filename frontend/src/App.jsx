@@ -4,6 +4,7 @@ import ClipDetail from './components/clips/ClipDetail';
 import CharacterRegistry from './components/characters/CharacterRegistry';
 import ScoreTrendChart from './components/trends/ScoreTrendChart';
 import RopeEffectivenessChart from './components/trends/RopeEffectivenessChart';
+import ParameterScatterChart from './components/trends/ParameterScatterChart';
 import CreateProjectModal from './components/forms/CreateProjectModal';
 import ProductionQueue from './components/queue/ProductionQueue';
 import { useApi } from './hooks/useApi';
@@ -45,6 +46,9 @@ function TrendsView() {
               <ScoreTrendChart iterations={iterations || []} />
               <div className="mt-6">
                 <RopeEffectivenessChart iterations={iterations || []} />
+              </div>
+              <div className="mt-6 border border-gray-700 rounded-lg p-4">
+                <ParameterScatterChart iterations={iterations || []} />
               </div>
             </>
       )}

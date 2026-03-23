@@ -26,6 +26,11 @@ export default function ClipCard({ clip, onClick }) {
           <span className="font-mono font-bold text-accent">{clip.best_score}/75</span>
         )}
       </div>
+      {clip.goal && (
+        <p className="text-xs text-gray-500 truncate mt-1">
+          {clip.goal.length > 60 ? clip.goal.slice(0, 60) + '...' : clip.goal}
+        </p>
+      )}
     </button>
   );
 }

@@ -20,6 +20,7 @@ export default function CreateClipModal({ onCreated, onClose }) {
   const [sceneId, setSceneId] = useState('');
   const [characters, setCharacters] = useState('');
   const [location, setLocation] = useState('');
+  const [goal, setGoal] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -39,7 +40,8 @@ export default function CreateClipModal({ onCreated, onClose }) {
         name: name.trim(),
         scene_id: sceneId,
         characters: charArray,
-        location: location.trim() || undefined
+        location: location.trim() || undefined,
+        goal: goal.trim() || undefined
       });
       onCreated(clip);
     } catch (err) {
@@ -113,6 +115,17 @@ export default function CreateClipModal({ onCreated, onClose }) {
               onChange={(e) => setLocation(e.target.value)}
               placeholder="e.g. Workshop interior"
               className="w-full bg-surface border border-gray-600 rounded px-3 py-2 text-sm font-mono text-gray-200 placeholder:text-gray-600"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-gray-500 block mb-1">Creative Brief / Goal</label>
+            <textarea
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              placeholder="What does 'done' look like? Action, character requirements, location, mood, must-avoid..."
+              rows={3}
+              className="w-full bg-surface border border-gray-600 rounded px-3 py-2 text-sm font-mono text-gray-200 placeholder:text-gray-600 resize-y"
             />
           </div>
 

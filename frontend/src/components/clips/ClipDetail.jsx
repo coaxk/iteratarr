@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../api';
-import { CLIP_STATUSES, SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constants';
+import { CLIP_STATUSES, SCORE_LOCK_THRESHOLD, GRAND_MAX, ROPES, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS } from '../../constants';
 import IterationLineage from './IterationLineage';
 import IterationTable from './IterationTable';
+import IterationFilter, { DEFAULT_FILTERS } from './IterationFilter';
 import ScoreRing from '../evaluation/ScoreRing';
 import EvaluationPanel from '../evaluation/EvaluationPanel';
 
@@ -12,7 +13,91 @@ export default function ClipDetail({ clip, onBack }) {
   const [selectedIteration, setSelectedIteration] = useState(null);
   const [liveScore, setLiveScore] = useState(null);
   const [viewMode, setViewMode] = useState('lineage'); // 'lineage' | 'table'
+  const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalDraft, setGoalDraft] = useState(clip.goal || '');
+  const [goalSaving, setGoalSaving] = useState(false);
+  const [currentGoal, setCurrentGoal] = useState(clip.goal || '');
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
+
+  const handleGoalSave = async () => {
+    setGoalSaving(true);
+    try {
+      await api.updateClip(clip.id, { goal: goalDraft });
+      setCurrentGoal(goalDraft);
+      setEditingGoal(false);
+    } catch (err) {
+      console.error('Failed to save goal:', err);
+    } finally {
+      setGoalSaving(false);
+    }
+  };
+
+  const handleGoalCancel = () => {
+    setGoalDraft(currentGoal);
+    setEditingGoal(false);
+  };
+
+  // Compute category totals for a single iteration
+  const sumFields = (scoreGroup, fields) => {
+    if (!scoreGroup) return null;
+    return fields.reduce((s, f) => s + (scoreGroup[f.key] || 0), 0);
+  };
+
+  // Filter iterations when in table view
+  const hasAnyScoreFilter = filters.scoreMin !== null || filters.scoreMax !== null
+    || filters.identityMin !== null || filters.locationMin !== null || filters.motionMin !== null;
+
+  const filteredIterations = useMemo(() => {
+    if (!iterations) return [];
+    const hasAnyFilter = Object.values(filters).some(v => v !== null);
+    if (!hasAnyFilter) return iterations;
+
+    return iterations.filter(iter => {
+      const ev = iter.evaluation;
+      const scores = ev?.scores;
+      const isUnevaluated = !ev || !scores;
+
+      // Exclude unevaluated when any score filter is active
+      if (isUnevaluated && hasAnyScoreFilter) return false;
+
+      // Score range
+      if (filters.scoreMin !== null && (isUnevaluated || (scores.grand_total ?? 0) < filters.scoreMin)) return false;
+      if (filters.scoreMax !== null && (isUnevaluated || (scores.grand_total ?? 0) > filters.scoreMax)) return false;
+
+      // Category minimums
+      if (filters.identityMin !== null) {
+        const total = sumFields(scores?.identity, IDENTITY_FIELDS);
+        if (total === null || total < filters.identityMin) return false;
+      }
+      if (filters.locationMin !== null) {
+        const total = sumFields(scores?.location, LOCATION_FIELDS);
+        if (total === null || total < filters.locationMin) return false;
+      }
+      if (filters.motionMin !== null) {
+        const total = sumFields(scores?.motion, MOTION_FIELDS);
+        if (total === null || total < filters.motionMin) return false;
+      }
+
+      // Rope
+      if (filters.rope !== null) {
+        if ((ev?.attribution?.rope || null) !== filters.rope) return false;
+      }
+
+      // Source
+      if (filters.source !== null) {
+        if ((ev?.scoring_source || null) !== filters.source) return false;
+      }
+
+      // Tag
+      if (filters.tag !== null) {
+        const tags = iter.tags || [];
+        if (!tags.some(t => t.toLowerCase().includes(filters.tag.toLowerCase()))) return false;
+      }
+
+      return true;
+    });
+  }, [iterations, filters, hasAnyScoreFilter]);
 
   // Find the child iteration (the one whose parent_iteration_id matches the selected)
   const childIteration = selectedIteration && iterations
@@ -62,6 +147,56 @@ export default function ClipDetail({ clip, onBack }) {
           {clip.location && <span>Location: {clip.location}</span>}
           {clip.characters?.length > 0 && <span>Characters: {clip.characters.join(', ')}</span>}
         </div>
+
+        {/* Creative brief / goal */}
+        <div className="mt-3">
+          {editingGoal ? (
+            <div className="space-y-2">
+              <textarea
+                value={goalDraft}
+                onChange={(e) => setGoalDraft(e.target.value)}
+                placeholder="What does 'done' look like? Action, character requirements, location, mood, must-avoid..."
+                rows={3}
+                autoFocus
+                className="w-full bg-surface border border-gray-600 rounded px-3 py-2 text-xs font-mono text-gray-200 placeholder:text-gray-600 resize-y"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleGoalSave}
+                  disabled={goalSaving}
+                  className="px-3 py-1 bg-accent text-black text-xs font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50"
+                >
+                  {goalSaving ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={handleGoalCancel}
+                  className="px-3 py-1 text-xs font-mono text-gray-400 hover:text-gray-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : currentGoal ? (
+            <div className="flex items-start gap-2">
+              <div className="text-xs font-mono text-gray-400 border-l-2 border-accent/30 pl-3 flex-1 whitespace-pre-wrap">
+                {currentGoal}
+              </div>
+              <button
+                onClick={() => setEditingGoal(true)}
+                className="shrink-0 text-xs font-mono text-gray-500 hover:text-accent transition-colors"
+              >
+                Edit
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setEditingGoal(true)}
+              className="text-xs font-mono text-gray-600 hover:text-gray-400 transition-colors italic"
+            >
+              Add creative brief...
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Iteration lineage/table + score ring — persistent top bar */}
@@ -95,11 +230,19 @@ export default function ClipDetail({ clip, onBack }) {
           {loading ? (
             <p className="text-gray-500 text-xs font-mono">Loading...</p>
           ) : viewMode === 'table' ? (
-            <IterationTable
-              iterations={iterations || []}
-              selectedId={selectedIteration?.id}
-              onSelect={setSelectedIteration}
-            />
+            <div className="space-y-2">
+              <IterationFilter filters={filters} onChange={setFilters} ropes={ROPES} />
+              {iterations && filteredIterations.length !== iterations.length && (
+                <p className="text-xs font-mono text-gray-500">
+                  Showing {filteredIterations.length} of {iterations.length} iterations
+                </p>
+              )}
+              <IterationTable
+                iterations={filteredIterations}
+                selectedId={selectedIteration?.id}
+                onSelect={setSelectedIteration}
+              />
+            </div>
           ) : (
             <IterationLineage
               iterations={iterations || []}

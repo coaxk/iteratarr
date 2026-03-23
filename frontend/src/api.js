@@ -69,6 +69,7 @@ export const api = {
   getRenderStatus: () => request('/render/status'),
   submitRender: (jsonPath) => request('/render/single', { method: 'POST', body: { json_path: jsonPath } }),
   submitBatchRender: (data) => request('/render/batch', { method: 'POST', body: data }),
+  submitBatchPaths: (paths) => request('/render/batch', { method: 'POST', body: { json_paths: paths } }),
 
   // Seed Screening
   generateSeedScreen: (clipId, data) => request(`/clips/${clipId}/seed-screen`, { method: 'POST', body: data }),

@@ -34,6 +34,9 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
   const [selectedSeed, setSelectedSeed] = useState(null);
   const [selecting, setSelecting] = useState(false);
 
+  // Render status
+  const [renderStatus, setRenderStatus] = useState(null);
+
   // Reference images
   const [referenceImages, setReferenceImages] = useState([]);
 
@@ -259,20 +262,50 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
         &larr; Back
       </button>
 
-      {/* Header */}
+      {/* Header with render controls */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-mono text-gray-200 font-bold">
           Seed Screening: {clip.name}
           <span className="ml-2 text-xs font-normal text-gray-500">
             {screenRecords.length} seeds
+            {screenRecords.filter(r => r.frames?.length > 0).length > 0 && (
+              <> — {screenRecords.filter(r => r.frames?.length > 0).length} rendered</>
+            )}
           </span>
         </h3>
-        {selectedSeed && (
-          <span className="text-xs font-mono text-accent font-bold">
-            Selected: {selectedSeed}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {selectedSeed && (
+            <span className="text-xs font-mono text-accent font-bold">
+              Selected: {selectedSeed}
+            </span>
+          )}
+          {screenRecords.some(r => !r.frames || r.frames.length === 0) && (
+            <button
+              onClick={async () => {
+                const unrendered = screenRecords.filter(r => !r.frames || r.frames.length === 0);
+                const paths = unrendered.map(r => r.json_path);
+                try {
+                  await api.submitBatchPaths(paths);
+                  setRenderStatus(`Submitted ${paths.length} renders to Wan2GP`);
+                  setTimeout(() => setRenderStatus(null), 5000);
+                } catch (err) {
+                  setRenderStatus(`Render failed: ${err.message}`);
+                }
+              }}
+              className="px-3 py-1.5 bg-score-high text-black text-xs font-mono font-bold rounded hover:bg-green-400 transition-colors"
+            >
+              Render All in Wan2GP
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Render status banner */}
+      {renderStatus && (
+        <div className="border border-score-high/50 bg-score-high/10 rounded px-3 py-2">
+          <p className="text-xs font-mono text-score-high">{renderStatus}</p>
+        </div>
+      )}
 
       {/* Guidance — where are the JSONs, what to do next */}
       {screenRecords.length > 0 && screenRecords.some(r => !r.frames || r.frames.length === 0) && (

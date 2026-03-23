@@ -318,11 +318,15 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         {/* Grand total */}
         <div className="border-t border-gray-700 pt-3 flex items-center justify-between">
           <span className="text-sm font-mono text-gray-400 uppercase">Grand Total</span>
-          <span className={`text-3xl font-mono font-bold ${
-            canLock ? 'text-score-high' : grandTotal / GRAND_MAX < 0.5 ? 'text-score-low' : 'text-score-mid'
-          }`}>
-            {grandTotal}/{GRAND_MAX}
-          </span>
+          {isEvaluated || grandTotal !== 45 ? (
+            <span className={`text-3xl font-mono font-bold ${
+              canLock ? 'text-score-high' : grandTotal / GRAND_MAX < 0.5 ? 'text-score-low' : 'text-score-mid'
+            }`}>
+              {grandTotal}/{GRAND_MAX}
+            </span>
+          ) : (
+            <span className="text-xl font-mono text-gray-600">—/{GRAND_MAX}</span>
+          )}
         </div>
 
         {/* Qualitative notes */}

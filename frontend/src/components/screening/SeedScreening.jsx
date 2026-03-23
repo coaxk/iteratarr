@@ -457,13 +457,18 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
                 <span className="text-xs font-mono text-gray-600">Frames:</span>
                 <button
                   onClick={async () => {
-                    const dir = `/api/frames/${expandedRecord.id}`;
-                    await navigator.clipboard.writeText(dir);
+                    // Get the actual disk path from the frames API
+                    try {
+                      const data = await api.listFrames(expandedRecord.id);
+                      if (data.frames_dir) {
+                        await navigator.clipboard.writeText(data.frames_dir);
+                      }
+                    } catch {}
                   }}
                   className="text-xs font-mono text-gray-500 hover:text-accent transition-colors"
-                  title="Copy frames path — paste into Claude web to upload frames for AI evaluation"
+                  title="Copy frames folder path — paste into Claude web file picker to upload for AI evaluation"
                 >
-                  Copy path for Claude web
+                  Copy folder path for Claude
                 </button>
               </div>
             </div>

@@ -1,7 +1,8 @@
-import { useRef } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 
 export default function IterationLineage({ iterations, selectedId, onSelect }) {
   const scrollRef = useRef(null);
+  const selectedRef = useRef(null);
 
   if (!iterations?.length) return <p className="text-gray-500 text-xs font-mono">No iterations yet</p>;
 
@@ -12,6 +13,17 @@ export default function IterationLineage({ iterations, selectedId, onSelect }) {
       scrollRef.current.scrollBy({ left: dir * 200, behavior: 'smooth' });
     }
   };
+
+  // Auto-scroll selected iteration into view
+  useEffect(() => {
+    if (selectedRef.current && scrollRef.current) {
+      selectedRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center'
+      });
+    }
+  }, [selectedId]);
 
   return (
     <div className="flex items-center gap-1">
@@ -30,7 +42,11 @@ export default function IterationLineage({ iterations, selectedId, onSelect }) {
           const borderColor = isLocked ? 'border-score-high' : isSelected ? 'border-accent' : 'border-gray-600';
 
           return (
-            <div key={iter.id} className="flex items-center shrink-0">
+            <div
+              key={iter.id}
+              ref={isSelected ? selectedRef : null}
+              className="flex items-center shrink-0"
+            >
               <button
                 onClick={() => onSelect(iter)}
                 className={`flex flex-col items-center px-3 py-2 rounded border-2 ${borderColor} ${

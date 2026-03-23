@@ -40,6 +40,7 @@ export default function IterationLineage({ iterations, selectedId, onSelect }) {
           const score = iter.evaluation?.scores?.grand_total;
           const pct = score ? score / 75 : 0;
           const borderColor = isLocked ? 'border-score-high' : isSelected ? 'border-accent' : 'border-gray-600';
+          const hasTags = iter.tags && iter.tags.length > 0;
 
           return (
             <div
@@ -49,10 +50,15 @@ export default function IterationLineage({ iterations, selectedId, onSelect }) {
             >
               <button
                 onClick={() => onSelect(iter)}
-                className={`flex flex-col items-center px-3 py-2 rounded border-2 ${borderColor} ${
+                className={`relative flex flex-col items-center px-3 py-2 rounded border-2 ${borderColor} ${
                   isSelected ? 'bg-surface-overlay' : 'bg-surface'
-                } hover:border-accent/70 transition-colors`}
+                } hover:border-accent/70 transition-colors group`}
+                title={hasTags ? iter.tags.join(', ') : undefined}
               >
+                {/* Tag indicator dot */}
+                {hasTags && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-accent/70 border border-surface" />
+                )}
                 <span className="text-xs font-mono text-gray-400">#{iter.iteration_number}</span>
                 {score !== undefined && (
                   <span className={`text-sm font-mono font-bold ${

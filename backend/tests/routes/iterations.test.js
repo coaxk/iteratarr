@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { createTestApp } from '../helpers.js';
+import { WAN2GP_FIELDS } from '../../routes/iterations.js';
 
 describe('Iterations API', () => {
   let tmpDir, request, store, iterSaveDir;
@@ -140,6 +141,57 @@ describe('Iterations API', () => {
     const diskContents = JSON.parse(readFileSync(expectedPath, 'utf-8'));
     expect(diskContents.loras_multipliers).toBe('1.0;0.2 0.2;1.3');
     expect(diskContents.seed).toBe(544083690);
+  });
+
+  it('POST /api/iterations/:id/next strips junk fields not in WAN2GP_FIELDS whitelist', async () => {
+    const junkJson = {
+      ...sampleJson,
+      'prompt, alt_prompt, negative_prompt': 'See iter_07 JSON',
+      'totally_bogus_field': 42,
+      '__internal_debug': true
+    };
+    const clip = await store.create('clips', { scene_id: 's1', name: 'C1', status: 'not_started' });
+    const iter = await request.post('/api/iterations').send({ clip_id: clip.id, json_filename: 'monaco_iter_01.json', json_contents: junkJson });
+
+    // Evaluate first so /next is allowed
+    await request.post(`/api/iterations/${iter.body.id}/evaluate`).send({
+      scores: {
+        identity: { face_match: 4, head_shape: 3, jaw: 4, cheekbones: 4, eyes_brow: 4, skin_texture: 3, hair: 3, frame_consistency: 2 },
+        location: { location_correct: 4, lighting_correct: 4, wardrobe_correct: 5, geometry_correct: 3 },
+        motion: { action_executed: 3, smoothness: 4, camera_movement: 2 }
+      },
+      attribution: {
+        lowest_element: 'frame_consistency',
+        rope: 'rope_3_lora_multipliers',
+        next_change_json_field: 'loras_multipliers',
+        next_change_value: '1.0;0.2 0.2;1.3'
+      }
+    });
+
+    const res = await request.post(`/api/iterations/${iter.body.id}/next`);
+    expect(res.status).toBe(201);
+
+    // Junk fields must NOT be in the generated JSON
+    expect(res.body.json_contents).not.toHaveProperty('prompt, alt_prompt, negative_prompt');
+    expect(res.body.json_contents).not.toHaveProperty('totally_bogus_field');
+    expect(res.body.json_contents).not.toHaveProperty('__internal_debug');
+
+    // Valid fields must still be present
+    expect(res.body.json_contents.prompt).toBe('mckdhn, standing on balcony');
+    expect(res.body.json_contents.guidance_scale).toBe(6.1);
+    expect(res.body.json_contents.loras_multipliers).toBe('1.0;0.2 0.2;1.3');
+    expect(res.body.json_contents.seed).toBe(544083690);
+
+    // Verify the on-disk JSON is also clean
+    const diskContents = JSON.parse(readFileSync(res.body.json_path, 'utf-8'));
+    expect(diskContents).not.toHaveProperty('prompt, alt_prompt, negative_prompt');
+    expect(diskContents).not.toHaveProperty('totally_bogus_field');
+    expect(diskContents.prompt).toBe('mckdhn, standing on balcony');
+
+    // Every key in the generated JSON must be in the whitelist
+    for (const key of Object.keys(res.body.json_contents)) {
+      expect(WAN2GP_FIELDS.has(key), `Unexpected field "${key}" found in generated JSON`).toBe(true);
+    }
   });
 
   it('POST /api/iterations/:id/lock locks iteration and generates production JSON', async () => {

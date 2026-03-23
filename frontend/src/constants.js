@@ -52,6 +52,23 @@ export const CLIP_STATUSES = {
 export const SCORE_LOCK_THRESHOLD = 65;
 export const GRAND_MAX = 75;
 
+// Rope → primary category map — which scoring category each rope primarily affects.
+// Used by regression detection to flag unexpected side effects in non-targeted categories.
+// 'all' means the rope affects everything (no regression check applies).
+export const ROPE_CATEGORY_MAP = {
+  rope_1_prompt_position: 'identity',
+  rope_2_attention_weighting: 'identity',
+  rope_3_lora_multipliers: 'identity',
+  rope_4a_cfg_high: 'location',
+  rope_4b_cfg_low: 'identity',
+  rope_5_steps_skipping: 'all',
+  rope_6_alt_prompt: 'identity',
+  bonus_flow_shift: 'motion',
+  bonus_nag_scale: 'all',
+  bonus_sample_solver: 'all',
+  multiple: 'all'
+};
+
 // Smart rope guidance — maps low-scoring elements to likely rope fixes.
 // When a score element is low, these suggestions help users pick the right rope.
 export const ROPE_GUIDANCE = {

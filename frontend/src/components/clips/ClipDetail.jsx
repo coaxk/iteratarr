@@ -3,6 +3,7 @@ import { useApi } from '../../hooks/useApi';
 import { api } from '../../api';
 import { CLIP_STATUSES, SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constants';
 import IterationLineage from './IterationLineage';
+import IterationTable from './IterationTable';
 import ScoreRing from '../evaluation/ScoreRing';
 import EvaluationPanel from '../evaluation/EvaluationPanel';
 
@@ -10,6 +11,7 @@ export default function ClipDetail({ clip, onBack }) {
   const { data: iterations, loading, refetch } = useApi(() => api.getClipIterations(clip.id), [clip.id]);
   const [selectedIteration, setSelectedIteration] = useState(null);
   const [liveScore, setLiveScore] = useState(null);
+  const [viewMode, setViewMode] = useState('lineage'); // 'lineage' | 'table'
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
   // Find the child iteration (the one whose parent_iteration_id matches the selected)
@@ -62,12 +64,42 @@ export default function ClipDetail({ clip, onBack }) {
         </div>
       </div>
 
-      {/* Iteration lineage + score ring — persistent top bar */}
+      {/* Iteration lineage/table + score ring — persistent top bar */}
       <div className="flex items-center gap-4">
         <div className="flex-1 min-w-0">
-          <h3 className="text-xs font-mono text-gray-500 uppercase tracking-wider mb-1">Iteration History</h3>
+          <div className="flex items-center gap-3 mb-1">
+            <h3 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Iteration History</h3>
+            <div className="flex border border-gray-700 rounded overflow-hidden">
+              <button
+                onClick={() => setViewMode('lineage')}
+                className={`px-2 py-0.5 text-xs font-mono transition-colors ${
+                  viewMode === 'lineage'
+                    ? 'bg-accent/20 text-accent'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                Lineage
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`px-2 py-0.5 text-xs font-mono transition-colors ${
+                  viewMode === 'table'
+                    ? 'bg-accent/20 text-accent'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                Table
+              </button>
+            </div>
+          </div>
           {loading ? (
             <p className="text-gray-500 text-xs font-mono">Loading...</p>
+          ) : viewMode === 'table' ? (
+            <IterationTable
+              iterations={iterations || []}
+              selectedId={selectedIteration?.id}
+              onSelect={setSelectedIteration}
+            />
           ) : (
             <IterationLineage
               iterations={iterations || []}

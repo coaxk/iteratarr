@@ -6,6 +6,32 @@ import { getClipPaths } from '../paths.js';
 import { EVENTS } from '../telemetry/index.js';
 
 /**
+ * Whitelist of valid Wan2GP JSON fields. When generating iteration JSONs,
+ * any field NOT in this set is stripped before writing to disk. This prevents
+ * junk fields from parent iterations propagating through the chain.
+ */
+export const WAN2GP_FIELDS = new Set([
+  'image_mode', 'prompt', 'alt_prompt', 'negative_prompt', 'resolution',
+  'video_length', 'batch_size', 'seed', 'num_inference_steps', 'guidance_scale',
+  'guidance2_scale', 'switch_threshold', 'guidance_phases', 'flow_shift',
+  'sample_solver', 'repeat_generation', 'multi_prompts_gen_type',
+  'multi_images_gen_type', 'skip_steps_cache_type', 'skip_steps_multiplier',
+  'skip_steps_start_step_perc', 'loras_multipliers', 'image_prompt_type',
+  'video_prompt_type', 'keep_frames_video_guide', 'mask_expand',
+  'audio_prompt_type', 'sliding_window_size', 'sliding_window_overlap',
+  'sliding_window_color_correction_strength', 'sliding_window_overlap_noise',
+  'sliding_window_discard_last_frames', 'temporal_upsampling',
+  'spatial_upsampling', 'film_grain_intensity', 'film_grain_saturation',
+  'RIFLEx_setting', 'NAG_scale', 'NAG_tau', 'NAG_alpha', 'perturbation_switch',
+  'perturbation_layers', 'perturbation_start_perc', 'perturbation_end_perc',
+  'apg_switch', 'cfg_star_switch', 'cfg_zero_step', 'min_frames_if_references',
+  'override_profile', 'override_attention', 'self_refiner_setting',
+  'self_refiner_plan', 'self_refiner_f_uncertainty',
+  'self_refiner_certain_percentage', 'output_filename', 'mode',
+  'activated_loras', 'type', 'settings_version', 'model_filename', 'model_type'
+]);
+
+/**
  * Validates that a resolved path is within the expected base directory.
  * Prevents directory traversal attacks on all file write operations.
  */
@@ -411,6 +437,9 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
       // Render path points to where Wan2GP will actually put the file
       const outputDir = config.wan2gp_output_dir || join(config.wan2gp_json_dir, 'outputs');
       renderPath = join(outputDir, `${renderBasename}.mp4`);
+
+      // Strip any fields not in the Wan2GP whitelist to prevent junk propagation
+      Object.keys(nextJson).forEach(k => { if (!WAN2GP_FIELDS.has(k)) delete nextJson[k]; });
 
       await mkdir(saveDir, { recursive: true });
       const savePath = join(saveDir, nextFilename);

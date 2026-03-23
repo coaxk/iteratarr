@@ -8,8 +8,9 @@ import JsonDiffPanel from './JsonDiffPanel';
 import FrameStrip from './FrameStrip';
 import VideoDiff from './VideoDiff';
 import GeneratedModal from './GeneratedModal';
+import TagInput from '../clips/TagInput';
 import { api } from '../../api';
-import { IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constants';
+import { IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, SCORE_LOCK_THRESHOLD, GRAND_MAX, ROPE_CATEGORY_MAP, ROPES } from '../../constants';
 
 const defaultScores = (fields) => Object.fromEntries(fields.map(f => [f.key, 3]));
 
@@ -260,6 +261,18 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         {iteration.change_from_parent && (
           <p className="text-xs text-accent font-mono mt-1 break-words">Changed: {iteration.change_from_parent}</p>
         )}
+        {/* Tags */}
+        <div className="mt-2">
+          <TagInput
+            tags={iteration.tags || []}
+            onChange={(newTags) => {
+              // Optimistically update iteration object and persist
+              iteration.tags = newTags;
+              api.updateIteration(iteration.id, { tags: newTags }).catch(() => {});
+            }}
+            readOnly={isReadOnly}
+          />
+        </div>
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════
@@ -314,6 +327,46 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
             <span className="text-gray-700">hover for details</span>
           </div>
         )}
+
+        {/* Regression warnings — flag unexpected score drops in non-targeted categories */}
+        {(() => {
+          // Only show when: parent exists with evaluation, current has been scored (not default 45),
+          // and a rope is selected that targets a specific category
+          const parentEval = parentIteration?.evaluation?.scores;
+          const ropeId = attribution?.rope;
+          const targetCategory = ropeId ? ROPE_CATEGORY_MAP[ropeId] : null;
+          if (!parentEval || !targetCategory || targetCategory === 'all' || grandTotal === 45) return null;
+
+          const identityTotal = IDENTITY_FIELDS.reduce((s, f) => s + (identity[f.key] || 1), 0);
+          const locationTotal = LOCATION_FIELDS.reduce((s, f) => s + (location[f.key] || 1), 0);
+          const motionTotal = MOTION_FIELDS.reduce((s, f) => s + (motion[f.key] || 1), 0);
+
+          const parentIdentity = parentEval.identity ? IDENTITY_FIELDS.reduce((s, f) => s + (parentEval.identity[f.key] || 1), 0) : null;
+          const parentLocation = parentEval.location ? LOCATION_FIELDS.reduce((s, f) => s + (parentEval.location[f.key] || 1), 0) : null;
+          const parentMotion = parentEval.motion ? MOTION_FIELDS.reduce((s, f) => s + (parentEval.motion[f.key] || 1), 0) : null;
+
+          const categories = [
+            { name: 'Identity', current: identityTotal, parent: parentIdentity, max: 40, key: 'identity' },
+            { name: 'Location', current: locationTotal, parent: parentLocation, max: 20, key: 'location' },
+            { name: 'Motion', current: motionTotal, parent: parentMotion, max: 15, key: 'motion' }
+          ];
+
+          const ropeLabel = ROPES.find(r => r.id === ropeId)?.label || ropeId;
+
+          const regressions = categories
+            .filter(c => c.key !== targetCategory && c.parent !== null && (c.parent - c.current) >= 3)
+            .map(c => `${c.name} regressed from ${c.parent}/${c.max} to ${c.current}/${c.max} but change was to ${ropeLabel} (${targetCategory} lever). Possible side effect.`);
+
+          if (regressions.length === 0) return null;
+
+          return (
+            <div className="border border-amber-500/50 bg-amber-500/10 rounded px-3 py-2 space-y-1">
+              {regressions.map((msg, i) => (
+                <p key={i} className="text-xs font-mono text-accent">{msg}</p>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Grand total */}
         <div className="border-t border-gray-700 pt-3 flex items-center justify-between">

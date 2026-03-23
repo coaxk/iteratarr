@@ -302,6 +302,7 @@ export default function ClipDetail({ clip, onBack }) {
           childIteration={childIteration}
           parentIteration={parentIteration}
           ancestorChain={ancestorChain}
+          allIterations={iterations || []}
           onSaved={refetch}
           onLocked={refetch}
           onGoToIteration={(iter) => setSelectedIteration(iter)}

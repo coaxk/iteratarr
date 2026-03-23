@@ -25,7 +25,7 @@ function CopyBtn({ text }) {
   );
 }
 
-export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange }) {
+export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], allIterations = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange }) {
   const [identity, setIdentity] = useState(defaultScores(IDENTITY_FIELDS));
   const [location, setLocation] = useState(defaultScores(LOCATION_FIELDS));
   const [motion, setMotion] = useState(defaultScores(MOTION_FIELDS));
@@ -44,6 +44,8 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [scoringSource, setScoringSource] = useState('manual');
   const [currentVideoPath, setCurrentVideoPath] = useState(null);
   const [previousVideoPath, setPreviousVideoPath] = useState(null);
+  const [comparisonVideoPath, setComparisonVideoPath] = useState(null);
+  const [comparisonIter, setComparisonIter] = useState(null);
   const [lockCharacterUpdates, setLockCharacterUpdates] = useState(null);
 
   const isEvaluated = !!iteration.evaluation;
@@ -79,6 +81,8 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     // Try to derive video paths from iteration data (render_path stored on iteration)
     setCurrentVideoPath(iteration.render_path || null);
     setPreviousVideoPath(parentIteration?.render_path || null);
+    setComparisonVideoPath(null);
+    setComparisonIter(null);
   }, [iteration.id]);
 
   const grandTotal =
@@ -264,9 +268,33 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         </div>
       )}
 
-      {/* Header with iteration info */}
+      {/* Header with iteration info + prev/next navigation */}
       <div>
         <div className="flex items-center gap-2">
+          {(() => {
+            const sorted = allIterations.sort((a, b) => a.iteration_number - b.iteration_number);
+            const idx = sorted.findIndex(i => i.id === iteration.id);
+            const prev = idx > 0 ? sorted[idx - 1] : null;
+            const next = idx < sorted.length - 1 ? sorted[idx + 1] : null;
+            return (
+              <>
+                <button
+                  onClick={() => prev && onGoToIteration?.(prev)}
+                  disabled={!prev}
+                  className="text-gray-600 hover:text-accent disabled:text-gray-800 font-mono text-sm px-1"
+                >
+                  ←
+                </button>
+                <button
+                  onClick={() => next && onGoToIteration?.(next)}
+                  disabled={!next}
+                  className="text-gray-600 hover:text-accent disabled:text-gray-800 font-mono text-sm px-1"
+                >
+                  →
+                </button>
+              </>
+            );
+          })()}
           <h3 className="text-sm font-mono text-gray-200">{iteration.json_filename}</h3>
           {scoringSource !== 'manual' && (
             <span className="px-1.5 py-0.5 text-xs font-mono bg-accent/10 text-accent rounded">
@@ -308,13 +336,18 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         {/* Video diff — side by side comparison with previous iteration */}
         <VideoDiff
           currentVideoPath={currentVideoPath}
-          previousVideoPath={previousVideoPath}
+          previousVideoPath={comparisonVideoPath || previousVideoPath}
           currentLabel={`Iteration #${iteration.iteration_number}`}
-          previousLabel={parentIteration ? `Iteration #${parentIteration.iteration_number}` : 'Previous'}
+          previousLabel={comparisonIter ? `Iteration #${comparisonIter.iteration_number}` : parentIteration ? `Iteration #${parentIteration.iteration_number}` : 'Previous'}
           currentIterationId={iteration.id}
-          previousIterationId={parentIteration?.id}
+          previousIterationId={comparisonIter?.id || parentIteration?.id}
           onCurrentPathSet={(path) => setCurrentVideoPath(path)}
           onPreviousPathSet={(path) => setPreviousVideoPath(path)}
+          allIterations={allIterations}
+          onPreviousIterationChange={(iter) => {
+            setComparisonIter(iter);
+            setComparisonVideoPath(iter.render_path);
+          }}
         />
 
         {/* Render frame thumbnails */}

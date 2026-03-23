@@ -120,7 +120,8 @@ export default function VideoDiff({
   currentVideoPath, previousVideoPath,
   currentLabel = 'Current', previousLabel = 'Previous',
   currentIterationId, previousIterationId,
-  onCurrentPathSet, onPreviousPathSet
+  onCurrentPathSet, onPreviousPathSet,
+  allIterations, onPreviousIterationChange
 }) {
   const [browsing, setBrowsing] = useState(null);
   const [outputDir, setOutputDir] = useState(null);
@@ -128,6 +129,18 @@ export default function VideoDiff({
   useEffect(() => {
     api.getConfigPaths().then(p => setOutputDir(p.wan2gp_output_dir)).catch(() => {});
   }, []);
+
+  // Build list of iterations with render paths for the comparison slider
+  const iterationsWithRenders = allIterations
+    ? allIterations.filter(i => i.render_path && i.id !== currentIterationId).sort((a, b) => a.iteration_number - b.iteration_number)
+    : [];
+
+  const handlePrevIterChange = (iterNum) => {
+    const iter = iterationsWithRenders.find(i => i.iteration_number === iterNum);
+    if (iter && onPreviousIterationChange) {
+      onPreviousIterationChange(iter);
+    }
+  };
 
   return (
     <div className="border border-gray-700 rounded p-3 space-y-2">
@@ -148,6 +161,28 @@ export default function VideoDiff({
           onBrowse={() => setBrowsing('current')}
         />
       </div>
+
+      {/* Iteration slider for left (comparison) video */}
+      {iterationsWithRenders.length > 1 && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono text-gray-600 shrink-0">Compare with:</span>
+          <div className="flex items-center gap-1 flex-1">
+            {iterationsWithRenders.map(iter => (
+              <button
+                key={iter.id}
+                onClick={() => handlePrevIterChange(iter.iteration_number)}
+                className={`px-1.5 py-0.5 text-xs font-mono rounded ${
+                  iter.id === previousIterationId
+                    ? 'bg-accent text-black font-bold'
+                    : 'bg-surface-overlay text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                #{iter.iteration_number}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {browsing && (
         <FileBrowserModal

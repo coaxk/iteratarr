@@ -14,6 +14,7 @@ export default function ClipDetail({ clip, onBack }) {
   const { data: iterations, loading, refetch } = useApi(() => api.getClipIterations(clip.id), [clip.id]);
   const [selectedIteration, setSelectedIteration] = useState(null);
   const [liveScore, setLiveScore] = useState(null);
+  const [clipTab, setClipTab] = useState(clip.status === 'screening' ? 'screening' : 'iterations'); // 'screening' | 'iterations' | 'trends'
   const [viewMode, setViewMode] = useState('lineage'); // 'lineage' | 'table'
   const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
   const [showComparison, setShowComparison] = useState(false);
@@ -23,8 +24,6 @@ export default function ClipDetail({ clip, onBack }) {
   const [goalDraft, setGoalDraft] = useState(clip.goal || '');
   const [goalSaving, setGoalSaving] = useState(false);
   const [currentGoal, setCurrentGoal] = useState(clip.goal || '');
-  const [showScreening, setShowScreening] = useState(clip.status === 'screening');
-  const [screeningCollapsed, setScreeningCollapsed] = useState(clip.status !== 'screening');
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
   // Auto-select the latest iteration when data loads
@@ -215,39 +214,37 @@ export default function ClipDetail({ clip, onBack }) {
         </div>
       </div>
 
-      {/* Seed Screening — shown as main content when clip is in screening status */}
-      {showScreening && (
+      {/* Clip-level tab bar */}
+      <div className="flex border-b border-gray-700">
+        {['screening', 'iterations'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setClipTab(tab)}
+            className={`px-4 py-2 text-xs font-mono uppercase tracking-wider transition-colors ${
+              clipTab === tab
+                ? 'text-accent border-b-2 border-accent -mb-px'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {tab === 'screening' ? 'Seed Screening' : 'Iterations'}
+          </button>
+        ))}
+      </div>
+
+      {/* Seed Screening tab */}
+      {clipTab === 'screening' && (
         <SeedScreening
           clip={clip}
           onSeedSelected={(iteration) => {
-            setShowScreening(false);
-            setScreeningCollapsed(true);
+            setClipTab('iterations');
             refetch();
           }}
-          onBack={() => setShowScreening(false)}
+          onBack={() => setClipTab('iterations')}
         />
       )}
 
-      {/* Seed Screening collapsed section — for clips that have been through screening */}
-      {!showScreening && clip.status !== 'screening' && (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setScreeningCollapsed(!screeningCollapsed)}
-            className="text-xs font-mono text-gray-500 hover:text-gray-400 transition-colors"
-          >
-            {screeningCollapsed ? '\u25B6' : '\u25BC'} Seed Screening
-          </button>
-          <button
-            onClick={() => setShowScreening(true)}
-            className="text-xs font-mono text-gray-600 hover:text-accent transition-colors"
-          >
-            Open
-          </button>
-        </div>
-      )}
-
-      {/* Iteration lineage/table + score ring — persistent top bar */}
-      {!showScreening && <div className="flex items-center gap-4">
+      {/* Iterations tab — lineage/table + score ring */}
+      {clipTab === 'iterations' && <div className="flex items-center gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-1">
             <h3 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Iteration History</h3>
@@ -330,7 +327,7 @@ export default function ClipDetail({ clip, onBack }) {
       </div>}
 
       {/* Evaluation panel for the selected iteration */}
-      {!showScreening && selectedIteration && (
+      {clipTab === 'iterations' && selectedIteration && (
         <EvaluationPanel
           iteration={selectedIteration}
           childIteration={childIteration}

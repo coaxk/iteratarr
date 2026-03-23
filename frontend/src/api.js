@@ -75,6 +75,7 @@ export const api = {
   generateSeedScreen: (clipId, data) => request(`/clips/${clipId}/seed-screen`, { method: 'POST', body: data }),
   getSeedScreen: (clipId) => request(`/clips/${clipId}/seed-screen`),
   updateSeedScreen: (clipId, screenId, data) => request(`/clips/${clipId}/seed-screen/${screenId}`, { method: 'PATCH', body: data }),
+  deleteSeedScreen: (clipId, screenId) => request(`/clips/${clipId}/seed-screen/${screenId}`, { method: 'DELETE' }),
   selectSeed: (clipId, data) => request(`/clips/${clipId}/select-seed`, { method: 'POST', body: data }),
 
   // Templates

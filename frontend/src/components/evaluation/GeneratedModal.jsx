@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from '../../api';
 
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
@@ -18,6 +19,27 @@ function CopyButton({ text }) {
 }
 
 export default function GeneratedModal({ jsonPath, renderPath, iterationNumber, onClose, onGoToIteration }) {
+  const [wan2gpAvailable, setWan2gpAvailable] = useState(false);
+  const [renderSubmitted, setRenderSubmitted] = useState(false);
+  const [renderError, setRenderError] = useState(null);
+
+  // Check Wan2GP availability on mount
+  useEffect(() => {
+    api.getRenderStatus()
+      .then(status => setWan2gpAvailable(status.available))
+      .catch(() => setWan2gpAvailable(false));
+  }, []);
+
+  const handleRender = async () => {
+    try {
+      await api.submitRender(jsonPath);
+      setRenderSubmitted(true);
+      setRenderError(null);
+    } catch (err) {
+      setRenderError(err.message);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-surface-raised border border-gray-700 rounded-lg w-[550px] flex flex-col" onClick={e => e.stopPropagation()}>
@@ -50,14 +72,35 @@ export default function GeneratedModal({ jsonPath, renderPath, iterationNumber, 
               <p className="text-xs font-mono text-gray-600 mt-1">Wan2GP will output here automatically. Iteratarr will find it.</p>
             </div>
           )}
+
+          {/* Render error */}
+          {renderError && (
+            <div className="border border-score-low/50 bg-score-low/10 rounded px-3 py-2">
+              <p className="text-xs font-mono text-score-low">{renderError}</p>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-700">
+          {/* Render in Wan2GP button — only when available */}
+          {wan2gpAvailable && jsonPath && (
+            <button
+              onClick={handleRender}
+              disabled={renderSubmitted}
+              className={`px-4 py-2 text-sm font-mono font-bold rounded transition-colors ${
+                renderSubmitted
+                  ? 'bg-score-high/20 text-score-high'
+                  : 'bg-accent text-black hover:bg-accent/90'
+              }`}
+            >
+              {renderSubmitted ? 'Render Submitted' : 'Render in Wan2GP'}
+            </button>
+          )}
           {onGoToIteration && (
             <button onClick={onGoToIteration}
               className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90">
-              Go to Iteration #{iterationNumber} →
+              Go to Iteration #{iterationNumber} &rarr;
             </button>
           )}
           <button onClick={onClose}

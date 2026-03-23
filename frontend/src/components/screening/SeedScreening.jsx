@@ -36,6 +36,7 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
 
   // Render status
   const [renderStatus, setRenderStatus] = useState(null);
+  const [renderConfirm, setRenderConfirm] = useState(null);
 
   // Reference images
   const [referenceImages, setReferenceImages] = useState([]);
@@ -159,6 +160,27 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
         r.id === screenId ? { ...r, rating } : r
       ));
     } catch { /* rating failed silently */ }
+  };
+
+  const handleDelete = async (screenId) => {
+    try {
+      await api.deleteSeedScreen(clip.id, screenId);
+      setScreenRecords(prev => prev.filter(r => r.id !== screenId));
+      if (expandedId === screenId) setExpandedId(null);
+    } catch (err) {
+      setGenerateError(`Delete failed: ${err.message}`);
+    }
+  };
+
+  const handleRender = async (jsonPath, screenId) => {
+    try {
+      await api.submitRender(jsonPath);
+      setRenderConfirm(screenId);
+      setTimeout(() => setRenderConfirm(null), 3000);
+    } catch (err) {
+      setRenderStatus(`Render failed: ${err.message}`);
+      setTimeout(() => setRenderStatus(null), 5000);
+    }
   };
 
   const handleReferenceImage = (e) => {
@@ -373,9 +395,12 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
             onSelect={handleSelectSeed}
             onRate={handleRate}
             onExpand={() => setExpandedId(expandedId === record.id ? null : record.id)}
+            onDelete={handleDelete}
+            onRender={handleRender}
             isSelected={record.seed === selectedSeed}
             expanded={expandedId === record.id}
             frameSrc={frameSrc}
+            renderConfirm={renderConfirm}
           />
         ))}
       </div>

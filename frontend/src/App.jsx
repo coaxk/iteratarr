@@ -8,6 +8,7 @@ import ParameterScatterChart from './components/trends/ParameterScatterChart';
 import CreateProjectModal from './components/forms/CreateProjectModal';
 import ProductionQueue from './components/queue/ProductionQueue';
 import TemplateLibrary from './components/templates/TemplateLibrary';
+import RenderStatus from './components/render/RenderStatus';
 import { useApi } from './hooks/useApi';
 import { api } from './api';
 
@@ -160,8 +161,9 @@ export default function App() {
             </button>
           </div>
 
-          {/* Telemetry toggle — pushed to bottom of sidebar */}
+          {/* Render status + Telemetry toggle — pushed to bottom of sidebar */}
           <div className="mt-auto">
+            <RenderStatus />
             <TelemetryToggle />
           </div>
         </aside>

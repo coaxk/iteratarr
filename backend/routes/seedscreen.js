@@ -169,6 +169,27 @@ export function createSeedScreenRoutes(store, config = {}) {
   });
 
   /**
+   * DELETE /api/clips/:clipId/seed-screen/:screenId
+   * Delete a seed screen record from the store.
+   */
+  router.delete('/:clipId/seed-screen/:screenId', async (req, res) => {
+    try {
+      const { clipId, screenId } = req.params;
+
+      // Verify the record belongs to this clip before deleting
+      const record = await store.get('seed_screens', screenId);
+      if (record.clip_id !== clipId) {
+        return res.status(404).json({ error: 'Seed screen not found for this clip' });
+      }
+
+      await store.delete('seed_screens', screenId);
+      res.json({ deleted: true, id: screenId });
+    } catch (err) {
+      res.status(err.message.includes('not found') ? 404 : 400).json({ error: err.message });
+    }
+  });
+
+  /**
    * POST /api/clips/:clipId/select-seed
    * Select a seed from screening and start the iteration loop.
    *

@@ -102,10 +102,10 @@ export default function SeedCard({ record, onSelect, onRate, onExpand, onDelete,
             <img
               key={filename}
               src={frameSrc(record.id, filename)}
-              title={`Frame ${idx + 1} — click to expand`}
+              title={`Frame ${idx + 1} — click card to expand all frames`}
               alt={`Frame ${idx + 1}`}
-              className="h-10 w-auto rounded border border-gray-700 flex-shrink-0 cursor-pointer hover:border-gray-500 transition-colors"
-              onClick={(e) => { e.stopPropagation(); }}
+              className="h-10 w-auto rounded border border-gray-700 flex-shrink-0 cursor-pointer hover:border-accent/50 transition-colors"
+              onClick={onExpand}
             />
           ))}
         </div>

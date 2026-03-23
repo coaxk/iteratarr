@@ -439,17 +439,33 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
             </button>
           </div>
 
-          {/* Frame strip */}
+          {/* Frame strip with copy path */}
           {expandedRecord.frames && expandedRecord.frames.length > 0 ? (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {expandedRecord.frames.map((filename, idx) => (
-                <img
-                  key={filename}
-                  src={frameSrc(expandedRecord.id, filename)}
-                  alt={`Frame ${idx + 1}`}
-                  className="h-24 w-auto rounded border border-gray-700"
-                />
-              ))}
+            <div className="space-y-1">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {expandedRecord.frames.map((filename, idx) => (
+                  <img
+                    key={filename}
+                    src={frameSrc(expandedRecord.id, filename)}
+                    alt={`Frame ${idx + 1}`}
+                    title={`Frame ${idx + 1} of ${expandedRecord.frames.length}`}
+                    className="h-24 w-auto rounded border border-gray-700 hover:border-accent/50 transition-colors"
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-gray-600">Frames:</span>
+                <button
+                  onClick={async () => {
+                    const dir = `/api/frames/${expandedRecord.id}`;
+                    await navigator.clipboard.writeText(dir);
+                  }}
+                  className="text-xs font-mono text-gray-500 hover:text-accent transition-colors"
+                  title="Copy frames path — paste into Claude web to upload frames for AI evaluation"
+                >
+                  Copy path for Claude web
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-center h-20 rounded border border-dashed border-gray-700">

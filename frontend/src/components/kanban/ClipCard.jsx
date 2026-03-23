@@ -1,12 +1,16 @@
 import { CLIP_STATUSES } from '../../constants';
 
-export default function ClipCard({ clip, onClick }) {
+export default function ClipCard({ clip, onClick, isDragging = false }) {
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
   return (
     <button
       onClick={() => onClick(clip)}
-      className="w-full text-left p-3 bg-surface rounded border border-gray-700 hover:border-accent/50 transition-colors group"
+      className={`w-full text-left p-3 bg-surface rounded border transition-colors group ${
+        isDragging
+          ? 'border-accent opacity-90 shadow-lg shadow-accent/10'
+          : 'border-gray-700 hover:border-accent/50'
+      }`}
     >
       <div className="flex items-center justify-between mb-1">
         <span className="text-sm font-mono text-gray-200 group-hover:text-accent transition-colors truncate">

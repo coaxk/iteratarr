@@ -75,6 +75,7 @@ export const MOTION_FIELDS = [
 // Clip statuses with display labels and Tailwind colour classes.
 export const CLIP_STATUSES = {
   not_started: { label: 'Not Started', color: 'bg-status-red' },
+  screening: { label: 'Screening', color: 'bg-purple-500' },
   in_progress: { label: 'In Progress', color: 'bg-status-yellow' },
   evaluating: { label: 'Evaluating', color: 'bg-status-yellow' },
   locked: { label: 'Locked', color: 'bg-status-green' },

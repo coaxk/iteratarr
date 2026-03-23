@@ -6,7 +6,7 @@ import { CLIP_STATUSES } from '../../constants';
 import ClipCard from './ClipCard';
 import CreateClipModal from '../forms/CreateClipModal';
 
-const COLUMNS = ['not_started', 'in_progress', 'evaluating', 'locked', 'in_queue'];
+const COLUMNS = ['not_started', 'screening', 'in_progress', 'evaluating', 'locked', 'in_queue'];
 
 export default function EpisodeTracker({ onSelectClip }) {
   const { data: clips, loading, error, refetch } = useApi(() => api.listClips(), []);

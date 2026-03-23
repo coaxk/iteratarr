@@ -1,4 +1,4 @@
-const CLIP_STATUSES = ['not_started', 'in_progress', 'evaluating', 'locked', 'in_queue'];
+const CLIP_STATUSES = ['not_started', 'screening', 'in_progress', 'evaluating', 'locked', 'in_queue'];
 const MODEL_TYPES = [
   'wan2.2_t2v_14B',
   'wan2.1_t2v_14B',

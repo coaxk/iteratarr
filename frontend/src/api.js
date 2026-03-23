@@ -65,6 +65,12 @@ export const api = {
   // Render tracking
   renderComplete: (id, detectedAt) => request(`/iterations/${id}/render-complete`, { method: 'POST', body: { detected_at: detectedAt } }),
 
+  // Seed Screening
+  generateSeedScreen: (clipId, data) => request(`/clips/${clipId}/seed-screen`, { method: 'POST', body: data }),
+  getSeedScreen: (clipId) => request(`/clips/${clipId}/seed-screen`),
+  updateSeedScreen: (clipId, screenId, data) => request(`/clips/${clipId}/seed-screen/${screenId}`, { method: 'PATCH', body: data }),
+  selectSeed: (clipId, data) => request(`/clips/${clipId}/select-seed`, { method: 'POST', body: data }),
+
   // Templates
   listTemplates: () => request('/templates'),
   createTemplate: (data) => request('/templates', { method: 'POST', body: data }),

@@ -8,6 +8,7 @@ import IterationFilter, { DEFAULT_FILTERS } from './IterationFilter';
 import ComparisonView from './ComparisonView';
 import ScoreRing from '../evaluation/ScoreRing';
 import EvaluationPanel from '../evaluation/EvaluationPanel';
+import SeedScreening from '../screening/SeedScreening';
 
 export default function ClipDetail({ clip, onBack }) {
   const { data: iterations, loading, refetch } = useApi(() => api.getClipIterations(clip.id), [clip.id]);
@@ -22,6 +23,8 @@ export default function ClipDetail({ clip, onBack }) {
   const [goalDraft, setGoalDraft] = useState(clip.goal || '');
   const [goalSaving, setGoalSaving] = useState(false);
   const [currentGoal, setCurrentGoal] = useState(clip.goal || '');
+  const [showScreening, setShowScreening] = useState(clip.status === 'screening');
+  const [screeningCollapsed, setScreeningCollapsed] = useState(clip.status !== 'screening');
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
   // Auto-select the latest iteration when data loads
@@ -212,8 +215,39 @@ export default function ClipDetail({ clip, onBack }) {
         </div>
       </div>
 
+      {/* Seed Screening — shown as main content when clip is in screening status */}
+      {showScreening && (
+        <SeedScreening
+          clip={clip}
+          onSeedSelected={(iteration) => {
+            setShowScreening(false);
+            setScreeningCollapsed(true);
+            refetch();
+          }}
+          onBack={() => setShowScreening(false)}
+        />
+      )}
+
+      {/* Seed Screening collapsed section — for clips that have been through screening */}
+      {!showScreening && clip.status !== 'screening' && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setScreeningCollapsed(!screeningCollapsed)}
+            className="text-xs font-mono text-gray-500 hover:text-gray-400 transition-colors"
+          >
+            {screeningCollapsed ? '\u25B6' : '\u25BC'} Seed Screening
+          </button>
+          <button
+            onClick={() => setShowScreening(true)}
+            className="text-xs font-mono text-gray-600 hover:text-accent transition-colors"
+          >
+            Open
+          </button>
+        </div>
+      )}
+
       {/* Iteration lineage/table + score ring — persistent top bar */}
-      <div className="flex items-center gap-4">
+      {!showScreening && <div className="flex items-center gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-1">
             <h3 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Iteration History</h3>
@@ -293,10 +327,10 @@ export default function ClipDetail({ clip, onBack }) {
             </div>
           );
         })()}
-      </div>
+      </div>}
 
       {/* Evaluation panel for the selected iteration */}
-      {selectedIteration && (
+      {!showScreening && selectedIteration && (
         <EvaluationPanel
           iteration={selectedIteration}
           childIteration={childIteration}

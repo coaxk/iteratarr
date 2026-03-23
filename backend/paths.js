@@ -37,6 +37,7 @@ export function getClipPaths(config, clip, scene) {
     iterations: join(clipBase, 'iterations'),
     renders: join(clipBase, 'renders'),
     frames: join(clipBase, 'frames'),
+    seedScreening: join(clipBase, 'seed-screening'),
     locked: join(clipBase, 'LOCKED'),
     iterationFile: (num) =>
       join(clipBase, 'iterations', `${safeName(clip.name)}_iter_${String(num).padStart(2, '0')}.json`),

@@ -28,7 +28,12 @@ const SAFE_PAYLOAD_FIELDS = new Set([
   'model_type', 'guidance_scale', 'guidance2_scale', 'loras_multipliers',
   'video_length', 'seed', 'flow_shift', 'NAG_scale', 'iteration_number',
   'production_ready', 'grand_total', 'grand_max', 'event_type',
-  'timestamp', 'app_version', 'status', 'change_from_parent'
+  'timestamp', 'app_version', 'status', 'change_from_parent',
+  // Environment fields
+  'platform', 'os_version', 'arch', 'ram_total_gb', 'cpu_model', 'cpu_cores',
+  'node_version', 'collected_at', 'gpu_model', 'gpu_vram_mb', 'gpu_driver',
+  // Render duration fields
+  'render_duration_seconds', 'detected_at'
 ]);
 
 /**
@@ -60,6 +65,30 @@ function buildCharacterMap(events) {
 }
 
 /**
+ * Anonymizes environment-specific fields:
+ * - os_version: strip to major version ("10.0.26200" -> "10")
+ * - cpu_model: strip to brand ("AMD Ryzen 9 5900X" -> "AMD Ryzen")
+ * GPU model, VRAM, and driver are kept as-is (valuable segmentation data).
+ */
+function anonymizeEnvironmentField(key, value) {
+  if (key === 'os_version' && typeof value === 'string') {
+    return value.split('.')[0];
+  }
+  if (key === 'cpu_model' && typeof value === 'string') {
+    // Extract brand family: "AMD Ryzen 9 5900X" -> "AMD Ryzen"
+    // "Intel(R) Core(TM) i9-13900K" -> "Intel Core"
+    const cleaned = value.replace(/\(R\)/gi, '').replace(/\(TM\)/gi, '').trim();
+    const words = cleaned.split(/\s+/);
+    // Take brand + family (first two meaningful words)
+    if (words.length >= 2) {
+      return `${words[0]} ${words[1]}`;
+    }
+    return words[0] || 'unknown';
+  }
+  return value;
+}
+
+/**
  * Deep-cleans a value, stripping paths and prompts recursively.
  */
 function cleanValue(key, value, characterMap) {
@@ -70,6 +99,11 @@ function cleanValue(key, value, characterMap) {
 
   // Strip known prompt fields
   if (PROMPT_FIELDS.includes(key)) return undefined;
+
+  // Anonymize environment fields
+  if (key === 'os_version' || key === 'cpu_model') {
+    return anonymizeEnvironmentField(key, value);
+  }
 
   // Anonymize character names
   if ((key === 'character_name' || key === 'character') && typeof value === 'string') {
@@ -146,4 +180,4 @@ export function anonymizeEvents(events) {
   }));
 }
 
-export { buildCharacterMap, cleanObject, cleanValue, PATH_FIELDS, PROMPT_FIELDS };
+export { buildCharacterMap, cleanObject, cleanValue, anonymizeEnvironmentField, PATH_FIELDS, PROMPT_FIELDS };

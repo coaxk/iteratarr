@@ -61,4 +61,7 @@ export const api = {
   getTelemetryStatus: () => request('/telemetry/status'),
   toggleTelemetry: (enabled) => request('/telemetry/toggle', { method: 'POST', body: { enabled } }),
   exportTelemetry: () => request('/telemetry/export'),
+
+  // Render tracking
+  renderComplete: (id, detectedAt) => request(`/iterations/${id}/render-complete`, { method: 'POST', body: { detected_at: detectedAt } }),
 };

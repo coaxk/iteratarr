@@ -330,6 +330,40 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
     }
   });
 
+  router.post('/:id/render-complete', async (req, res) => {
+    try {
+      const { detected_at } = req.body;
+      if (!detected_at) {
+        return res.status(400).json({ error: 'Body must include { detected_at: ISO string }' });
+      }
+
+      const iteration = await store.get('iterations', req.params.id);
+      const detectedTime = new Date(detected_at);
+      const createdTime = new Date(iteration.created_at);
+      const render_duration_seconds = Math.round((detectedTime - createdTime) / 1000);
+
+      await store.update('iterations', req.params.id, { render_duration_seconds });
+
+      // Telemetry: record render completion with duration and context
+      if (telemetry) {
+        telemetry.record(EVENTS.RENDER_COMPLETED, {
+          render_duration_seconds,
+          iteration_number: iteration.iteration_number,
+          video_length: iteration.json_contents?.video_length || null
+        });
+      }
+
+      res.json({
+        render_duration_seconds,
+        iteration_id: req.params.id,
+        iteration_number: iteration.iteration_number
+      });
+    } catch (err) {
+      const status = err.message.includes('not found') ? 404 : 400;
+      res.status(status).json({ error: err.message });
+    }
+  });
+
   router.delete('/:id', async (req, res) => {
     try {
       await store.delete('iterations', req.params.id);

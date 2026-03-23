@@ -13,6 +13,7 @@
  */
 
 import { anonymizeEvents } from './anonymizer.js';
+import { collectEnvironment } from './environment.js';
 
 // Telemetry event types
 export const EVENTS = {
@@ -20,7 +21,9 @@ export const EVENTS = {
   ITERATION_GENERATED: 'iteration_generated',
   ITERATION_LOCKED: 'iteration_locked',
   CHARACTER_CREATED: 'character_created',
-  ROPE_ATTRIBUTED: 'rope_attributed'
+  ROPE_ATTRIBUTED: 'rope_attributed',
+  ENVIRONMENT_COLLECTED: 'environment_collected',
+  RENDER_COMPLETED: 'render_completed'
 };
 
 const TELEMETRY_COLLECTION = 'telemetry_events';
@@ -37,16 +40,44 @@ export function createTelemetry(store, config) {
   // Telemetry state — mutable so toggle endpoint can flip it at runtime
   let enabled = config.telemetry_enabled === true;
 
-  return {
+  // Cached environment record — collected once per session
+  let environmentRecord = null;
+  let environmentCollected = false;
+
+  /**
+   * Collects and stores environment fingerprint if not already done.
+   * Called on first record() or on setEnabled(true). Safe to call multiple times.
+   */
+  async function ensureEnvironmentCollected(instance) {
+    if (environmentCollected) return;
+    environmentCollected = true;
+
+    try {
+      const env = collectEnvironment();
+      environmentRecord = env;
+      // Store as a telemetry event so it appears in exports
+      await instance.record(EVENTS.ENVIRONMENT_COLLECTED, env);
+    } catch (err) {
+      console.error('[Telemetry] Failed to collect environment:', err.message);
+    }
+  }
+
+  const instance = {
     /**
      * Records a telemetry event if telemetry is enabled.
      * No-op when disabled — zero overhead.
+     * On first call, also collects environment fingerprint.
      *
      * @param {string} eventType - One of EVENTS.*
      * @param {object} data - Event-specific payload (scores, attribution, settings, etc.)
      */
     async record(eventType, data = {}) {
       if (!enabled) return null;
+
+      // Collect environment on first real event (not the env event itself, to avoid recursion)
+      if (eventType !== EVENTS.ENVIRONMENT_COLLECTED) {
+        await ensureEnvironmentCollected(instance);
+      }
 
       const event = {
         event_type: eventType,
@@ -128,12 +159,24 @@ export function createTelemetry(store, config) {
     },
 
     /**
+     * Returns the cached environment fingerprint, or null if not yet collected.
+     */
+    getEnvironment() {
+      return environmentRecord;
+    },
+
+    /**
      * Enables or disables telemetry at runtime.
-     * Called by the toggle endpoint.
+     * Called by the toggle endpoint. When enabling, triggers environment collection.
      */
     setEnabled(value) {
       enabled = value === true;
+      if (enabled) {
+        ensureEnvironmentCollected(instance);
+      }
       return enabled;
     }
   };
+
+  return instance;
 }

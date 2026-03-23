@@ -52,6 +52,42 @@ export const CLIP_STATUSES = {
 export const SCORE_LOCK_THRESHOLD = 65;
 export const GRAND_MAX = 75;
 
+// Settings tiers — which Wan2GP JSON fields to surface at each visibility level.
+// Tier 1: always visible in evaluation panel. Directly affect output quality.
+// Tier 2: collapsed accordion. Power users reach for these when Tier 1 isn't enough.
+// Tier 3: everything else. Preserved silently in JSON generation, never shown.
+export const SETTINGS_TIERS = {
+  tier1: [
+    { key: 'prompt', label: 'Prompt', type: 'text' },
+    { key: 'alt_prompt', label: 'Alt Prompt', type: 'text' },
+    { key: 'negative_prompt', label: 'Negative Prompt', type: 'text' },
+    { key: 'loras_multipliers', label: 'LoRA Multipliers', type: 'text', hint: 'Phase-aware: "high;low high;low"' },
+    { key: 'guidance_scale', label: 'CFG High Noise', type: 'number', step: 0.1, hint: 'Sweet spot: 5.9-6.2' },
+    { key: 'guidance2_scale', label: 'CFG Low Noise', type: 'number', step: 0.1, hint: 'Default 3' },
+    { key: 'film_grain_intensity', label: 'Film Grain', type: 'number', step: 0.01 },
+    { key: 'film_grain_saturation', label: 'Grain Saturation', type: 'number', step: 0.1 },
+    { key: 'video_length', label: 'Video Length', type: 'number', step: 1, hint: '32 iteration, 81 production' },
+    { key: 'seed', label: 'Seed', type: 'number', step: 1 },
+    { key: 'num_inference_steps', label: 'Steps', type: 'number', step: 1 },
+    { key: 'resolution', label: 'Resolution', type: 'text' },
+    { key: 'skip_steps_cache_type', label: 'Steps Skipping', type: 'text', hint: '"Taylor2" for speed, empty for quality' }
+  ],
+  tier2: [
+    { key: 'flow_shift', label: 'Flow Shift', type: 'number', step: 1, hint: 'Temporal coherence. Higher=stable. Default 12, range 1-20' },
+    { key: 'NAG_scale', label: 'NAG Scale', type: 'number', step: 0.1, hint: 'Normalised Attention Guidance. Default 1, range 1-3' },
+    { key: 'NAG_tau', label: 'NAG Tau', type: 'number', step: 0.1 },
+    { key: 'NAG_alpha', label: 'NAG Alpha', type: 'number', step: 0.1 },
+    { key: 'sample_solver', label: 'Sample Solver', type: 'text', hint: 'unipc, euler, dpmpp' },
+    { key: 'switch_threshold', label: 'Switch Threshold', type: 'number', step: 1 },
+    { key: 'perturbation_switch', label: 'Perturbation', type: 'number', step: 1 },
+    { key: 'RIFLEx_setting', label: 'RIFLEx', type: 'number', step: 1 },
+    { key: 'cfg_star_switch', label: 'CFG Star', type: 'number', step: 1 },
+    { key: 'cfg_zero_step', label: 'CFG Zero Step', type: 'number', step: 1 },
+    { key: 'apg_switch', label: 'APG Switch', type: 'number', step: 1 }
+  ]
+  // Tier 3 = everything else. Not listed, preserved silently in JSON generation.
+};
+
 // Rope → primary category map — which scoring category each rope primarily affects.
 // Used by regression detection to flag unexpected side effects in non-targeted categories.
 // 'all' means the rope affects everything (no regression check applies).

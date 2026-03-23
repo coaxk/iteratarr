@@ -6,7 +6,7 @@ import { api } from '../../api';
  * VideoPanel — single video player with polling for render completion.
  * When path is set but file doesn't exist yet, polls every 30s until it appears.
  */
-function VideoPanel({ label, path, side, onBrowse }) {
+function VideoPanel({ label, path, side, onBrowse, iterationId }) {
   const [loaded, setLoaded] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [pollCount, setPollCount] = useState(0);
@@ -49,6 +49,10 @@ function VideoPanel({ label, path, side, onBrowse }) {
             setLoaded(true);
             setWaiting(false);
             clearInterval(interval);
+            // Record render completion for telemetry
+            if (iterationId) {
+              api.renderComplete(iterationId, new Date().toISOString()).catch(() => {});
+            }
           }
         }, 10000);
       }
@@ -133,12 +137,14 @@ export default function VideoDiff({
           label={previousLabel}
           path={previousVideoPath}
           side="previous"
+          iterationId={previousIterationId}
           onBrowse={() => setBrowsing('previous')}
         />
         <VideoPanel
           label={currentLabel}
           path={currentVideoPath}
           side="current"
+          iterationId={currentIterationId}
           onBrowse={() => setBrowsing('current')}
         />
       </div>

@@ -21,7 +21,8 @@ export function createTelemetryRoutes(telemetry, config) {
       res.json({
         enabled: telemetry.isEnabled(),
         event_count: (await telemetry.getEvents()).length,
-        last_event: events[0] || null
+        last_event: events[0] || null,
+        environment: telemetry.getEnvironment() || null
       });
     } catch (err) {
       res.status(500).json({ error: err.message });

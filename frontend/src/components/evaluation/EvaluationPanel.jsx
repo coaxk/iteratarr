@@ -5,6 +5,7 @@ import AttributionPanel from './AttributionPanel';
 import JsonViewer from './JsonViewer';
 import ImportEvalModal from './ImportEvalModal';
 import JsonDiffPanel from './JsonDiffPanel';
+import SettingsPanel from './SettingsPanel';
 import FrameStrip from './FrameStrip';
 import VideoDiff from './VideoDiff';
 import GeneratedModal from './GeneratedModal';
@@ -411,6 +412,12 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           currentJson={iteration.json_contents}
         />
       )}
+
+      {/* Tiered settings display — Tier 1 always visible, Tier 2 accordion, Tier 3 hidden */}
+      <SettingsPanel
+        jsonContents={iteration.json_contents}
+        parentJsonContents={parentIteration?.json_contents}
+      />
 
       {/* ════════════════════════════════════════════════════════════════════
          STAGE 2: ACT — what do you do about it?

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../../api';
 import FileBrowserModal from '../forms/FileBrowserModal';
+import CopyButton from '../common/CopyButton';
 
 /**
  * FrameStrip — horizontal strip of thumbnail frames extracted from a rendered MP4.
@@ -20,8 +21,9 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
   const [expandedFrame, setExpandedFrame] = useState(null);
   const [showBrowser, setShowBrowser] = useState(false);
   const [framesDir, setFramesDir] = useState(null);
-  const [copiedDir, setCopiedDir] = useState(false);
   const [outputDir, setOutputDir] = useState(null);
+  const [pollCount, setPollCount] = useState(0);
+  const MAX_POLLS = 40; // 40 * 15s = 10 minutes
 
   // Fetch Wan2GP output dir for browse starting point
   useEffect(() => {
@@ -63,9 +65,17 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
         } else if (renderPathProp) {
           const extracted = await tryExtract();
           if (!extracted && !cancelled) {
-            // Render not ready yet — poll every 15s until it appears
+            // Render not ready yet — poll every 15s, timeout after 10 min
+            let polls = 0;
             interval = setInterval(async () => {
               if (cancelled) return;
+              polls++;
+              setPollCount(polls);
+              if (polls >= MAX_POLLS) {
+                clearInterval(interval);
+                setError('Render not detected after 10 minutes. Use Extract Frames manually once the render completes.');
+                return;
+              }
               const done = await tryExtract();
               if (done) clearInterval(interval);
             }, 15000);
@@ -213,18 +223,7 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
         <div className="flex items-center gap-2 bg-surface rounded border border-accent/30 px-2 py-1.5">
           <span className="text-xs font-mono text-gray-400 flex-shrink-0">Frames saved to:</span>
           <span className="text-xs font-mono text-accent break-all flex-1 select-all">{framesDir}</span>
-          <button
-            onClick={async () => {
-              await navigator.clipboard.writeText(framesDir);
-              setCopiedDir(true);
-              setTimeout(() => setCopiedDir(false), 1500);
-            }}
-            className={`px-2 py-0.5 rounded text-xs font-mono flex-shrink-0 ${
-              copiedDir ? 'bg-score-high/20 text-score-high' : 'bg-surface-overlay text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            {copiedDir ? 'Copied' : 'Copy'}
-          </button>
+          <CopyButton text={framesDir} title="Copy frames folder path" />
         </div>
       )}
 
@@ -236,14 +235,22 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
         </div>
       )}
 
-      {/* Browse for render button */}
+      {/* Browse for render / polling status */}
       {frames.length === 0 && !extracting && (
-        <button
-          onClick={() => setShowBrowser(true)}
-          className="w-full py-2 border border-dashed border-gray-600 rounded text-xs font-mono text-gray-500 hover:text-accent hover:border-accent/50 transition-colors"
-        >
-          Browse for Render
-        </button>
+        <div className="space-y-2">
+          {pollCount > 0 && !error && (
+            <div className="flex items-center gap-2 text-xs font-mono text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+              Waiting for render... checked {pollCount} time{pollCount !== 1 ? 's' : ''} ({Math.round(pollCount * 15 / 60)}m)
+            </div>
+          )}
+          <button
+            onClick={() => setShowBrowser(true)}
+            className="w-full py-2 border border-dashed border-gray-600 rounded text-xs font-mono text-gray-500 hover:text-accent hover:border-accent/50 transition-colors"
+          >
+            Browse for Render
+          </button>
+        </div>
       )}
 
       {/* File browser modal */}

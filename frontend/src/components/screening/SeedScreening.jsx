@@ -103,6 +103,9 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
   // Lightbox for full-size frame viewing
   const [lightboxIndex, setLightboxIndex] = useState(null);
 
+  // Add more seeds
+  const [showAddSeeds, setShowAddSeeds] = useState(false);
+
   // Polling
   const pollRef = useRef(null);
 
@@ -363,6 +366,12 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
           </span>
         </h3>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAddSeeds(!showAddSeeds)}
+            className="px-3 py-1.5 border border-gray-700 text-gray-400 text-xs font-mono rounded hover:text-accent hover:border-accent/30 transition-colors"
+          >
+            {showAddSeeds ? 'Cancel' : '+ Add Seeds'}
+          </button>
           {selectedSeed && (
             <span className="text-xs font-mono text-accent font-bold">
               Selected: {selectedSeed}
@@ -430,6 +439,56 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
             ))}
           </div>
           <p className="text-xs font-mono text-gray-500">Renders will auto-detect when complete. Checking every 10 seconds.</p>
+        </div>
+      )}
+
+      {/* Add more seeds — inline form */}
+      {showAddSeeds && (
+        <div className="border border-accent/30 bg-accent/5 rounded p-3 space-y-3">
+          <h4 className="text-xs font-mono text-accent font-bold">Add More Seeds</h4>
+          <div>
+            <label className="text-xs font-mono text-gray-500 block mb-1">Base Generation JSON</label>
+            <textarea
+              value={baseJsonText}
+              onChange={(e) => setBaseJsonText(e.target.value)}
+              placeholder='Paste Wan2GP generation JSON here...'
+              rows={4}
+              className="w-full bg-surface border border-gray-600 rounded px-3 py-2 text-xs font-mono text-gray-200 placeholder:text-gray-600 resize-y"
+            />
+          </div>
+          <div className="flex gap-4">
+            <div>
+              <label className="text-xs font-mono text-gray-500 block mb-1">Count</label>
+              <input
+                type="number"
+                min={1}
+                max={12}
+                value={seedCount}
+                onChange={(e) => setSeedCount(Math.min(12, Math.max(1, parseInt(e.target.value) || 6)))}
+                className="w-20 bg-surface border border-gray-600 rounded px-2 py-1.5 text-sm font-mono text-gray-200"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs font-mono text-gray-500 block mb-1">Manual Seeds (optional)</label>
+              <input
+                type="text"
+                value={manualSeeds}
+                onChange={(e) => setManualSeeds(e.target.value)}
+                placeholder="544083690, 123456789, ..."
+                className="w-full bg-surface border border-gray-600 rounded px-2 py-1.5 text-sm font-mono text-gray-200 placeholder:text-gray-600"
+              />
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              await handleGenerate();
+              setShowAddSeeds(false);
+            }}
+            disabled={generating || !baseJsonText.trim()}
+            className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50 transition-colors"
+          >
+            {generating ? 'Generating...' : 'Generate'}
+          </button>
         </div>
       )}
 

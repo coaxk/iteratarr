@@ -1,4 +1,4 @@
-import { BRANCH_STATUSES, SCORE_LOCK_THRESHOLD } from '../../constants';
+import { BRANCH_STATUSES, SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constants';
 
 /**
  * BranchPillBar — horizontal pill selector for switching between branches.
@@ -72,16 +72,19 @@ export default function BranchPillBar({ branches, selectedBranchId, onSelect, on
 
               {shortName}
 
-              {/* Score badge */}
-              {branch.best_score !== null && branch.best_score !== undefined && (
-                <span className={`ml-0.5 ${
-                  isSelected ? 'text-black/60' :
-                  branch.best_score >= SCORE_LOCK_THRESHOLD ? 'text-green-400' :
-                  'text-gray-500'
-                }`}>
-                  {branch.best_score}
-                </span>
-              )}
+              {/* Score badge — matches iteration lineage color scale */}
+              {branch.best_score !== null && branch.best_score !== undefined && (() => {
+                const pct = branch.best_score / GRAND_MAX;
+                const scoreColor = isSelected ? 'text-black/60' :
+                  pct >= 0.75 ? 'text-score-high' :
+                  pct >= 0.5 ? 'text-score-mid' :
+                  'text-score-low';
+                return (
+                  <span className={`ml-0.5 ${scoreColor}`}>
+                    {branch.best_score}
+                  </span>
+                );
+              })()}
 
               {/* Iteration count */}
               {branch.iteration_count > 0 && (
@@ -91,11 +94,11 @@ export default function BranchPillBar({ branches, selectedBranchId, onSelect, on
               )}
             </button>
 
-            {/* Manage button — only on hover, for non-locked branches */}
+            {/* Manage button */}
             {onManage && !isLocked && (
               <button
                 onClick={(e) => { e.stopPropagation(); onManage(branch.id); }}
-                className="ml-0.5 w-4 h-4 flex items-center justify-center text-gray-600 hover:text-gray-400 text-xs opacity-0 hover:opacity-100 transition-opacity"
+                className="ml-0.5 w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-accent hover:bg-surface-overlay text-xs font-mono transition-colors"
                 title="Manage branch"
               >
                 ...

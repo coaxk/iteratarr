@@ -15,7 +15,7 @@ export default function CharacterRegistry() {
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-1">
         <h2 className="text-sm font-mono font-bold text-gray-200 uppercase tracking-wider">Character Registry</h2>
         <span className="text-xs font-mono text-gray-500">{list.length}</span>
         <button
@@ -25,8 +25,18 @@ export default function CharacterRegistry() {
           + New Character
         </button>
       </div>
+      <p className="text-xs font-mono text-gray-600 mb-4">LoRA-trained characters for your production. Register each character with their trigger word and LoRA files.</p>
       {list.length === 0 ? (
-        <p className="text-gray-600 text-xs font-mono">No characters registered</p>
+        <div className="border border-dashed border-gray-700 rounded-lg p-8 text-center">
+          <p className="text-sm font-mono text-gray-400 mb-2">No characters registered</p>
+          <p className="text-xs font-mono text-gray-600 mb-4">Add your first character to track their LoRA files, trigger words, and proven generation settings.</p>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90"
+          >
+            + Register First Character
+          </button>
+        </div>
       ) : (
         <div className="space-y-2">
           {list.map(character => (

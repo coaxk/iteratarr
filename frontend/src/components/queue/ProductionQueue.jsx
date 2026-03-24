@@ -1,38 +1,6 @@
-import { useState } from 'react';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../api';
-
-function CopyButton({ text }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Fallback for non-HTTPS contexts
-      const el = document.createElement('textarea');
-      el.value = text;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    }
-  };
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="text-xs font-mono text-gray-500 hover:text-accent transition-colors"
-      title="Copy path to clipboard"
-    >
-      {copied ? 'copied' : 'copy'}
-    </button>
-  );
-}
+import CopyButton from '../common/CopyButton';
 
 function QueueCard({ item }) {
   const loras = item.loras || [];
@@ -103,7 +71,10 @@ export default function ProductionQueue() {
       )}
 
       {!loading && !error && (!queueItems || queueItems.length === 0) && (
-        <p className="text-gray-600 text-xs font-mono">No clips queued</p>
+        <div className="text-center py-4">
+          <p className="text-gray-600 text-xs font-mono mb-1">No clips queued</p>
+          <p className="text-gray-700 text-xs font-mono">Clips appear here when an iteration scores {'\u2265'}65/75 and is locked for production.</p>
+        </div>
       )}
 
       {!loading && queueItems && queueItems.length > 0 && (

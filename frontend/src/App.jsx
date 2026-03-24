@@ -30,6 +30,8 @@ function TrendsView() {
   return (
     <div className="space-y-4">
       <div>
+        <h2 className="text-xs font-mono text-gray-500 uppercase tracking-wider mb-1">Score Trends</h2>
+        <p className="text-xs font-mono text-gray-600 mb-3">Track scoring progress, rope effectiveness, and parameter correlations across iterations.</p>
         <label className="text-xs font-mono text-gray-500 block mb-1">Select Clip</label>
         <select
           value={selectedClipId || ''}

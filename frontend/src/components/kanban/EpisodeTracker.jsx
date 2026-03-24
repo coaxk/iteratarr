@@ -40,7 +40,10 @@ export default function EpisodeTracker({ onSelectClip }) {
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Episode Tracker</h2>
+        <div>
+          <h2 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Episode Tracker</h2>
+          <p className="text-xs font-mono text-gray-600 mt-0.5">Drag clips between columns to update status. Click a clip to open it.</p>
+        </div>
         <button
           onClick={() => setShowCreateClip(true)}
           className="px-3 py-1.5 bg-accent text-black text-xs font-mono font-bold rounded hover:bg-accent/90"
@@ -48,6 +51,20 @@ export default function EpisodeTracker({ onSelectClip }) {
           + New Clip
         </button>
       </div>
+
+      {/* Empty state */}
+      {(!clips || clips.length === 0) && (
+        <div className="border border-dashed border-gray-700 rounded-lg p-8 text-center">
+          <p className="text-sm font-mono text-gray-400 mb-2">No clips yet</p>
+          <p className="text-xs font-mono text-gray-600 mb-4">Create your first clip to start the iteration loop. Each clip represents one video segment in your production.</p>
+          <button
+            onClick={() => setShowCreateClip(true)}
+            className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90"
+          >
+            + Create First Clip
+          </button>
+        </div>
+      )}
 
       {/* Kanban columns */}
       <DragDropContext onDragEnd={handleDragEnd}>

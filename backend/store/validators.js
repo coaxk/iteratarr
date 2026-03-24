@@ -54,4 +54,17 @@ export function validateCharacter(data) {
   requireField(data, 'trigger_word', 'trigger_word');
 }
 
-export { CLIP_STATUSES, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, MODEL_TYPES };
+const BRANCH_STATUSES = ['screening', 'active', 'stalled', 'locked', 'abandoned', 'superseded'];
+
+export function validateBranch(data) {
+  requireField(data, 'clip_id', 'clip_id');
+  requireField(data, 'seed', 'seed');
+  if (typeof data.seed !== 'number' || isNaN(data.seed)) {
+    throw new Error('seed must be a number');
+  }
+  if (data.status && !BRANCH_STATUSES.includes(data.status)) {
+    throw new Error(`Invalid branch status: ${data.status}. Must be one of: ${BRANCH_STATUSES.join(', ')}`);
+  }
+}
+
+export { CLIP_STATUSES, BRANCH_STATUSES, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, MODEL_TYPES };

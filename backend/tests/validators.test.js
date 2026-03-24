@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateProject, validateClip, validateEvaluation, validateCharacter } from '../store/validators.js';
+import { validateProject, validateClip, validateEvaluation, validateCharacter, validateBranch } from '../store/validators.js';
 
 describe('Validators', () => {
   it('validates a project', () => {
@@ -44,5 +44,29 @@ describe('Validators', () => {
   it('validates a character', () => {
     expect(() => validateCharacter({ name: 'Mick', trigger_word: 'mckdhn' })).not.toThrow();
     expect(() => validateCharacter({ name: 'Mick' })).toThrow('trigger_word is required');
+  });
+
+  it('validates a branch', () => {
+    expect(() => validateBranch({ clip_id: 'c1', seed: 123 })).not.toThrow();
+    expect(() => validateBranch({ clip_id: 'c1', seed: 123, status: 'active' })).not.toThrow();
+  });
+
+  it('rejects branch without required fields', () => {
+    expect(() => validateBranch({ seed: 123 })).toThrow('clip_id is required');
+    expect(() => validateBranch({ clip_id: 'c1' })).toThrow('seed is required');
+  });
+
+  it('rejects branch with non-numeric seed', () => {
+    expect(() => validateBranch({ clip_id: 'c1', seed: 'abc' })).toThrow('seed must be a number');
+  });
+
+  it('rejects invalid branch status', () => {
+    expect(() => validateBranch({ clip_id: 'c1', seed: 123, status: 'invalid' })).toThrow('Invalid branch status');
+  });
+
+  it('accepts all valid branch statuses', () => {
+    for (const status of ['screening', 'active', 'stalled', 'locked', 'abandoned', 'superseded']) {
+      expect(() => validateBranch({ clip_id: 'c1', seed: 123, status })).not.toThrow();
+    }
   });
 });

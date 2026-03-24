@@ -7,6 +7,7 @@ import { createIterationRoutes } from '../routes/iterations.js';
 import { createCharacterRoutes } from '../routes/characters.js';
 import { createTemplateRoutes } from '../routes/templates.js';
 import { createSeedScreenRoutes } from '../routes/seedscreen.js';
+import { createBranchRoutes, createBranchIterationRoutes } from '../routes/branches.js';
 import { createTelemetry } from '../telemetry/index.js';
 import { createTelemetryRoutes } from '../routes/telemetry.js';
 
@@ -23,6 +24,8 @@ export function createTestApp(dataDir, config = {}) {
   app.use('/api/characters', createCharacterRoutes(store));
   app.use('/api/templates', createTemplateRoutes(store));
   app.use('/api/clips', createSeedScreenRoutes(store, config));
+  app.use('/api/clips', createBranchRoutes(store));
+  app.use('/api/branches', createBranchIterationRoutes(store));
   app.use('/api/telemetry', createTelemetryRoutes(telemetry, config));
 
   return { app, store, telemetry };

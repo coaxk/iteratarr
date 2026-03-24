@@ -86,8 +86,22 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
       const existing = await store.list('iterations', i => i.clip_id === req.body.clip_id);
       const iteration_number = existing.reduce((max, i) => Math.max(max, i.iteration_number || 0), 0) + 1;
 
+      // Validate branch_id if provided
+      const branch_id = req.body.branch_id || null;
+      if (branch_id) {
+        try {
+          const branch = await store.get('branches', branch_id);
+          if (branch.clip_id !== req.body.clip_id) {
+            return res.status(400).json({ error: 'Branch does not belong to this clip' });
+          }
+        } catch {
+          return res.status(400).json({ error: `Branch ${branch_id} not found` });
+        }
+      }
+
       const iteration = await store.create('iterations', {
         clip_id: req.body.clip_id,
+        branch_id,
         iteration_number,
         json_filename: req.body.json_filename || `iter_${String(iteration_number).padStart(2, '0')}.json`,
         json_path: req.body.json_path || null,
@@ -167,6 +181,25 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         status: 'evaluated',
         evaluation_id: evaluation.id
       });
+
+      // Update branch best score if this evaluation is higher
+      const iterForBranch = await store.get('iterations', req.params.id);
+      if (iterForBranch.branch_id) {
+        try {
+          const branch = await store.get('branches', iterForBranch.branch_id);
+          if (!branch.best_score || evaluation.scores.grand_total > branch.best_score) {
+            await store.update('branches', iterForBranch.branch_id, {
+              best_score: evaluation.scores.grand_total,
+              best_iteration_id: req.params.id
+            });
+          }
+          // Update iteration count
+          const branchIters = await store.list('iterations', i => i.branch_id === iterForBranch.branch_id);
+          await store.update('branches', iterForBranch.branch_id, {
+            iteration_count: branchIters.length
+          });
+        } catch { /* branch may not exist */ }
+      }
 
       // Telemetry: record evaluation with scores, attribution, and generation settings
       if (telemetry) {
@@ -309,13 +342,29 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         queued_at: new Date().toISOString()
       });
 
-      // --- Step 7: Mark iteration locked, update clip status to in_queue ---
+      // --- Step 7: Mark iteration locked, update clip + branch statuses ---
       await store.update('iterations', req.params.id, { status: 'locked' });
       await store.update('clips', iteration.clip_id, {
         status: 'in_queue',
         locked_iteration_id: req.params.id,
         production_json_path: prodJsonPath
       });
+
+      // Branch lock cascade: lock the winning branch, supersede all others
+      if (iteration.branch_id) {
+        await store.update('branches', iteration.branch_id, {
+          status: 'locked',
+          locked_at: new Date().toISOString(),
+          best_score: evaluation.scores.grand_total,
+          best_iteration_id: iteration.id
+        });
+        const otherBranches = await store.list('branches',
+          b => b.clip_id === iteration.clip_id && b.id !== iteration.branch_id && b.status !== 'abandoned'
+        );
+        for (const branch of otherBranches) {
+          await store.update('branches', branch.id, { status: 'superseded' });
+        }
+      }
 
       // --- Step 8: Update character proven settings from locked iteration ---
       // When an iteration is locked as production, its generation settings become
@@ -547,6 +596,7 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
 
       const nextIteration = await store.create('iterations', {
         clip_id: parent.clip_id,
+        branch_id: parent.branch_id || null,
         iteration_number: nextNum,
         json_filename: nextFilename,
         json_path: savePath,

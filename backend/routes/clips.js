@@ -47,7 +47,11 @@ export function createClipRoutes(store) {
   });
 
   router.get('/:id/iterations', async (req, res) => {
-    const iterations = await store.list('iterations', i => i.clip_id === req.params.id);
+    const { branch_id } = req.query;
+    let iterations = await store.list('iterations', i => i.clip_id === req.params.id);
+    if (branch_id) {
+      iterations = iterations.filter(i => i.branch_id === branch_id);
+    }
     iterations.sort((a, b) => a.iteration_number - b.iteration_number);
     // Enrich with evaluation data so UI can show scores and load existing evaluations
     for (const iter of iterations) {

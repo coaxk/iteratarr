@@ -254,5 +254,69 @@ describe('Seed Screening API', () => {
       expect(res.status).toBe(400);
       expect(res.body.error).toContain('number');
     });
+
+    it('creates a branch when selecting a seed', async () => {
+      const { clip } = await createClipWithScene();
+
+      await request.post(`/api/clips/${clip.id}/seed-screen`).send({
+        base_json: baseJson,
+        seeds: [544083690, 123456789]
+      });
+
+      const res = await request.post(`/api/clips/${clip.id}/select-seed`).send({
+        seed: 544083690
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.branch_id).toBeTruthy();
+      expect(res.body.branch).toBeDefined();
+      expect(res.body.branch.seed).toBe(544083690);
+      expect(res.body.branch.status).toBe('active');
+      expect(res.body.branch.created_from).toBe('screening');
+
+      // Verify branch exists in store
+      const branches = await store.list('branches', b => b.clip_id === clip.id);
+      expect(branches).toHaveLength(1);
+      expect(branches[0].seed).toBe(544083690);
+    });
+
+    it('links seed screen record to branch', async () => {
+      const { clip } = await createClipWithScene();
+
+      await request.post(`/api/clips/${clip.id}/seed-screen`).send({
+        base_json: baseJson,
+        seeds: [544083690]
+      });
+
+      const res = await request.post(`/api/clips/${clip.id}/select-seed`).send({
+        seed: 544083690
+      });
+
+      // Verify seed screen record has branch_id
+      const screens = await store.list('seed_screens', r => r.clip_id === clip.id && r.seed === 544083690);
+      expect(screens[0].branch_id).toBe(res.body.branch_id);
+    });
+
+    it('supports multiple seed selections (multiple branches)', async () => {
+      const { clip } = await createClipWithScene();
+
+      await request.post(`/api/clips/${clip.id}/seed-screen`).send({
+        base_json: baseJson,
+        seeds: [544083690, 123456789, 987654321]
+      });
+
+      // Select first seed
+      await request.post(`/api/clips/${clip.id}/select-seed`).send({ seed: 544083690 });
+      // Select second seed
+      await request.post(`/api/clips/${clip.id}/select-seed`).send({ seed: 123456789 });
+
+      // Should have two branches
+      const branches = await store.list('branches', b => b.clip_id === clip.id);
+      expect(branches).toHaveLength(2);
+
+      // Clip should still be in_progress
+      const updatedClip = await store.get('clips', clip.id);
+      expect(updatedClip.status).toBe('in_progress');
+    });
   });
 });

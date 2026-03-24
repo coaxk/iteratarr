@@ -219,4 +219,107 @@ describe('Iterations API', () => {
     expect(res.body.davinci_metadata).toBeDefined();
     expect(res.body.davinci_metadata.final_score).toBe(75);
   });
+
+  it('POST /api/iterations creates iteration with branch_id', async () => {
+    const clip = await store.create('clips', { scene_id: 's1', name: 'C1', status: 'in_progress' });
+    const branch = await store.create('branches', { clip_id: clip.id, seed: 544083690, name: 'seed-544', status: 'active' });
+    const res = await request.post('/api/iterations').send({
+      clip_id: clip.id,
+      branch_id: branch.id,
+      json_filename: 'i1.json',
+      json_contents: sampleJson
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.branch_id).toBe(branch.id);
+  });
+
+  it('POST /api/iterations rejects branch from wrong clip', async () => {
+    const clip1 = await store.create('clips', { scene_id: 's1', name: 'C1', status: 'in_progress' });
+    const clip2 = await store.create('clips', { scene_id: 's1', name: 'C2', status: 'in_progress' });
+    const branch = await store.create('branches', { clip_id: clip2.id, seed: 544083690, name: 'seed-544', status: 'active' });
+    const res = await request.post('/api/iterations').send({
+      clip_id: clip1.id,
+      branch_id: branch.id,
+      json_filename: 'i1.json',
+      json_contents: sampleJson
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/does not belong/);
+  });
+
+  it('POST /api/iterations/:id/next propagates branch_id', async () => {
+    const clip = await store.create('clips', { scene_id: 's1', name: 'C1', status: 'in_progress' });
+    const branch = await store.create('branches', { clip_id: clip.id, seed: 544083690, name: 'seed-544', status: 'active' });
+    const iter = await request.post('/api/iterations').send({
+      clip_id: clip.id,
+      branch_id: branch.id,
+      json_filename: 'monaco_iter_01.json',
+      json_contents: sampleJson
+    });
+
+    // Evaluate first
+    await request.post(`/api/iterations/${iter.body.id}/evaluate`).send({
+      scores: {
+        identity: { face_match: 4, head_shape: 3, jaw: 4, cheekbones: 4, eyes_brow: 4, skin_texture: 3, hair: 3, frame_consistency: 2 },
+        location: { location_correct: 4, lighting_correct: 4, wardrobe_correct: 5, geometry_correct: 3 },
+        motion: { action_executed: 3, smoothness: 4, camera_movement: 2 }
+      },
+      attribution: { lowest_element: 'frame_consistency', rope: 'rope_3_lora_multipliers', next_change_json_field: 'loras_multipliers', next_change_value: '1.0;0.2 0.2;1.3' }
+    });
+
+    const res = await request.post(`/api/iterations/${iter.body.id}/next`);
+    expect(res.status).toBe(201);
+    expect(res.body.branch_id).toBe(branch.id);
+  });
+
+  it('GET /api/clips/:id/iterations filters by branch_id', async () => {
+    const clip = await store.create('clips', { scene_id: 's1', name: 'C1', status: 'in_progress' });
+    const b1 = await store.create('branches', { clip_id: clip.id, seed: 111, name: 'b1', status: 'active' });
+    const b2 = await store.create('branches', { clip_id: clip.id, seed: 222, name: 'b2', status: 'active' });
+
+    await store.create('iterations', { clip_id: clip.id, branch_id: b1.id, iteration_number: 1 });
+    await store.create('iterations', { clip_id: clip.id, branch_id: b1.id, iteration_number: 2 });
+    await store.create('iterations', { clip_id: clip.id, branch_id: b2.id, iteration_number: 1 });
+
+    const all = await request.get(`/api/clips/${clip.id}/iterations`);
+    expect(all.body).toHaveLength(3);
+
+    const filtered = await request.get(`/api/clips/${clip.id}/iterations?branch_id=${b1.id}`);
+    expect(filtered.body).toHaveLength(2);
+    expect(filtered.body.every(i => i.branch_id === b1.id)).toBe(true);
+  });
+
+  it('POST /api/iterations/:id/lock cascades branch statuses', async () => {
+    const scene = await store.create('scenes', { project_id: 'p1', name: 'Scene 01', episode: 1 });
+    const clip = await store.create('clips', { scene_id: scene.id, name: 'C1', status: 'in_progress' });
+    const b1 = await store.create('branches', { clip_id: clip.id, seed: 111, name: 'b1', status: 'active' });
+    const b2 = await store.create('branches', { clip_id: clip.id, seed: 222, name: 'b2', status: 'active' });
+
+    const iter = await request.post('/api/iterations').send({
+      clip_id: clip.id, branch_id: b1.id, json_filename: 'i1.json', json_contents: sampleJson
+    });
+
+    // Evaluate with all 5s
+    await request.post(`/api/iterations/${iter.body.id}/evaluate`).send({
+      scores: {
+        identity: { face_match: 5, head_shape: 5, jaw: 5, cheekbones: 5, eyes_brow: 5, skin_texture: 5, hair: 5, frame_consistency: 5 },
+        location: { location_correct: 5, lighting_correct: 5, wardrobe_correct: 5, geometry_correct: 5 },
+        motion: { action_executed: 5, smoothness: 5, camera_movement: 5 }
+      },
+      attribution: { lowest_element: 'none', rope: 'none' }
+    });
+
+    const res = await request.post(`/api/iterations/${iter.body.id}/lock`);
+    expect(res.status).toBe(200);
+
+    // Winning branch should be locked
+    const winnerBranch = await store.get('branches', b1.id);
+    expect(winnerBranch.status).toBe('locked');
+    expect(winnerBranch.locked_at).toBeTruthy();
+    expect(winnerBranch.best_score).toBe(75);
+
+    // Other branch should be superseded
+    const loserBranch = await store.get('branches', b2.id);
+    expect(loserBranch.status).toBe('superseded');
+  });
 });

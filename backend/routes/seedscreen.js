@@ -268,9 +268,42 @@ export function createSeedScreenRoutes(store, config = {}) {
       const outputDir = config.wan2gp_output_dir || join(config.wan2gp_json_dir || '.', 'outputs');
       const renderPath = join(outputDir, `${safeClipName}_iter_01.mp4`);
 
-      // Create iteration record in store
+      // Create branch for the selected seed
+      // Check if a branch for this seed already exists (re-selection)
+      const existingBranches = await store.list('branches', b => b.clip_id === clipId && b.seed === parsedSeed);
+      let branch;
+      if (existingBranches.length > 0) {
+        branch = existingBranches[0];
+        // Reactivate if it was screening-only
+        if (branch.status === 'screening') {
+          branch = await store.update('branches', branch.id, { status: 'active' });
+        }
+      } else {
+        branch = await store.create('branches', {
+          clip_id: clipId,
+          seed: parsedSeed,
+          name: `seed-${parsedSeed}`,
+          status: 'active',
+          created_from: 'screening',
+          source_branch_id: null,
+          source_iteration_id: null,
+          base_settings: baseSettings,
+          best_score: null,
+          best_iteration_id: null,
+          iteration_count: 0,
+          locked_at: null
+        });
+      }
+
+      // Link seed screen record to branch
+      if (match) {
+        await store.update('seed_screens', match.id, { branch_id: branch.id });
+      }
+
+      // Create iteration record in store with branch_id
       const iteration = await store.create('iterations', {
         clip_id: clipId,
+        branch_id: branch.id,
         iteration_number: 1,
         json_filename: iterFilename,
         json_path: iterPath,
@@ -284,10 +317,16 @@ export function createSeedScreenRoutes(store, config = {}) {
         change_from_parent: 'Selected from seed screening'
       });
 
-      // Update clip status to in_progress
-      await store.update('clips', clipId, { status: 'in_progress' });
+      // Update branch iteration count
+      await store.update('branches', branch.id, { iteration_count: 1 });
 
-      res.status(201).json(iteration);
+      // Update clip status to in_progress (only on first selection)
+      const clip_current = await store.get('clips', clipId);
+      if (clip_current.status !== 'in_progress') {
+        await store.update('clips', clipId, { status: 'in_progress' });
+      }
+
+      res.status(201).json({ ...iteration, branch_id: branch.id, branch: branch });
     } catch (err) {
       const status = err.message.includes('not found') ? 404 : 400;
       res.status(status).json({ error: err.message });

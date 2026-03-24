@@ -9,9 +9,18 @@ import ComparisonView from './ComparisonView';
 import ScoreRing from '../evaluation/ScoreRing';
 import EvaluationPanel from '../evaluation/EvaluationPanel';
 import SeedScreening from '../screening/SeedScreening';
+import BranchPillBar from './BranchPillBar';
 
 export default function ClipDetail({ clip, onBack }) {
-  const { data: iterations, loading, refetch } = useApi(() => api.getClipIterations(clip.id), [clip.id]);
+  // Branch state
+  const [selectedBranchId, setSelectedBranchId] = useState(null);
+  const { data: branches, refetch: refetchBranches } = useApi(() => api.listBranches(clip.id), [clip.id]);
+
+  // Iterations — filtered by branch when one is selected
+  const { data: iterations, loading, refetch } = useApi(
+    () => api.getClipIterations(clip.id, selectedBranchId),
+    [clip.id, selectedBranchId]
+  );
   const [selectedIteration, setSelectedIteration] = useState(null);
   const [liveScore, setLiveScore] = useState(null);
   const [clipTab, setClipTab] = useState(clip.status === 'screening' ? 'screening' : 'iterations'); // 'screening' | 'iterations' | 'trends'
@@ -25,6 +34,11 @@ export default function ClipDetail({ clip, onBack }) {
   const [goalSaving, setGoalSaving] = useState(false);
   const [currentGoal, setCurrentGoal] = useState(clip.goal || '');
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
+
+  // Reset selected iteration when branch changes
+  useEffect(() => {
+    setSelectedIteration(null);
+  }, [selectedBranchId]);
 
   // Auto-select the latest iteration when data loads
   useEffect(() => {
@@ -238,8 +252,18 @@ export default function ClipDetail({ clip, onBack }) {
           onSeedSelected={(iteration) => {
             setClipTab('iterations');
             refetch();
+            refetchBranches();
           }}
           onBack={() => setClipTab('iterations')}
+        />
+      )}
+
+      {/* Branch pill bar — shown on iterations tab when branches exist */}
+      {clipTab === 'iterations' && branches && branches.length > 0 && (
+        <BranchPillBar
+          branches={branches}
+          selectedBranchId={selectedBranchId}
+          onSelect={setSelectedBranchId}
         />
       )}
 
@@ -334,8 +358,8 @@ export default function ClipDetail({ clip, onBack }) {
           parentIteration={parentIteration}
           ancestorChain={ancestorChain}
           allIterations={iterations || []}
-          onSaved={refetch}
-          onLocked={refetch}
+          onSaved={() => { refetch(); refetchBranches(); }}
+          onLocked={() => { refetch(); refetchBranches(); }}
           onGoToIteration={(iter) => setSelectedIteration(iter)}
           onScoreChange={setLiveScore}
         />

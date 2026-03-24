@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background: dark surface matching the app theme -->
+  <rect width="32" height="32" rx="6" fill="#1a1a2e"/>
+  <!-- Iteration loop arrow — the core concept -->
+  <path d="M16 6 L24 12 L20 12 L20 20 L12 20 L12 12 L8 12 Z" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linejoin="round"/>
+  <!-- Inner dot — the seed/starting point -->
+  <circle cx="16" cy="15" r="2.5" fill="#f59e0b"/>
+  <!-- Branch lines — representing the per-seed branching -->
+  <line x1="16" y1="20" x2="11" y2="26" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+  <line x1="16" y1="20" x2="21" y2="26" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+  <!-- Branch endpoints -->
+  <circle cx="11" cy="26" r="1.5" fill="#f59e0b" opacity="0.6"/>
+  <circle cx="21" cy="26" r="1.5" fill="#f59e0b" opacity="0.6"/>
+</svg>

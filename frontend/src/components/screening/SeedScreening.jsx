@@ -19,6 +19,64 @@ import SeedCard from './SeedCard';
  *   onSeedSelected — callback when user selects a seed and iter_01 is created
  *   onBack         — callback to go back to clip detail
  */
+function LightboxViewer({ frames, index, frameSrc, onClose, onNavigate }) {
+  const prev = (index - 1 + frames.length) % frames.length;
+  const next = (index + 1) % frames.length;
+
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') onNavigate(prev);
+      if (e.key === 'ArrowRight') onNavigate(next);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [index, prev, next]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+      onClick={onClose}
+    >
+      {/* Previous arrow */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onNavigate(prev); }}
+        className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-2xl font-mono transition-colors z-10"
+      >
+        ‹
+      </button>
+
+      {/* Frame image — as large as possible */}
+      <img
+        src={frameSrc(frames[index])}
+        alt={`Frame ${index + 1} of ${frames.length}`}
+        className="max-w-[95vw] max-h-[95vh] object-contain"
+        onClick={(e) => e.stopPropagation()}
+      />
+
+      {/* Next arrow */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onNavigate(next); }}
+        className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-2xl font-mono transition-colors z-10"
+      >
+        ›
+      </button>
+
+      {/* Frame counter + close */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 text-sm font-mono text-gray-400">
+        Frame {index + 1} / {frames.length}
+      </div>
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-mono"
+      >
+        ×
+      </button>
+      <span className="absolute bottom-4 text-xs font-mono text-gray-600">Arrow keys to navigate · Esc to close</span>
+    </div>
+  );
+}
+
 export default function SeedScreening({ clip, onSeedSelected, onBack }) {
   // Setup state
   const [baseJsonText, setBaseJsonText] = useState('');
@@ -41,6 +99,9 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
   // Reference images
   const [referenceImages, setReferenceImages] = useState([]);
   const [showRefImages, setShowRefImages] = useState(false);
+
+  // Lightbox for full-size frame viewing
+  const [lightboxIndex, setLightboxIndex] = useState(null);
 
   // Polling
   const pollRef = useRef(null);
@@ -448,8 +509,9 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
                     key={filename}
                     src={frameSrc(expandedRecord.id, filename)}
                     alt={`Frame ${idx + 1}`}
-                    title={`Frame ${idx + 1} of ${expandedRecord.frames.length}`}
-                    className="h-24 w-auto rounded border border-gray-700 hover:border-accent/50 transition-colors"
+                    title={`Frame ${idx + 1} — click to view full size`}
+                    className="h-40 w-auto rounded border border-gray-700 hover:border-accent cursor-pointer transition-colors"
+                    onClick={() => setLightboxIndex(idx)}
                   />
                 ))}
               </div>
@@ -512,6 +574,17 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
           Polling for renders every 10s
         </div>
+      )}
+
+      {/* Lightbox overlay — full-screen frame viewer with arrow navigation */}
+      {lightboxIndex !== null && expandedRecord?.frames?.length > 0 && (
+        <LightboxViewer
+          frames={expandedRecord.frames}
+          index={lightboxIndex}
+          frameSrc={(filename) => frameSrc(expandedRecord.id, filename)}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={setLightboxIndex}
+        />
       )}
     </div>
   );

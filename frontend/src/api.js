@@ -27,7 +27,7 @@ export const api = {
   },
   createClip: (data) => request('/clips', { method: 'POST', body: data }),
   updateClip: (id, data) => request(`/clips/${id}`, { method: 'PATCH', body: data }),
-  getClipIterations: (id) => request(`/clips/${id}/iterations`),
+  getClipIterations: (id, branchId) => request(`/clips/${id}/iterations${branchId ? `?branch_id=${branchId}` : ''}`),
 
   // Iterations
   createIteration: (data) => request('/iterations', { method: 'POST', body: data }),
@@ -77,6 +77,14 @@ export const api = {
   updateSeedScreen: (clipId, screenId, data) => request(`/clips/${clipId}/seed-screen/${screenId}`, { method: 'PATCH', body: data }),
   deleteSeedScreen: (clipId, screenId) => request(`/clips/${clipId}/seed-screen/${screenId}`, { method: 'DELETE' }),
   selectSeed: (clipId, data) => request(`/clips/${clipId}/select-seed`, { method: 'POST', body: data }),
+
+  // Branches
+  listBranches: (clipId) => request(`/clips/${clipId}/branches`),
+  createBranch: (clipId, data) => request(`/clips/${clipId}/branches`, { method: 'POST', body: data }),
+  getBranch: (clipId, branchId) => request(`/clips/${clipId}/branches/${branchId}`),
+  updateBranch: (clipId, branchId, data) => request(`/clips/${clipId}/branches/${branchId}`, { method: 'PATCH', body: data }),
+  deleteBranch: (clipId, branchId) => request(`/clips/${clipId}/branches/${branchId}`, { method: 'DELETE' }),
+  getBranchIterations: (branchId) => request(`/branches/${branchId}/iterations`),
 
   // Templates
   listTemplates: () => request('/templates'),

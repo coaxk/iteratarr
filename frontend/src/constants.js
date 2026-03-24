@@ -82,6 +82,16 @@ export const CLIP_STATUSES = {
   in_queue: { label: 'In Queue', color: 'bg-status-blue' }
 };
 
+// Branch statuses with display labels and Tailwind colour classes.
+export const BRANCH_STATUSES = {
+  screening: { label: 'Screening', color: 'bg-purple-500', textColor: 'text-purple-400' },
+  active: { label: 'Active', color: 'bg-status-yellow', textColor: 'text-amber-400' },
+  stalled: { label: 'Stalled', color: 'bg-gray-500', textColor: 'text-gray-400' },
+  locked: { label: 'Locked', color: 'bg-status-green', textColor: 'text-green-400' },
+  abandoned: { label: 'Abandoned', color: 'bg-status-red', textColor: 'text-red-400' },
+  superseded: { label: 'Superseded', color: 'bg-gray-600', textColor: 'text-gray-500' }
+};
+
 // Scoring thresholds
 export const SCORE_LOCK_THRESHOLD = 65;
 export const GRAND_MAX = 75;

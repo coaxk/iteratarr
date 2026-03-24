@@ -10,6 +10,7 @@ import ScoreRing from '../evaluation/ScoreRing';
 import EvaluationPanel from '../evaluation/EvaluationPanel';
 import SeedScreening from '../screening/SeedScreening';
 import BranchPillBar from './BranchPillBar';
+import BranchManageMenu from './BranchManageMenu';
 
 export default function ClipDetail({ clip, onBack }) {
   // Branch state
@@ -33,6 +34,7 @@ export default function ClipDetail({ clip, onBack }) {
   const [goalDraft, setGoalDraft] = useState(clip.goal || '');
   const [goalSaving, setGoalSaving] = useState(false);
   const [currentGoal, setCurrentGoal] = useState(clip.goal || '');
+  const [managingBranchId, setManagingBranchId] = useState(null);
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
   // Reset selected iteration when branch changes
@@ -264,6 +266,7 @@ export default function ClipDetail({ clip, onBack }) {
           branches={branches}
           selectedBranchId={selectedBranchId}
           onSelect={setSelectedBranchId}
+          onManage={setManagingBranchId}
         />
       )}
 
@@ -373,6 +376,20 @@ export default function ClipDetail({ clip, onBack }) {
           onClose={() => {
             setShowComparison(false);
             setComparisonPreselect(null);
+          }}
+        />
+      )}
+
+      {/* Branch management modal */}
+      {managingBranchId && (
+        <BranchManageMenu
+          clipId={clip.id}
+          branchId={managingBranchId}
+          onClose={() => setManagingBranchId(null)}
+          onUpdated={() => {
+            refetchBranches();
+            refetch();
+            setManagingBranchId(null);
           }}
         />
       )}

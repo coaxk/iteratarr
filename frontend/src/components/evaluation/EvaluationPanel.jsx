@@ -15,15 +15,9 @@ import { IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, SCORE_LOCK_THRESHOLD, 
 
 const defaultScores = (fields) => Object.fromEntries(fields.map(f => [f.key, 3]));
 
-function CopyBtn({ text }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button onClick={async () => { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-      className={`px-1.5 py-0.5 rounded text-xs font-mono shrink-0 ${copied ? 'bg-score-high/20 text-score-high' : 'bg-surface-overlay text-gray-600 hover:text-gray-400'}`}>
-      {copied ? 'Copied' : 'Copy'}
-    </button>
-  );
-}
+// Use shared CopyButton, alias for backward compat with inline usage
+import CopyButton from '../common/CopyButton';
+const CopyBtn = ({ text }) => <CopyButton text={text} />;
 
 export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], allIterations = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange }) {
   const [identity, setIdentity] = useState(defaultScores(IDENTITY_FIELDS));
@@ -228,12 +222,20 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         />
       )}
 
-      {/* Read-only banner */}
+      {/* Read-only banner with navigation to next iteration */}
       {isReadOnly && (
-        <div className="border border-gray-600 bg-surface-overlay rounded px-3 py-2">
+        <div className="border border-gray-600 bg-surface-overlay rounded px-3 py-2 flex items-center justify-between">
           <p className="text-xs font-mono text-gray-400">
-            This iteration has been evaluated and its next iteration generated. Viewing in read-only mode.
+            Evaluated and locked — viewing read-only. Next iteration has been generated.
           </p>
+          {childIteration && onGoToIteration && (
+            <button
+              onClick={() => onGoToIteration(childIteration)}
+              className="shrink-0 px-3 py-1 bg-accent text-black text-xs font-mono font-bold rounded hover:bg-accent/90 transition-colors"
+            >
+              Go to #{childIteration.iteration_number} &rarr;
+            </button>
+          )}
         </div>
       )}
 
@@ -528,30 +530,39 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
 
         {/* Action buttons */}
         {!isReadOnly && (
-          <div className="flex gap-2 flex-wrap">
-            {!isEvaluated && (
-              <>
-                <button onClick={handleSave} disabled={saving}
-                  className="px-4 py-2 bg-surface-overlay text-gray-200 text-sm font-mono rounded hover:bg-gray-600 disabled:opacity-50 border border-gray-600">
-                  Save Evaluation
+          <div className="space-y-1.5">
+            <div className="flex gap-2 flex-wrap">
+              {!isEvaluated && (
+                <>
+                  <button onClick={handleSave} disabled={saving}
+                    className="px-4 py-2 bg-surface-overlay text-gray-200 text-sm font-mono rounded hover:bg-gray-600 disabled:opacity-50 border border-gray-600">
+                    Save Evaluation
+                  </button>
+                  <button onClick={handleSaveAndGenerate} disabled={saving || !attribution.rope}
+                    className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50"
+                    title={!attribution.rope ? 'Select a rope attribution below before generating' : undefined}>
+                    Save &amp; Generate Next
+                  </button>
+                </>
+              )}
+              {isEvaluated && !hasChild && (
+                <button onClick={handleNext} disabled={saving || !attribution.rope}
+                  className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50"
+                  title={!attribution.rope ? 'Select a rope attribution below before generating' : undefined}>
+                  Generate Next Iteration
                 </button>
-                <button onClick={handleSaveAndGenerate} disabled={saving || !attribution.rope}
-                  className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50">
-                  Save &amp; Generate Next
+              )}
+              {canLock && !hasChild && (
+                <button onClick={handleLock} disabled={saving}
+                  className="px-4 py-2 bg-score-high text-black text-sm font-mono font-bold rounded hover:bg-green-400 disabled:opacity-50">
+                  Lock as Production
                 </button>
-              </>
-            )}
-            {isEvaluated && !hasChild && (
-              <button onClick={handleNext} disabled={saving || !attribution.rope}
-                className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50">
-                Generate Next Iteration
-              </button>
-            )}
-            {canLock && !hasChild && (
-              <button onClick={handleLock} disabled={saving}
-                className="px-4 py-2 bg-score-high text-black text-sm font-mono font-bold rounded hover:bg-green-400 disabled:opacity-50">
-                Lock as Production
-              </button>
+              )}
+            </div>
+            {!attribution.rope && !isEvaluated && (
+              <p className="text-xs font-mono text-gray-600">
+                Select a rope in the Attribution section below to enable Generate
+              </p>
             )}
           </div>
         )}

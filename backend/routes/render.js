@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { renderSingle, renderBatch, renderQueue, createQueueFile, checkWan2GP } from '../wan2gp-bridge.js';
+import { renderSingle, renderBatch, renderQueue, createQueueFile, checkWan2GP, onProgress } from '../wan2gp-bridge.js';
 import { join } from 'path';
 
 // Track active renders
@@ -7,7 +7,21 @@ const activeRenders = new Map();
 let renderIdCounter = 0;
 
 function trackRender(id, info) {
-  activeRenders.set(id, { ...info, id, startedAt: new Date().toISOString(), status: 'rendering' });
+  activeRenders.set(id, { ...info, id, startedAt: new Date().toISOString(), status: 'rendering', progress: null });
+  // Subscribe to progress updates from the bridge
+  onProgress(id, (data) => {
+    const render = activeRenders.get(id);
+    if (render) {
+      if (data.type === 'progress') {
+        render.progress = { percent: data.percent, step: data.step, totalSteps: data.totalSteps, secsPerStep: data.secsPerStep };
+      } else if (data.type === 'abort') {
+        render.status = 'aborted';
+        render.error = data.message;
+      } else if (data.type === 'info') {
+        render.phase = data.phase;
+      }
+    }
+  });
 }
 
 function completeRender(id, success, error) {
@@ -66,7 +80,7 @@ export function createRenderRoutes(store, config) {
     const filename = json_path.split(/[/\\]/).pop();
     trackRender(id, { json_path, filename, type: 'single' });
 
-    renderSingle(json_path).then(result => {
+    renderSingle(json_path, { renderId: id }).then(result => {
       console.log(`[Render API] Complete: ${filename}`);
       completeRender(id, true);
     }).catch(err => {

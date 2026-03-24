@@ -98,13 +98,16 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
 
   // Reference images
   const [referenceImages, setReferenceImages] = useState([]);
-  const [showRefImages, setShowRefImages] = useState(false);
+  const [showRefImages, setShowRefImages] = useState(true);
 
   // Lightbox for full-size frame viewing
   const [lightboxIndex, setLightboxIndex] = useState(null);
 
   // Add more seeds
   const [showAddSeeds, setShowAddSeeds] = useState(false);
+
+  // Reference image lightbox
+  const [refLightboxIndex, setRefLightboxIndex] = useState(null);
 
   // Polling
   const pollRef = useRef(null);
@@ -253,19 +256,46 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
     }
   };
 
+  // Load persisted reference images from clip record
+  useEffect(() => {
+    if (clip.reference_images?.length > 0) {
+      setReferenceImages(clip.reference_images);
+    }
+  }, [clip.id]);
+
+  const saveReferenceImages = async (images) => {
+    try {
+      await api.updateClip(clip.id, { reference_images: images });
+    } catch { /* save failed silently */ }
+  };
+
   const handleReferenceImage = (e) => {
     const files = Array.from(e.target.files);
+    const newImages = [];
+    let loaded = 0;
     files.forEach(file => {
       const reader = new FileReader();
       reader.onload = (ev) => {
-        setReferenceImages(prev => [...prev, { name: file.name, src: ev.target.result }]);
+        newImages.push({ name: file.name, src: ev.target.result });
+        loaded++;
+        if (loaded === files.length) {
+          setReferenceImages(prev => {
+            const updated = [...prev, ...newImages];
+            saveReferenceImages(updated);
+            return updated;
+          });
+        }
       };
       reader.readAsDataURL(file);
     });
   };
 
   const removeReference = (idx) => {
-    setReferenceImages(prev => prev.filter((_, i) => i !== idx));
+    setReferenceImages(prev => {
+      const updated = prev.filter((_, i) => i !== idx);
+      saveReferenceImages(updated);
+      return updated;
+    });
   };
 
   const frameSrc = (screenId, filename) => `/api/frames/${screenId}/${filename}`;
@@ -507,7 +537,12 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
           <div className="flex gap-2 overflow-x-auto pb-1 mt-2">
             {referenceImages.map((img, idx) => (
               <div key={idx} className="flex-shrink-0 relative group">
-                <img src={img.src} alt={img.name} className="h-16 w-auto rounded border border-gray-700" />
+                <img
+                  src={img.src}
+                  alt={img.name}
+                  className="h-16 w-auto rounded border border-gray-700 cursor-pointer hover:border-accent transition-colors"
+                  onClick={() => setRefLightboxIndex(idx)}
+                />
                 <button
                   onClick={() => removeReference(idx)}
                   className="absolute -top-1 -right-1 w-4 h-4 bg-gray-800 border border-gray-600 rounded-full text-xs text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
@@ -643,6 +678,17 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
           frameSrc={(filename) => frameSrc(expandedRecord.id, filename)}
           onClose={() => setLightboxIndex(null)}
           onNavigate={setLightboxIndex}
+        />
+      )}
+
+      {/* Reference photo lightbox */}
+      {refLightboxIndex !== null && referenceImages.length > 0 && (
+        <LightboxViewer
+          frames={referenceImages}
+          index={refLightboxIndex}
+          frameSrc={(img) => img.src}
+          onClose={() => setRefLightboxIndex(null)}
+          onNavigate={setRefLightboxIndex}
         />
       )}
     </div>

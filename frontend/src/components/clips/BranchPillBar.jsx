@@ -67,7 +67,7 @@ export default function BranchPillBar({ branches, selectedBranchId, onSelect, on
                   isSelected
                     ? 'bg-accent text-black'
                     : isFork
-                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30'
+                      ? 'pill-fork'
                       : isDimmed
                         ? 'bg-surface-overlay/50 text-gray-600 hover:text-gray-400'
                         : 'bg-surface-overlay text-gray-300 hover:text-gray-100'

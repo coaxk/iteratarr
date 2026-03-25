@@ -85,6 +85,7 @@ export const api = {
   updateBranch: (clipId, branchId, data) => request(`/clips/${clipId}/branches/${branchId}`, { method: 'PATCH', body: data }),
   deleteBranch: (clipId, branchId) => request(`/clips/${clipId}/branches/${branchId}`, { method: 'DELETE' }),
   getBranchIterations: (branchId) => request(`/branches/${branchId}/iterations`),
+  forkBranch: (clipId, data) => request(`/clips/${clipId}/fork`, { method: 'POST', body: data }),
 
   // Templates
   listTemplates: () => request('/templates'),

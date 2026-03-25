@@ -154,6 +154,68 @@ describe('Branches API', () => {
     expect(res.body.error).toMatch(/Cannot delete branch with/);
   });
 
+  it('POST /api/clips/:clipId/fork creates a new branch from an iteration', async () => {
+    const clip = await createClip();
+    const branch = (await request.post(`/api/clips/${clip.id}/branches`).send({ seed: 544083690 })).body;
+
+    // Create source iteration with settings
+    const sourceIter = await store.create('iterations', {
+      clip_id: clip.id,
+      branch_id: branch.id,
+      iteration_number: 3,
+      seed_used: 544083690,
+      json_contents: { prompt: 'test prompt', seed: 544083690, guidance_scale: 6.1, video_length: 32 },
+      render_path: '/tmp/some-render.mp4'
+    });
+
+    const res = await request.post(`/api/clips/${clip.id}/fork`).send({
+      source_iteration_id: sourceIter.id,
+      seed: 999888777
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.branch).toBeDefined();
+    expect(res.body.branch.seed).toBe(999888777);
+    expect(res.body.branch.created_from).toBe('fork');
+    expect(res.body.branch.source_iteration_id).toBe(sourceIter.id);
+    expect(res.body.branch.source_branch_id).toBe(branch.id);
+    expect(res.body.iteration).toBeDefined();
+    expect(res.body.iteration.iteration_number).toBe(1);
+    expect(res.body.iteration.branch_id).toBe(res.body.branch.id);
+    expect(res.body.iteration.json_contents.seed).toBe(999888777);
+    expect(res.body.iteration.json_contents.prompt).toBe('test prompt');
+    expect(res.body.iteration.change_from_parent).toMatch(/Forked from/);
+  });
+
+  it('POST /api/clips/:clipId/fork with same seed reuses source render path', async () => {
+    const clip = await createClip();
+    const branch = (await request.post(`/api/clips/${clip.id}/branches`).send({ seed: 544083690 })).body;
+
+    const sourceIter = await store.create('iterations', {
+      clip_id: clip.id,
+      branch_id: branch.id,
+      iteration_number: 5,
+      seed_used: 544083690,
+      json_contents: { prompt: 'test', seed: 544083690, video_length: 32 },
+      render_path: '/tmp/original-render.mp4'
+    });
+
+    const res = await request.post(`/api/clips/${clip.id}/fork`).send({
+      source_iteration_id: sourceIter.id
+      // no seed override — uses source seed
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.iteration.render_path).toBe('/tmp/original-render.mp4');
+  });
+
+  it('POST /api/clips/:clipId/fork rejects missing source_iteration_id', async () => {
+    const clip = await createClip();
+    const res = await request.post(`/api/clips/${clip.id}/fork`).send({});
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/source_iteration_id/);
+  });
+
   it('GET /api/branches/:id/iterations lists iterations for a branch', async () => {
     const clip = await createClip();
     const branchRes = await request.post(`/api/clips/${clip.id}/branches`).send({ seed: 544083690 });

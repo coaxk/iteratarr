@@ -1,11 +1,15 @@
 import { Router } from 'express';
+import { writeFile, mkdir } from 'fs/promises';
+import { join, basename } from 'path';
 import { validateBranch } from '../store/validators.js';
+import { getClipPaths } from '../paths.js';
+import { WAN2GP_FIELDS } from './iterations.js';
 
 /**
  * Branch routes — manages per-seed iteration branches within a clip.
  * Each branch represents an independent iteration chain for a specific seed.
  */
-export function createBranchRoutes(store) {
+export function createBranchRoutes(store, config = {}) {
   const router = Router();
 
   /**
@@ -117,6 +121,129 @@ export function createBranchRoutes(store) {
       res.json(updated);
     } catch (err) {
       res.status(err.message.includes('not found') ? 404 : 400).json({ error: err.message });
+    }
+  });
+
+  /**
+   * POST /api/clips/:clipId/fork — create a new branch by forking from any iteration
+   *
+   * Body: {
+   *   source_iteration_id: string,  — iteration to fork from (copies its settings)
+   *   seed: number (optional),      — new seed for the fork (defaults to source seed)
+   *   name: string (optional)       — branch name
+   * }
+   *
+   * Creates a new branch + iter_01 with the source iteration's settings.
+   * Returns { branch, iteration } for frontend navigation.
+   */
+  router.post('/:clipId/fork', async (req, res) => {
+    try {
+      const { clipId } = req.params;
+      const { source_iteration_id, seed: requestedSeed, name } = req.body;
+
+      if (!source_iteration_id) {
+        return res.status(400).json({ error: 'source_iteration_id is required' });
+      }
+
+      // Get source iteration and its settings
+      const sourceIter = await store.get('iterations', source_iteration_id);
+      if (sourceIter.clip_id !== clipId) {
+        return res.status(400).json({ error: 'Source iteration does not belong to this clip' });
+      }
+
+      const seed = requestedSeed !== undefined ? parseInt(requestedSeed) : (sourceIter.seed_used || sourceIter.json_contents?.seed);
+      if (!seed || isNaN(seed)) {
+        return res.status(400).json({ error: 'Could not determine seed — provide one explicitly' });
+      }
+
+      // Check for duplicate seed branch
+      const existing = await store.list('branches', b => b.clip_id === clipId && b.seed === seed);
+      if (existing.length > 0 && !requestedSeed) {
+        // Same seed fork — allow it but with a distinct name
+      }
+
+      // Build iter_01 JSON from source iteration's settings
+      const forkJson = { ...sourceIter.json_contents };
+      forkJson.seed = seed;
+      forkJson.video_length = config.iteration_frame_count || 32;
+
+      // Set output filename
+      const clip = await store.get('clips', clipId);
+      const safeClipName = basename(clip.name)
+        .replace(/[^a-zA-Z0-9\-. ]/g, '')
+        .replace(/\s+/g, '-')
+        .toLowerCase();
+      forkJson.output_filename = `${safeClipName}_iter_01`;
+
+      // Strip junk fields
+      Object.keys(forkJson).forEach(k => { if (!WAN2GP_FIELDS.has(k)) delete forkJson[k]; });
+
+      // Create branch
+      const branchName = name || `seed-${seed}${existing.length > 0 ? `-fork-${existing.length + 1}` : ''}`;
+      const branch = await store.create('branches', {
+        clip_id: clipId,
+        seed,
+        name: branchName,
+        status: 'active',
+        created_from: 'fork',
+        source_branch_id: sourceIter.branch_id || null,
+        source_iteration_id,
+        base_settings: forkJson,
+        best_score: null,
+        best_iteration_id: null,
+        iteration_count: 1,
+        locked_at: null
+      });
+
+      // Write iter_01 JSON to disk
+      let iterPath = null;
+      let renderPath = null;
+      const iterFilename = `${safeClipName}_iter_01.json`;
+      try {
+        const scene = await store.get('scenes', clip.scene_id);
+        const paths = getClipPaths(config, clip, scene);
+        // Use branch-specific subdirectory
+        const branchIterDir = join(paths.iterations, `branch-${seed}`);
+        await mkdir(branchIterDir, { recursive: true });
+        iterPath = join(branchIterDir, iterFilename);
+        await writeFile(iterPath, JSON.stringify(forkJson, null, 2));
+      } catch {
+        // Fall back to flat save dir
+        const saveDir = config.iteration_save_dir || './iterations';
+        await mkdir(saveDir, { recursive: true });
+        iterPath = join(saveDir, iterFilename);
+        await writeFile(iterPath, JSON.stringify(forkJson, null, 2));
+      }
+
+      // Render path — if same seed as source, reuse source render
+      if (seed === sourceIter.seed_used && sourceIter.render_path) {
+        renderPath = sourceIter.render_path;
+      } else {
+        const outputDir = config.wan2gp_output_dir || join(config.wan2gp_json_dir || '.', 'outputs');
+        renderPath = join(outputDir, `${safeClipName}_iter_01.mp4`);
+      }
+
+      // Create iteration record
+      const iteration = await store.create('iterations', {
+        clip_id: clipId,
+        branch_id: branch.id,
+        iteration_number: 1,
+        json_filename: iterFilename,
+        json_path: iterPath,
+        json_contents: forkJson,
+        seed_used: seed,
+        model_type: sourceIter.model_type || 'other',
+        render_path: renderPath,
+        status: 'pending',
+        evaluation_id: null,
+        parent_iteration_id: null,
+        change_from_parent: `Forked from branch ${sourceIter.branch_id || 'unknown'} iter #${sourceIter.iteration_number}`
+      });
+
+      res.status(201).json({ branch, iteration });
+    } catch (err) {
+      const status = err.message.includes('not found') ? 404 : 400;
+      res.status(status).json({ error: err.message });
     }
   });
 

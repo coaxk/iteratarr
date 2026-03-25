@@ -52,7 +52,7 @@ app.use('/api/browser', createBrowserRoutes(config));
 app.use('/api/templates', createTemplateRoutes(store));
 app.use('/api/render', createRenderRoutes(store, config));
 app.use('/api/clips', createSeedScreenRoutes(store, config));
-app.use('/api/clips', createBranchRoutes(store));
+app.use('/api/clips', createBranchRoutes(store, config));
 app.use('/api/branches', createBranchIterationRoutes(store));
 
 // Video file serving — streams MP4 files from allowed directories

@@ -24,7 +24,7 @@ export function createTestApp(dataDir, config = {}) {
   app.use('/api/characters', createCharacterRoutes(store));
   app.use('/api/templates', createTemplateRoutes(store));
   app.use('/api/clips', createSeedScreenRoutes(store, config));
-  app.use('/api/clips', createBranchRoutes(store));
+  app.use('/api/clips', createBranchRoutes(store, config));
   app.use('/api/branches', createBranchIterationRoutes(store));
   app.use('/api/telemetry', createTelemetryRoutes(telemetry, config));
 

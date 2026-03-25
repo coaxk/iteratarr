@@ -72,7 +72,10 @@ export default function BranchPillBar({ branches, selectedBranchId, onSelect, on
                         ? 'bg-surface-overlay text-gray-300 hover:text-gray-100'
                         : 'bg-surface-overlay text-gray-300 hover:text-gray-100'
                 }`}
-                style={isFork && !isSelected ? { backgroundColor: 'rgba(168, 85, 247, 0.2)', border: '1px solid rgba(168, 85, 247, 0.3)', color: '#c4b5fd' } : undefined}
+                style={isFork ? (isSelected
+                  ? { backgroundColor: 'rgba(168, 85, 247, 0.7)', border: '1px solid rgba(168, 85, 247, 0.8)', color: '#fff' }
+                  : { backgroundColor: 'rgba(168, 85, 247, 0.2)', border: '1px solid rgba(168, 85, 247, 0.3)', color: '#c4b5fd' }
+                ) : undefined}
                 title={`${displayName} — ${(BRANCH_STATUSES[branch.status] || BRANCH_STATUSES.active).label}${branch.best_score ? `, best: ${branch.best_score}/75` : ''}${branch.iteration_count ? `, ${branch.iteration_count} iters` : ''}${isFork ? ' (forked)' : ''}`}
               >
                 {/* Status dot */}

@@ -264,9 +264,10 @@ export function createSeedScreenRoutes(store, config = {}) {
       const iterPath = join(paths.iterations, iterFilename);
       await writeFile(iterPath, JSON.stringify(baseSettings, null, 2));
 
-      // Expected render path for iter_01
+      // Use the seed screening render as iter_01's video — same seed, same settings
       const outputDir = config.wan2gp_output_dir || join(config.wan2gp_json_dir || '.', 'outputs');
-      const renderPath = join(outputDir, `${safeClipName}_iter_01.mp4`);
+      const screenRenderPath = match?.render_path || join(outputDir, `${safeClipName}_seed-screen_${parsedSeed}.mp4`);
+      const renderPath = screenRenderPath;
 
       // Create branch for the selected seed
       // Check if a branch for this seed already exists (re-selection)

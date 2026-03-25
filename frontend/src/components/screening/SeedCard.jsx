@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { api } from '../../api';
 
 /**
  * SeedCard — individual card in the seed screening contact sheet.
@@ -19,6 +20,7 @@ import { useState, useEffect } from 'react';
  */
 export default function SeedCard({ record, onSelect, onRate, onExpand, onDelete, onRender, isSelected, expanded, frameSrc, renderConfirm }) {
   const [copied, setCopied] = useState(false);
+  const [copiedDir, setCopiedDir] = useState(false);
   const [hoveredStar, setHoveredStar] = useState(0);
 
   const handleCopySeed = async (e) => {
@@ -95,19 +97,40 @@ export default function SeedCard({ record, onSelect, onRate, onExpand, onDelete,
         )}
       </div>
 
-      {/* Frame strip — small thumbnails under the video */}
+      {/* Frame strip — small thumbnails under the video + copy frames dir */}
       {hasFrames && record.frames.length > 1 && (
-        <div className="flex gap-1 overflow-x-auto mb-2 pb-0.5">
-          {record.frames.map((filename, idx) => (
-            <img
-              key={filename}
-              src={frameSrc(record.id, filename)}
-              title={`Frame ${idx + 1} — click card to expand all frames`}
-              alt={`Frame ${idx + 1}`}
-              className="h-10 w-auto rounded border border-gray-700 flex-shrink-0 cursor-pointer hover:border-accent/50 transition-colors"
-              onClick={onExpand}
-            />
-          ))}
+        <div className="mb-2">
+          <div className="flex gap-1 overflow-x-auto pb-0.5">
+            {record.frames.map((filename, idx) => (
+              <img
+                key={filename}
+                src={frameSrc(record.id, filename)}
+                title={`Frame ${idx + 1} — click card to expand all frames`}
+                alt={`Frame ${idx + 1}`}
+                className="h-10 w-auto rounded border border-gray-700 flex-shrink-0 cursor-pointer hover:border-accent/50 transition-colors"
+                onClick={onExpand}
+              />
+            ))}
+          </div>
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              try {
+                const data = await api.listFrames(record.id);
+                if (data.frames_dir) {
+                  await navigator.clipboard.writeText(data.frames_dir);
+                  setCopiedDir(true);
+                  setTimeout(() => setCopiedDir(false), 1500);
+                }
+              } catch {}
+            }}
+            className={`mt-1 px-1.5 py-0.5 rounded text-xs font-mono ${
+              copiedDir ? 'bg-score-high/20 text-score-high' : 'text-gray-600 hover:text-accent'
+            } transition-colors`}
+            title="Copy frames folder path for Claude/Tenzing"
+          >
+            {copiedDir ? 'Copied path' : 'Copy frames dir'}
+          </button>
         </div>
       )}
 

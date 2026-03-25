@@ -11,6 +11,26 @@ const COLUMNS = ['not_started', 'screening', 'in_progress', 'evaluating', 'locke
 export default function EpisodeTracker({ onSelectClip }) {
   const { data: clips, loading, error, refetch } = useApi(() => api.listClips(), []);
   const [showCreateClip, setShowCreateClip] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [showArchive, setShowArchive] = useState(false);
+  const [restoring, setRestoring] = useState(null);
+
+  const handleDeleteClip = async (clip) => {
+    if (deleteConfirm?.id === clip.id) {
+      // Second click — actually delete
+      try {
+        await api.deleteClip(clip.id, true);
+        setDeleteConfirm(null);
+        refetch();
+      } catch (err) {
+        console.error('Delete failed:', err);
+        setDeleteConfirm(null);
+      }
+    } else {
+      // First click — show confirmation
+      setDeleteConfirm(clip);
+    }
+  };
 
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result;
@@ -26,14 +46,31 @@ export default function EpisodeTracker({ onSelectClip }) {
     }
   };
 
+  const handleRestore = async (clipId, toStatus = 'not_started') => {
+    setRestoring(clipId);
+    try {
+      await api.updateClip(clipId, { status: toStatus });
+      refetch();
+    } catch (err) {
+      console.error('Restore failed:', err);
+    } finally {
+      setRestoring(null);
+    }
+  };
+
   if (loading) return <p className="text-gray-500 font-mono text-sm">Loading clips...</p>;
   if (error) return <p className="text-red-400 font-mono text-sm">Error: {error}</p>;
 
   const grouped = {};
   for (const col of COLUMNS) grouped[col] = [];
+  const archivedClips = [];
   for (const clip of (clips || [])) {
     const status = clip.status || 'not_started';
-    if (grouped[status]) grouped[status].push(clip);
+    if (status === 'archived') {
+      archivedClips.push(clip);
+    } else if (grouped[status]) {
+      grouped[status].push(clip);
+    }
   }
 
   return (
@@ -44,12 +81,26 @@ export default function EpisodeTracker({ onSelectClip }) {
           <h2 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Episode Tracker</h2>
           <p className="text-xs font-mono text-gray-600 mt-0.5">Drag clips between columns to update status. Click a clip to open it.</p>
         </div>
-        <button
-          onClick={() => setShowCreateClip(true)}
-          className="px-3 py-1.5 bg-accent text-black text-xs font-mono font-bold rounded hover:bg-accent/90"
-        >
-          + New Clip
-        </button>
+        <div className="flex items-center gap-2">
+          {archivedClips.length > 0 && (
+            <button
+              onClick={() => setShowArchive(!showArchive)}
+              className={`px-3 py-1.5 text-xs font-mono rounded transition-colors ${
+                showArchive
+                  ? 'bg-gray-600 text-gray-200'
+                  : 'border border-gray-700 text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              Archived ({archivedClips.length})
+            </button>
+          )}
+          <button
+            onClick={() => setShowCreateClip(true)}
+            className="px-3 py-1.5 bg-accent text-black text-xs font-mono font-bold rounded hover:bg-accent/90"
+          >
+            + New Clip
+          </button>
+        </div>
       </div>
 
       {/* Empty state */}
@@ -66,14 +117,73 @@ export default function EpisodeTracker({ onSelectClip }) {
         </div>
       )}
 
-      {/* Kanban columns */}
-      <DragDropContext onDragEnd={handleDragEnd}>
+      {/* Archive view */}
+      {showArchive && (
+        <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-mono text-gray-200 font-bold">Archived Clips</h3>
+            <button
+              onClick={() => setShowArchive(false)}
+              className="text-xs font-mono text-gray-500 hover:text-accent transition-colors"
+            >
+              Back to Tracker
+            </button>
+          </div>
+          {archivedClips.length === 0 ? (
+            <p className="text-xs font-mono text-gray-600">No archived clips</p>
+          ) : (
+            <div className="space-y-2">
+              {archivedClips.map(clip => (
+                <div key={clip.id} className="flex items-center justify-between bg-surface border border-gray-700 rounded p-3">
+                  <div>
+                    <span className="text-sm font-mono text-gray-300">{clip.name}</span>
+                    <div className="flex gap-3 text-xs font-mono text-gray-600 mt-0.5">
+                      {clip.location && <span>{clip.location}</span>}
+                      {clip.characters?.length > 0 && <span>{clip.characters.join(', ')}</span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleRestore(clip.id, 'not_started')}
+                      disabled={restoring === clip.id}
+                      className="px-3 py-1 bg-accent text-black text-xs font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50"
+                    >
+                      {restoring === clip.id ? 'Restoring...' : 'Restore'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClip(clip)}
+                      className="px-3 py-1 text-xs font-mono text-gray-600 hover:text-score-low transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {deleteConfirm && (
+        <div className="border border-score-low/50 bg-score-low/10 rounded px-3 py-2 flex items-center justify-between">
+          <p className="text-xs font-mono text-score-low">
+            Delete "{deleteConfirm.name}"? Click × again to confirm.
+          </p>
+          <button onClick={() => setDeleteConfirm(null)} className="text-xs font-mono text-gray-500 hover:text-gray-300">
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Kanban columns — hidden when viewing archive */}
+      {!showArchive && <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex gap-4 flex-1 overflow-x-auto">
           {COLUMNS.map(col => {
             const status = CLIP_STATUSES[col];
             return (
               <div key={col} className="flex-shrink-0 w-56">
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center justify-center gap-2 mb-3">
                   <div className={`w-2 h-2 rounded-full ${status.color}`} />
                   <h3 className="text-xs font-mono text-gray-400 uppercase tracking-wider">{status.label}</h3>
                   <span className="text-xs font-mono text-gray-600">{grouped[col].length}</span>
@@ -93,7 +203,13 @@ export default function EpisodeTracker({ onSelectClip }) {
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
                             >
-                              <ClipCard clip={clip} onClick={onSelectClip} isDragging={snapshot.isDragging} />
+                              <ClipCard
+                                clip={clip}
+                                onClick={onSelectClip}
+                                onDelete={handleDeleteClip}
+                                onArchive={async (c) => { await api.updateClip(c.id, { status: 'archived' }); refetch(); }}
+                                isDragging={snapshot.isDragging}
+                              />
                             </div>
                           )}
                         </Draggable>
@@ -106,7 +222,7 @@ export default function EpisodeTracker({ onSelectClip }) {
             );
           })}
         </div>
-      </DragDropContext>
+      </DragDropContext>}
 
       {/* Create Clip Modal */}
       {showCreateClip && (

@@ -3,43 +3,58 @@ import { api } from '../../api';
 import { useApi } from '../../hooks/useApi';
 
 export default function CreateClipModal({ onCreated, onClose }) {
-  const { data: projects, loading: projLoading } = useApi(() => api.listProjects(), []);
-
-  // Auto-select first project, then load its scenes
-  const firstProjectId = (!projLoading && projects?.length) ? projects[0].id : null;
-  const [selectedProjectId, setSelectedProjectId] = useState(null);
-  const projectId = selectedProjectId || firstProjectId;
-
-  const { data: project, loading: sceneLoading } = useApi(
-    () => projectId ? api.getProject(projectId) : Promise.resolve(null),
-    [projectId]
-  );
-  const scenes = project?.scenes || [];
+  // Load characters from registry for selection
+  const { data: characters, loading: charsLoading } = useApi(() => api.listCharacters(), []);
 
   const [name, setName] = useState('');
-  const [sceneId, setSceneId] = useState('');
-  const [characters, setCharacters] = useState('');
+  const [scene, setScene] = useState('');
+  const [selectedChars, setSelectedChars] = useState([]);
   const [location, setLocation] = useState('');
   const [goal, setGoal] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
+  const toggleChar = (triggerWord) => {
+    setSelectedChars(prev =>
+      prev.includes(triggerWord) ? prev.filter(c => c !== triggerWord) : [...prev, triggerWord]
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !sceneId) return;
+    if (!name.trim()) return;
 
     setSubmitting(true);
     setError(null);
     try {
-      const charArray = characters
-        .split(',')
-        .map(c => c.trim())
-        .filter(Boolean);
+      // Create a default scene from the text input (or use a placeholder)
+      // This maintains backward compatibility with the scene_id requirement
+      // until clip-first simplification removes it entirely
+      let sceneId;
+      const sceneName = scene.trim() || name.trim();
+      try {
+        // Try to find existing project, or create one
+        const projects = await api.listProjects();
+        let projectId;
+        if (projects.length > 0) {
+          projectId = projects[0].id;
+        } else {
+          const project = await api.createProject({ name: 'Default Project' });
+          projectId = project.id;
+        }
+        const sceneRecord = await api.createScene(projectId, { name: sceneName });
+        sceneId = sceneRecord.id;
+      } catch {
+        // Scene creation failed — use a placeholder
+        setError('Failed to create scene record');
+        setSubmitting(false);
+        return;
+      }
 
       const clip = await api.createClip({
         name: name.trim(),
         scene_id: sceneId,
-        characters: charArray,
+        characters: selectedChars,
         location: location.trim() || undefined,
         goal: goal.trim() || undefined
       });
@@ -67,44 +82,51 @@ export default function CreateClipModal({ onCreated, onClose }) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. KS_EP01_SC03_CLIP02"
+              placeholder="e.g. Clip 1e - Mick Balcony"
               autoFocus
               className="w-full bg-surface border border-gray-600 rounded px-3 py-2 text-sm font-mono text-gray-200 placeholder:text-gray-600"
             />
           </div>
 
           <div>
-            <label className="text-xs font-mono text-gray-500 block mb-1">Scene</label>
-            {(projLoading || sceneLoading) ? (
-              <p className="text-xs font-mono text-gray-600">Loading scenes...</p>
-            ) : scenes.length === 0 ? (
-              <p className="text-xs font-mono text-gray-600">No scenes found. Create a scene first.</p>
-            ) : (
-              <select
-                value={sceneId}
-                onChange={(e) => setSceneId(e.target.value)}
-                className="w-full bg-surface border border-gray-600 rounded px-2 py-2 text-sm font-mono text-gray-200"
-              >
-                <option value="">Select a scene...</option>
-                {scenes.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.scene_number ? `Scene ${s.scene_number}` : s.id} {s.description ? `- ${s.description}` : ''}
-                  </option>
-                ))}
-              </select>
-            )}
+            <label className="text-xs font-mono text-gray-500 block mb-1">Scene <span className="text-gray-700">(optional)</span></label>
+            <input
+              type="text"
+              value={scene}
+              onChange={(e) => setScene(e.target.value)}
+              placeholder="e.g. Monaco Harbour, Episode 1"
+              className="w-full bg-surface border border-gray-600 rounded px-3 py-2 text-sm font-mono text-gray-200 placeholder:text-gray-600"
+            />
+            <p className="text-xs font-mono text-gray-600 mt-1">Context for this clip — used for file organization</p>
           </div>
 
           <div>
             <label className="text-xs font-mono text-gray-500 block mb-1">Characters</label>
-            <input
-              type="text"
-              value={characters}
-              onChange={(e) => setCharacters(e.target.value)}
-              placeholder="e.g. Kebbin, Luna, Sable"
-              className="w-full bg-surface border border-gray-600 rounded px-3 py-2 text-sm font-mono text-gray-200 placeholder:text-gray-600"
-            />
-            <p className="text-xs font-mono text-gray-600 mt-1">Comma-separated names</p>
+            {charsLoading ? (
+              <p className="text-xs font-mono text-gray-600">Loading characters...</p>
+            ) : characters && characters.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {characters.map(ch => {
+                  const isSelected = selectedChars.includes(ch.trigger_word);
+                  return (
+                    <button
+                      key={ch.id}
+                      type="button"
+                      onClick={() => toggleChar(ch.trigger_word)}
+                      className={`px-2.5 py-1 rounded text-xs font-mono transition-colors ${
+                        isSelected
+                          ? 'bg-accent text-black font-bold'
+                          : 'bg-surface-overlay text-gray-400 hover:text-gray-200'
+                      }`}
+                    >
+                      {ch.name} <span className="text-gray-500">{ch.trigger_word}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs font-mono text-gray-600">No characters in registry. You can add them later.</p>
+            )}
           </div>
 
           <div>
@@ -113,17 +135,17 @@ export default function CreateClipModal({ onCreated, onClose }) {
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g. Workshop interior"
+              placeholder="e.g. Monaco Balcony"
               className="w-full bg-surface border border-gray-600 rounded px-3 py-2 text-sm font-mono text-gray-200 placeholder:text-gray-600"
             />
           </div>
 
           <div>
-            <label className="text-xs font-mono text-gray-500 block mb-1">Creative Brief / Goal</label>
+            <label className="text-xs font-mono text-gray-500 block mb-1">Creative Brief <span className="text-gray-700">(optional)</span></label>
             <textarea
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
-              placeholder="What does 'done' look like? Action, character requirements, location, mood, must-avoid..."
+              placeholder="What does 'done' look like? Action, mood, must-avoid..."
               rows={3}
               className="w-full bg-surface border border-gray-600 rounded px-3 py-2 text-sm font-mono text-gray-200 placeholder:text-gray-600 resize-y"
             />
@@ -141,7 +163,7 @@ export default function CreateClipModal({ onCreated, onClose }) {
               className="px-4 py-2 text-sm font-mono text-gray-400 hover:text-gray-200">
               Cancel
             </button>
-            <button type="submit" disabled={!name.trim() || !sceneId || submitting}
+            <button type="submit" disabled={!name.trim() || submitting}
               className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50">
               {submitting ? 'Creating...' : 'Create Clip'}
             </button>

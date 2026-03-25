@@ -46,6 +46,48 @@ export function createClipRoutes(store) {
     }
   });
 
+  router.delete('/:id', async (req, res) => {
+    try {
+      const clip = await store.get('clips', req.params.id);
+
+      // Check for iterations — warn but allow with force flag
+      const iterations = await store.list('iterations', i => i.clip_id === req.params.id);
+      if (iterations.length > 0 && !req.query.force) {
+        return res.status(400).json({
+          error: `Clip has ${iterations.length} iteration(s). Use ?force=true to delete anyway.`,
+          iteration_count: iterations.length
+        });
+      }
+
+      // Clean up related data
+      if (iterations.length > 0) {
+        for (const iter of iterations) {
+          if (iter.evaluation_id) {
+            try { await store.delete('evaluations', iter.evaluation_id); } catch {}
+          }
+          await store.delete('iterations', iter.id);
+        }
+      }
+
+      // Clean up branches
+      const branches = await store.list('branches', b => b.clip_id === req.params.id);
+      for (const branch of branches) {
+        await store.delete('branches', branch.id);
+      }
+
+      // Clean up seed screens
+      const screens = await store.list('seed_screens', s => s.clip_id === req.params.id);
+      for (const screen of screens) {
+        await store.delete('seed_screens', screen.id);
+      }
+
+      await store.delete('clips', req.params.id);
+      res.json({ deleted: true, id: req.params.id, cleaned: { iterations: iterations.length, branches: branches.length, seed_screens: screens.length } });
+    } catch (err) {
+      res.status(err.message.includes('not found') ? 404 : 400).json({ error: err.message });
+    }
+  });
+
   router.get('/:id/iterations', async (req, res) => {
     const { branch_id } = req.query;
     let iterations = await store.list('iterations', i => i.clip_id === req.params.id);

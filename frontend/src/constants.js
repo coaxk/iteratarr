@@ -79,7 +79,8 @@ export const CLIP_STATUSES = {
   in_progress: { label: 'In Progress', color: 'bg-status-yellow' },
   evaluating: { label: 'Evaluating', color: 'bg-status-yellow' },
   locked: { label: 'Locked', color: 'bg-status-green' },
-  in_queue: { label: 'In Queue', color: 'bg-status-blue' }
+  in_queue: { label: 'In Queue', color: 'bg-status-blue' },
+  archived: { label: 'Archived', color: 'bg-gray-600' }
 };
 
 // Branch statuses with display labels and Tailwind colour classes.

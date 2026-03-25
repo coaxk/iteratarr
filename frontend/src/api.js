@@ -27,6 +27,7 @@ export const api = {
   },
   createClip: (data) => request('/clips', { method: 'POST', body: data }),
   updateClip: (id, data) => request(`/clips/${id}`, { method: 'PATCH', body: data }),
+  deleteClip: (id, force = false) => request(`/clips/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   getClipIterations: (id, branchId) => request(`/clips/${id}/iterations${branchId ? `?branch_id=${branchId}` : ''}`),
 
   // Iterations

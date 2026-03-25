@@ -8,7 +8,8 @@ export default function ClipCard({ clip, onClick, onDelete, onArchive, isDraggin
       onClick={() => onClick(clip)}
       role="button"
       tabIndex={0}
-      className={`w-full text-left p-3 bg-surface rounded border transition-colors group cursor-pointer min-h-[100px] ${
+      style={{ minHeight: '100px' }}
+      className={`w-full text-left p-3 bg-surface rounded border transition-colors group cursor-pointer ${
         isDragging
           ? 'border-accent opacity-90 shadow-lg shadow-accent/10'
           : 'border-gray-700 hover:border-accent/50'

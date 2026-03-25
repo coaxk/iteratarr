@@ -20,7 +20,7 @@ const defaultScores = (fields) => Object.fromEntries(fields.map(f => [f.key, 3])
 import CopyButton from '../common/CopyButton';
 const CopyBtn = ({ text }) => <CopyButton text={text} />;
 
-export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], allIterations = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange, clipId, onForked }) {
+export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], allIterations = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange, clipId, onForked, isForkPoint = false }) {
   const [identity, setIdentity] = useState(defaultScores(IDENTITY_FIELDS));
   const [location, setLocation] = useState(defaultScores(LOCATION_FIELDS));
   const [motion, setMotion] = useState(defaultScores(MOTION_FIELDS));
@@ -315,6 +315,11 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
             );
           })()}
           <h3 className="text-sm font-mono text-gray-200">{iteration.json_filename}</h3>
+          {isForkPoint && (
+            <span className="px-2 py-0.5 text-xs font-mono font-bold rounded border" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', borderColor: 'rgba(168, 85, 247, 0.4)', color: '#c4b5fd' }}>
+              ⑂ Fork Point
+            </span>
+          )}
           {clipId && onForked && (
             <button
               onClick={() => setShowFork(true)}

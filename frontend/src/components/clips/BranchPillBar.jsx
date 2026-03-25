@@ -64,18 +64,19 @@ export default function BranchPillBar({ branches, selectedBranchId, onSelect, on
               <button
                 onClick={() => onSelect(isSelected ? null : branch.id)}
                 className={`px-3 py-1.5 rounded-full text-xs font-mono font-bold transition-all flex items-center gap-1.5 ${
-                  isSelected
-                    ? 'bg-accent text-black'
-                    : isDimmed
-                      ? 'bg-surface-overlay/50 text-gray-600 hover:text-gray-400'
-                      : isFork
-                        ? 'bg-surface-overlay text-gray-300 hover:text-gray-100'
-                        : 'bg-surface-overlay text-gray-300 hover:text-gray-100'
+                  isDimmed
+                    ? 'bg-surface-overlay/50 text-gray-600 hover:text-gray-400'
+                    : 'bg-surface-overlay text-gray-300 hover:text-gray-100'
                 }`}
-                style={isFork ? (isSelected
-                  ? { backgroundColor: 'rgba(168, 85, 247, 0.7)', border: '1px solid rgba(168, 85, 247, 0.8)', color: '#fff' }
-                  : { backgroundColor: 'rgba(168, 85, 247, 0.2)', border: '1px solid rgba(168, 85, 247, 0.3)', color: '#c4b5fd' }
-                ) : undefined}
+                style={
+                  isFork ? (isSelected
+                    ? { backgroundColor: 'rgba(168, 85, 247, 0.7)', border: '1px solid rgba(168, 85, 247, 0.8)', color: '#fff' }
+                    : { backgroundColor: 'rgba(168, 85, 247, 0.2)', border: '1px solid rgba(168, 85, 247, 0.3)', color: '#c4b5fd' }
+                  ) : isSelected
+                    ? { backgroundColor: 'rgba(34, 197, 94, 0.7)', border: '1px solid rgba(34, 197, 94, 0.8)', color: '#fff' }
+                    : isDimmed ? undefined
+                    : { backgroundColor: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.25)', color: '#86efac' }
+                }
                 title={`${displayName} — ${(BRANCH_STATUSES[branch.status] || BRANCH_STATUSES.active).label}${branch.best_score ? `, best: ${branch.best_score}/75` : ''}${branch.iteration_count ? `, ${branch.iteration_count} iters` : ''}${isFork ? ' (forked)' : ''}`}
               >
                 {/* Status dot */}

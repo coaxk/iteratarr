@@ -343,6 +343,7 @@ export default function ClipDetail({ clip, onBack }) {
               iterations={iterations || []}
               selectedId={selectedIteration?.id}
               onSelect={setSelectedIteration}
+              forkPoints={new Set((branches || []).filter(b => b.source_iteration_id).map(b => b.source_iteration_id))}
             />
           )}
         </div>

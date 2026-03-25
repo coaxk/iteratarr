@@ -71,7 +71,7 @@ export default function BranchPillBar({ branches, selectedBranchId, onSelect, on
               }`} />
 
               {branch.created_from === 'fork' && (
-                <span className={`text-xs ${isSelected ? 'text-black/50' : 'text-purple-400'}`} title="Forked branch">⑂</span>
+                <span className={`text-sm font-bold ${isSelected ? 'text-black' : 'text-purple-300'}`} title="Forked branch">⑂</span>
               )}
               {shortName}
 

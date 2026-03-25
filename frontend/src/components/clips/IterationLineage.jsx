@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react';
 
-export default function IterationLineage({ iterations, selectedId, onSelect }) {
+export default function IterationLineage({ iterations, selectedId, onSelect, forkPoints = new Set() }) {
   const scrollRef = useRef(null);
   const selectedRef = useRef(null);
 
@@ -55,6 +55,10 @@ export default function IterationLineage({ iterations, selectedId, onSelect }) {
                 } hover:border-accent/70 transition-colors group`}
                 title={hasTags ? iter.tags.join(', ') : undefined}
               >
+                {/* Fork point indicator */}
+                {forkPoints.has(iter.id) && (
+                  <span className="absolute -top-1 -left-1 text-purple-300 text-xs font-bold" title="Fork point — a branch was created from this iteration">⑂</span>
+                )}
                 {/* Tag indicator dot */}
                 {hasTags && (
                   <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-accent/70 border border-surface" />

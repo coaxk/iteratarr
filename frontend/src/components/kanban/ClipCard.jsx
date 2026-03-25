@@ -4,9 +4,11 @@ export default function ClipCard({ clip, onClick, isDragging = false }) {
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
   return (
-    <button
+    <div
       onClick={() => onClick(clip)}
-      className={`w-full text-left p-3 bg-surface rounded border transition-colors group ${
+      role="button"
+      tabIndex={0}
+      className={`w-full text-left p-3 bg-surface rounded border transition-colors group cursor-pointer ${
         isDragging
           ? 'border-accent opacity-90 shadow-lg shadow-accent/10'
           : 'border-gray-700 hover:border-accent/50'
@@ -35,6 +37,6 @@ export default function ClipCard({ clip, onClick, isDragging = false }) {
           {clip.goal.length > 60 ? clip.goal.slice(0, 60) + '...' : clip.goal}
         </p>
       )}
-    </button>
+    </div>
   );
 }

@@ -365,6 +365,14 @@ export default function ClipDetail({ clip, onBack }) {
           onLocked={() => { refetch(); refetchBranches(); }}
           onGoToIteration={(iter) => setSelectedIteration(iter)}
           onScoreChange={setLiveScore}
+          clipId={clip.id}
+          onForked={(result) => {
+            refetch();
+            refetchBranches();
+            // Auto-switch to the new branch
+            setSelectedBranchId(result.branch.id);
+            setSelectedIteration(result.iteration);
+          }}
         />
       )}
 

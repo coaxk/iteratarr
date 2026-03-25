@@ -10,6 +10,7 @@ import FrameStrip from './FrameStrip';
 import VideoDiff from './VideoDiff';
 import GeneratedModal from './GeneratedModal';
 import TagInput from '../clips/TagInput';
+import ForkModal from './ForkModal';
 import { api } from '../../api';
 import { IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, SCORE_LOCK_THRESHOLD, GRAND_MAX, ROPE_CATEGORY_MAP, ROPES, MODEL_TYPES } from '../../constants';
 
@@ -19,7 +20,7 @@ const defaultScores = (fields) => Object.fromEntries(fields.map(f => [f.key, 3])
 import CopyButton from '../common/CopyButton';
 const CopyBtn = ({ text }) => <CopyButton text={text} />;
 
-export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], allIterations = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange }) {
+export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], allIterations = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange, clipId, onForked }) {
   const [identity, setIdentity] = useState(defaultScores(IDENTITY_FIELDS));
   const [location, setLocation] = useState(defaultScores(LOCATION_FIELDS));
   const [motion, setMotion] = useState(defaultScores(MOTION_FIELDS));
@@ -41,6 +42,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [comparisonVideoPath, setComparisonVideoPath] = useState(null);
   const [comparisonIter, setComparisonIter] = useState(null);
   const [lockCharacterUpdates, setLockCharacterUpdates] = useState(null);
+  const [showFork, setShowFork] = useState(false);
 
   const isEvaluated = !!iteration.evaluation;
   const hasChild = !!childIteration;
@@ -222,6 +224,19 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         />
       )}
 
+      {/* Fork modal */}
+      {showFork && clipId && (
+        <ForkModal
+          iteration={iteration}
+          clipId={clipId}
+          onForked={(result) => {
+            setShowFork(false);
+            onForked?.(result);
+          }}
+          onClose={() => setShowFork(false)}
+        />
+      )}
+
       {/* Read-only banner with navigation to next iteration */}
       {isReadOnly && (
         <div className="border border-gray-600 bg-surface-overlay rounded px-3 py-2 flex items-center justify-between">
@@ -298,6 +313,15 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
             );
           })()}
           <h3 className="text-sm font-mono text-gray-200">{iteration.json_filename}</h3>
+          {clipId && onForked && (
+            <button
+              onClick={() => setShowFork(true)}
+              className="px-2 py-0.5 text-xs font-mono border border-gray-700 rounded text-gray-500 hover:text-accent hover:border-accent/30 transition-colors"
+              title="Fork a new branch from this iteration's settings"
+            >
+              Fork
+            </button>
+          )}
           {scoringSource !== 'manual' && (
             <span className="px-1.5 py-0.5 text-xs font-mono bg-accent/10 text-accent rounded">
               {scoringSource === 'ai_assisted' ? 'AI-Assisted' : scoringSource}

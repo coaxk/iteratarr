@@ -4,3 +4,4 @@ backend/data/
 .env
 *.db
 *.sqlite
+backend/iterations/

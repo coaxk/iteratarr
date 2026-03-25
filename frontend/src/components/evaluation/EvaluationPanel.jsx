@@ -43,6 +43,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [comparisonIter, setComparisonIter] = useState(null);
   const [lockCharacterUpdates, setLockCharacterUpdates] = useState(null);
   const [showFork, setShowFork] = useState(false);
+  const [localTags, setLocalTags] = useState(iteration.tags || []);
 
   const isEvaluated = !!iteration.evaluation;
   const hasChild = !!childIteration;
@@ -74,6 +75,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
       setOutputJson(null);
       setGeneratedPath(null);
     }
+    setLocalTags(iteration.tags || []);
     // Try to derive video paths from iteration data (render_path stored on iteration)
     setCurrentVideoPath(iteration.render_path || null);
     setPreviousVideoPath(parentIteration?.render_path || null);
@@ -342,10 +344,10 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         {/* Tags */}
         <div className="mt-2">
           <TagInput
-            tags={iteration.tags || []}
-            onChange={async (newTags) => {
-              await api.updateIteration(iteration.id, { tags: newTags });
-              onSaved?.();
+            tags={localTags}
+            onChange={(newTags) => {
+              setLocalTags(newTags);
+              api.updateIteration(iteration.id, { tags: newTags }).catch(() => {});
             }}
             readOnly={isReadOnly}
           />

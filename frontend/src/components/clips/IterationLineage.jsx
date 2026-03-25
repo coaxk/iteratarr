@@ -57,7 +57,7 @@ export default function IterationLineage({ iterations, selectedId, onSelect, for
               >
                 {/* Fork point indicator */}
                 {forkPoints.has(iter.id) && (
-                  <span className="absolute -top-1 -left-1 text-purple-300 text-xs font-bold" title="Fork point — a branch was created from this iteration">⑂</span>
+                  <span className="absolute -top-2 -left-2 text-purple-300 text-sm font-bold bg-surface rounded-full w-4 h-4 flex items-center justify-center border border-purple-500/50" title="Fork point — a branch was created from this iteration">⑂</span>
                 )}
                 {/* Tag indicator dot */}
                 {hasTags && (

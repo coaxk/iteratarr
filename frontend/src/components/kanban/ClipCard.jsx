@@ -51,8 +51,8 @@ export default function ClipCard({ clip, onClick, onDelete, onArchive, isDraggin
         <span className={clip.location ? 'text-gray-500' : 'text-gray-700 italic'}>{clip.location || 'No location'}</span>
         <div className="flex items-center gap-2">
           {clip.branch_count > 0 && (
-            <span className="font-mono text-accent/60 font-bold" title={`${clip.branch_count} branch${clip.branch_count !== 1 ? 'es' : ''}`}>
-              ⑂ {clip.branch_count}
+            <span className="font-mono text-purple-400 font-bold text-sm" title={`${clip.branch_count} branch${clip.branch_count !== 1 ? 'es' : ''}`}>
+              ⑂{clip.branch_count}
             </span>
           )}
           {clip.best_score != null && (

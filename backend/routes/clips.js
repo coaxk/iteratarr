@@ -14,6 +14,11 @@ export function createClipRoutes(store) {
       const sceneIds = new Set(scenes.map(s => s.id));
       clips = clips.filter(c => sceneIds.has(c.scene_id));
     }
+    // Enrich with branch count
+    for (const clip of clips) {
+      const branches = await store.list('branches', b => b.clip_id === clip.id);
+      clip.branch_count = branches.length;
+    }
     res.json(clips);
   });
 

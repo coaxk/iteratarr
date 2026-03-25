@@ -37,6 +37,18 @@ export default function ClipDetail({ clip, onBack }) {
   const [managingBranchId, setManagingBranchId] = useState(null);
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
+  // Auto-select the most recently active branch when branches load
+  useEffect(() => {
+    if (branches?.length > 0 && selectedBranchId === null) {
+      const active = branches
+        .filter(b => b.status === 'active' || b.status === 'locked')
+        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      if (active.length > 0) {
+        setSelectedBranchId(active[0].id);
+      }
+    }
+  }, [branches]);
+
   // Reset selected iteration when branch changes
   useEffect(() => {
     setSelectedIteration(null);

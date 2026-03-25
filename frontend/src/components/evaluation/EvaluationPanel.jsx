@@ -343,10 +343,9 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         <div className="mt-2">
           <TagInput
             tags={iteration.tags || []}
-            onChange={(newTags) => {
-              // Optimistically update iteration object and persist
-              iteration.tags = newTags;
-              api.updateIteration(iteration.id, { tags: newTags }).catch(() => {});
+            onChange={async (newTags) => {
+              await api.updateIteration(iteration.id, { tags: newTags });
+              onSaved?.();
             }}
             readOnly={isReadOnly}
           />

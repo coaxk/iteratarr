@@ -70,6 +70,9 @@ export default function BranchPillBar({ branches, selectedBranchId, onSelect, on
                 'bg-gray-600'
               }`} />
 
+              {branch.created_from === 'fork' && (
+                <span className={`text-xs ${isSelected ? 'text-black/50' : 'text-purple-400'}`} title="Forked branch">⑂</span>
+              )}
               {shortName}
 
               {/* Score badge — matches iteration lineage color scale */}

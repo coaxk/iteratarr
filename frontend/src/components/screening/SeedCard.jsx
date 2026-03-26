@@ -21,6 +21,7 @@ import { api } from '../../api';
 export default function SeedCard({ record, onSelect, onRate, onExpand, onDelete, onRender, isSelected, expanded, frameSrc, renderConfirm }) {
   const [copied, setCopied] = useState(false);
   const [copiedDir, setCopiedDir] = useState(false);
+  const [contactSheet, setContactSheet] = useState(null);
   const [hoveredStar, setHoveredStar] = useState(0);
 
   const handleCopySeed = async (e) => {
@@ -130,6 +131,26 @@ export default function SeedCard({ record, onSelect, onRate, onExpand, onDelete,
             title="Copy frames folder path for Claude/Tenzing"
           >
             {copiedDir ? 'Copied path' : 'Copy frames dir'}
+          </button>
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              try {
+                const result = await api.createContactSheet({
+                  frame_id: record.id,
+                  metadata: { seed: record.seed, clip_name: record.clip_id }
+                });
+                setContactSheet(result);
+                await navigator.clipboard.writeText(result.path);
+                setTimeout(() => setContactSheet(null), 3000);
+              } catch {}
+            }}
+            className={`mt-0.5 px-1.5 py-0.5 rounded text-xs font-mono ${
+              contactSheet ? 'bg-score-high/20 text-score-high' : 'text-gray-600 hover:text-accent'
+            } transition-colors`}
+            title="Export frames as contact sheet (single image for Tenzing)"
+          >
+            {contactSheet ? `Copied: ${contactSheet.filename}` : 'Contact sheet'}
           </button>
         </div>
       )}

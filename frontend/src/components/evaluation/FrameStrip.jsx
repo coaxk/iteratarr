@@ -23,6 +23,7 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
   const [framesDir, setFramesDir] = useState(null);
   const [outputDir, setOutputDir] = useState(null);
   const [pollCount, setPollCount] = useState(0);
+  const [csExported, setCsExported] = useState(null);
   const MAX_POLLS = 40; // 40 * 15s = 10 minutes
 
   // Fetch Wan2GP output dir for browse starting point
@@ -224,6 +225,22 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
           <span className="text-xs font-mono text-gray-400 flex-shrink-0">Frames saved to:</span>
           <span className="text-xs font-mono text-accent break-all flex-1 select-all">{framesDir}</span>
           <CopyButton text={framesDir} title="Copy frames folder path" />
+          <button
+            onClick={async () => {
+              try {
+                const result = await api.createContactSheet({ frame_id: iterationId });
+                setCsExported(result);
+                await navigator.clipboard.writeText(result.path);
+                setTimeout(() => setCsExported(null), 3000);
+              } catch {}
+            }}
+            className={`px-1.5 py-0.5 rounded text-xs font-mono shrink-0 ${
+              csExported ? 'bg-score-high/20 text-score-high' : 'bg-surface-overlay text-gray-500 hover:text-gray-300'
+            } transition-colors`}
+            title="Export frames as contact sheet (single image)"
+          >
+            {csExported ? 'Exported' : 'Contact sheet'}
+          </button>
         </div>
       )}
 

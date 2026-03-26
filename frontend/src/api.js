@@ -88,6 +88,9 @@ export const api = {
   getBranchIterations: (branchId) => request(`/branches/${branchId}/iterations`),
   forkBranch: (clipId, data) => request(`/clips/${clipId}/fork`, { method: 'POST', body: data }),
 
+  // Contact Sheets
+  createContactSheet: (data) => request('/contactsheet', { method: 'POST', body: data }),
+
   // Templates
   listTemplates: () => request('/templates'),
   createTemplate: (data) => request('/templates', { method: 'POST', body: data }),

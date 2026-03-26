@@ -13,6 +13,7 @@ import { createTemplateRoutes } from './routes/templates.js';
 import { createSeedScreenRoutes } from './routes/seedscreen.js';
 import { createRenderRoutes } from './routes/render.js';
 import { createBranchRoutes, createBranchIterationRoutes } from './routes/branches.js';
+import { createContactSheetRoutes } from './routes/contactsheet.js';
 import { createWatcher } from './watcher.js';
 import { createTelemetry } from './telemetry/index.js';
 import config from './config.js';
@@ -54,6 +55,7 @@ app.use('/api/render', createRenderRoutes(store, config));
 app.use('/api/clips', createSeedScreenRoutes(store, config));
 app.use('/api/clips', createBranchRoutes(store, config));
 app.use('/api/branches', createBranchIterationRoutes(store));
+app.use('/api/contactsheet', createContactSheetRoutes(config));
 
 // Video file serving — streams MP4 files from allowed directories
 import { resolve, relative, extname } from 'path';

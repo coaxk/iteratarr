@@ -612,7 +612,7 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
           {/* Frame strip with copy path */}
           {expandedRecord.frames && expandedRecord.frames.length > 0 ? (
             <div className="space-y-1">
-              <div className="flex gap-2 overflow-x-auto pb-1 items-end">
+              <div className="flex gap-2 overflow-x-auto pb-1 items-end scrollbar-hide">
                 {expandedRecord.frames.map((filename, idx) => (
                   <img
                     key={filename}
@@ -623,17 +623,22 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
                     onClick={() => setLightboxIndex(idx)}
                   />
                 ))}
-                {/* Contact sheet — auto-generated, draggable to Tenzing */}
+                {/* Contact sheet — auto-generated, click to save for Tenzing */}
                 {contactSheets[expandedRecord.id] && (
                   <div className="flex-shrink-0 relative">
-                    <img
-                      src={`/api/contactsheet/${contactSheets[expandedRecord.id]}`}
-                      alt="Contact sheet — drag to Tenzing"
-                      title="Drag this to Tenzing's chat"
-                      className="h-40 w-auto rounded border-2 border-accent cursor-grab"
-                      draggable
-                    />
-                    <span className="absolute bottom-1 left-1 text-xs font-mono bg-black/70 text-accent px-1 rounded">CS</span>
+                    <a
+                      href={`/api/contactsheet/${contactSheets[expandedRecord.id]}`}
+                      download={contactSheets[expandedRecord.id]}
+                      title="Click to download — then drag to Tenzing"
+                      className="block"
+                    >
+                      <img
+                        src={`/api/contactsheet/${contactSheets[expandedRecord.id]}`}
+                        alt="Contact sheet"
+                        className="h-40 w-auto rounded border-2 border-accent cursor-pointer hover:brightness-110 transition-all"
+                      />
+                    </a>
+                    <span className="absolute bottom-1 left-1 text-xs font-mono bg-black/70 text-accent px-1 rounded">Save</span>
                   </div>
                 )}
               </div>

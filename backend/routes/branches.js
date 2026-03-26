@@ -139,7 +139,7 @@ export function createBranchRoutes(store, config = {}) {
   router.post('/:clipId/fork', async (req, res) => {
     try {
       const { clipId } = req.params;
-      const { source_iteration_id, seed: requestedSeed, name } = req.body;
+      const { source_iteration_id, seed: requestedSeed, name, json_contents: customJson } = req.body;
 
       if (!source_iteration_id) {
         return res.status(400).json({ error: 'source_iteration_id is required' });
@@ -162,8 +162,8 @@ export function createBranchRoutes(store, config = {}) {
         // Same seed fork — allow it but with a distinct name
       }
 
-      // Build iter_01 JSON from source iteration's settings
-      const forkJson = { ...sourceIter.json_contents };
+      // Build iter_01 JSON — use custom JSON if provided (cold injection), otherwise copy source
+      const forkJson = customJson ? { ...customJson } : { ...sourceIter.json_contents };
       forkJson.seed = seed;
       forkJson.video_length = config.iteration_frame_count || 32;
 
@@ -237,7 +237,9 @@ export function createBranchRoutes(store, config = {}) {
         status: 'pending',
         evaluation_id: null,
         parent_iteration_id: null,
-        change_from_parent: `Forked from branch ${sourceIter.branch_id || 'unknown'} iter #${sourceIter.iteration_number}`
+        change_from_parent: customJson
+          ? `Cold JSON injection — forked from iter #${sourceIter.iteration_number}`
+          : `Forked from branch ${sourceIter.branch_id || 'unknown'} iter #${sourceIter.iteration_number}`
       });
 
       res.status(201).json({ branch, iteration });

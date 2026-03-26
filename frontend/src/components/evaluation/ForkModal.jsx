@@ -3,7 +3,9 @@ import { api } from '../../api';
 
 /**
  * ForkModal — create a new branch by forking from the current iteration.
- * Copies all settings, optionally with a new seed.
+ * Two modes:
+ *   1. Standard fork: copies settings, optionally changes seed
+ *   2. Cold JSON fork: inject custom Wan2GP JSON (auto-fork)
  *
  * Props:
  *   iteration — source iteration to fork from
@@ -12,9 +14,11 @@ import { api } from '../../api';
  *   onClose   — close the modal
  */
 export default function ForkModal({ iteration, clipId, onForked, onClose }) {
+  const [mode, setMode] = useState('fork'); // 'fork' | 'inject'
   const [useSameSeed, setUseSameSeed] = useState(true);
   const [newSeed, setNewSeed] = useState('');
   const [name, setName] = useState('');
+  const [jsonText, setJsonText] = useState('');
   const [forking, setForking] = useState(false);
   const [error, setError] = useState(null);
 
@@ -27,14 +31,32 @@ export default function ForkModal({ iteration, clipId, onForked, onClose }) {
       const data = {
         source_iteration_id: iteration.id
       };
-      if (!useSameSeed && newSeed.trim()) {
-        data.seed = parseInt(newSeed.trim());
-        if (isNaN(data.seed)) {
-          setError('Seed must be a number');
+
+      if (mode === 'inject') {
+        // Cold JSON injection — parse and validate
+        let parsed;
+        try {
+          parsed = JSON.parse(jsonText);
+        } catch {
+          setError('Invalid JSON');
           setForking(false);
           return;
         }
+        data.json_contents = parsed;
+        // Use seed from the injected JSON, or fall back to current
+        data.seed = parsed.seed || currentSeed;
+      } else {
+        // Standard fork — seed selection
+        if (!useSameSeed && newSeed.trim()) {
+          data.seed = parseInt(newSeed.trim());
+          if (isNaN(data.seed)) {
+            setError('Seed must be a number');
+            setForking(false);
+            return;
+          }
+        }
       }
+
       if (name.trim()) {
         data.name = name.trim();
       }
@@ -54,7 +76,7 @@ export default function ForkModal({ iteration, clipId, onForked, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-surface-raised border border-gray-700 rounded-lg w-[420px]" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface-raised border border-gray-700 rounded-lg w-[520px] max-h-[85vh] overflow-auto" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
           <h3 className="text-sm font-mono text-gray-200 font-bold">Fork Branch</h3>
@@ -73,57 +95,98 @@ export default function ForkModal({ iteration, clipId, onForked, onClose }) {
             )}
           </div>
 
-          <p className="text-xs font-mono text-gray-500">
-            Creates a new branch starting from this iteration's settings.
-            All prompts, guidance values, and LoRA configuration will be copied.
-          </p>
-
-          {/* Seed selection */}
-          <div className="space-y-2">
-            <label className="text-xs font-mono text-gray-500 block">Seed</label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setUseSameSeed(true)}
-                className={`flex-1 px-3 py-1.5 rounded text-xs font-mono transition-colors ${
-                  useSameSeed
-                    ? 'bg-accent text-black font-bold'
-                    : 'bg-surface-overlay text-gray-400 hover:text-gray-200'
-                }`}
-              >
-                Same seed ({currentSeed})
-              </button>
-              <button
-                type="button"
-                onClick={() => setUseSameSeed(false)}
-                className={`flex-1 px-3 py-1.5 rounded text-xs font-mono transition-colors ${
-                  !useSameSeed
-                    ? 'bg-accent text-black font-bold'
-                    : 'bg-surface-overlay text-gray-400 hover:text-gray-200'
-                }`}
-              >
-                New seed
-              </button>
-            </div>
-            {!useSameSeed && (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newSeed}
-                  onChange={(e) => setNewSeed(e.target.value)}
-                  placeholder="Enter seed number..."
-                  className="flex-1 bg-surface border border-gray-600 rounded px-3 py-1.5 text-sm font-mono text-gray-200 placeholder:text-gray-600"
-                />
-                <button
-                  type="button"
-                  onClick={generateRandomSeed}
-                  className="px-3 py-1.5 bg-surface-overlay text-gray-400 hover:text-gray-200 text-xs font-mono rounded transition-colors"
-                >
-                  Random
-                </button>
-              </div>
-            )}
+          {/* Mode toggle */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setMode('fork')}
+              className={`flex-1 px-3 py-2 rounded text-xs font-mono transition-colors ${
+                mode === 'fork'
+                  ? 'bg-accent text-black font-bold'
+                  : 'bg-surface-overlay text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Fork Settings
+              <span className="block text-xs mt-0.5 opacity-70 font-normal">Copy current settings, change seed</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('inject')}
+              className={`flex-1 px-3 py-2 rounded text-xs font-mono transition-colors ${
+                mode === 'inject'
+                  ? 'bg-accent text-black font-bold'
+                  : 'bg-surface-overlay text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Inject JSON
+              <span className="block text-xs mt-0.5 opacity-70 font-normal">Paste custom Wan2GP JSON</span>
+            </button>
           </div>
+
+          {mode === 'fork' && (
+            <>
+              <p className="text-xs font-mono text-gray-500">
+                Creates a new branch copying this iteration's prompts, guidance, and LoRA settings.
+              </p>
+
+              {/* Seed selection */}
+              <div className="space-y-2">
+                <label className="text-xs font-mono text-gray-500 block">Seed</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setUseSameSeed(true)}
+                    className={`flex-1 px-3 py-1.5 rounded text-xs font-mono transition-colors ${
+                      useSameSeed ? 'bg-accent text-black font-bold' : 'bg-surface-overlay text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    Same seed ({currentSeed})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUseSameSeed(false)}
+                    className={`flex-1 px-3 py-1.5 rounded text-xs font-mono transition-colors ${
+                      !useSameSeed ? 'bg-accent text-black font-bold' : 'bg-surface-overlay text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    New seed
+                  </button>
+                </div>
+                {!useSameSeed && (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newSeed}
+                      onChange={(e) => setNewSeed(e.target.value)}
+                      placeholder="Enter seed number..."
+                      className="flex-1 bg-surface border border-gray-600 rounded px-3 py-1.5 text-sm font-mono text-gray-200 placeholder:text-gray-600"
+                    />
+                    <button type="button" onClick={generateRandomSeed}
+                      className="px-3 py-1.5 bg-surface-overlay text-gray-400 hover:text-gray-200 text-xs font-mono rounded transition-colors">
+                      Random
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {mode === 'inject' && (
+            <>
+              <p className="text-xs font-mono text-gray-500">
+                Paste a complete Wan2GP generation JSON. This creates a new branch with your custom settings — the iteration chain on the current branch stays untouched.
+              </p>
+
+              {/* JSON paste area */}
+              <textarea
+                value={jsonText}
+                onChange={(e) => setJsonText(e.target.value)}
+                rows={10}
+                placeholder='Paste Wan2GP JSON here...'
+                className="w-full bg-surface border border-gray-600 rounded px-3 py-2 text-xs font-mono text-gray-200 placeholder:text-gray-600 resize-y"
+              />
+            </>
+          )}
 
           {/* Branch name */}
           <div>
@@ -132,7 +195,7 @@ export default function ForkModal({ iteration, clipId, onForked, onClose }) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={`seed-${useSameSeed ? currentSeed : (newSeed || '...')}`}
+              placeholder={mode === 'inject' ? 'e.g. lora-1000-test' : `seed-${useSameSeed ? currentSeed : (newSeed || '...')}`}
               className="w-full bg-surface border border-gray-600 rounded px-3 py-1.5 text-sm font-mono text-gray-200 placeholder:text-gray-600"
             />
           </div>
@@ -150,10 +213,10 @@ export default function ForkModal({ iteration, clipId, onForked, onClose }) {
             </button>
             <button
               onClick={handleFork}
-              disabled={forking || (!useSameSeed && !newSeed.trim())}
+              disabled={forking || (mode === 'inject' && !jsonText.trim()) || (mode === 'fork' && !useSameSeed && !newSeed.trim())}
               className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90 disabled:opacity-50"
             >
-              {forking ? 'Forking...' : 'Fork Branch'}
+              {forking ? 'Creating...' : mode === 'inject' ? 'Inject & Fork' : 'Fork Branch'}
             </button>
           </div>
         </div>

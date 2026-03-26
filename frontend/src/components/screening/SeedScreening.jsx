@@ -644,7 +644,8 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
                         e.stopPropagation();
                         try {
                           const result = await api.createContactSheet({ frame_id: expandedRecord.id, metadata: { seed: expandedRecord.seed } });
-                          const dir = result.path.replace(/[/\\][^/\\]+$/, '');
+                          const framesData = await api.listFrames(expandedRecord.id);
+                          const dir = framesData.frames_dir || result.path.replace(/[/\\][^/\\]+$/, '');
                           await navigator.clipboard.writeText(dir);
                         } catch {}
                       }}

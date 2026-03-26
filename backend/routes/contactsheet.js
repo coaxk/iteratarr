@@ -139,10 +139,20 @@ export function createContactSheetRoutes(config) {
         .png()
         .toBuffer();
 
-      // Save to disk
+      // Save alongside frames (same directory) so they're grouped in explorer
+      let saveDir = sheetsDir;
+      if (frame_id) {
+        const framesDir = join(config.iteratarr_data_dir || '.', 'frames', frame_id);
+        if (existsSync(framesDir)) {
+          saveDir = framesDir;
+        }
+      }
+      await mkdir(saveDir, { recursive: true });
+      const outFilename = filename || `contact_sheet_${metadata?.seed || frame_id || 'manual'}.png`;
+      const outPath = join(saveDir, outFilename);
+      // Also save to central sheets dir for the serving endpoint
       await mkdir(sheetsDir, { recursive: true });
-      const outFilename = filename || `cs_${frame_id || 'manual'}_${Date.now()}.png`;
-      const outPath = join(sheetsDir, outFilename);
+      await writeFile(join(sheetsDir, outFilename), result);
       await writeFile(outPath, result);
 
       res.json({

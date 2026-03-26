@@ -62,6 +62,44 @@ function VramBar({ used, total }) {
   );
 }
 
+function ReleaseVramButton() {
+  const [releasing, setReleasing] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleRelease = async () => {
+    setReleasing(true);
+    setResult(null);
+    try {
+      await api.releaseVram();
+      setResult('released');
+      setTimeout(() => setResult(null), 5000);
+    } catch (err) {
+      setResult(err.message);
+      setTimeout(() => setResult(null), 5000);
+    } finally {
+      setReleasing(false);
+    }
+  };
+
+  return (
+    <div className="pt-1">
+      <button
+        onClick={handleRelease}
+        disabled={releasing}
+        className={`w-full px-2 py-1.5 text-xs font-mono font-bold rounded transition-colors ${
+          result === 'released'
+            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+            : releasing
+              ? 'bg-surface-overlay text-gray-500 cursor-wait'
+              : 'bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20'
+        }`}
+      >
+        {releasing ? 'Releasing...' : result === 'released' ? 'VRAM Released' : result ? result : 'Release VRAM'}
+      </button>
+    </div>
+  );
+}
+
 export default function GpuStatus() {
   const [status, setStatus] = useState(null);
   const [history, setHistory] = useState([]);
@@ -106,13 +144,15 @@ export default function GpuStatus() {
       {/* Header — clickable to expand/collapse */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between text-xs font-mono text-gray-400 hover:text-gray-300 transition-colors"
+        className="w-full flex items-center justify-between text-xs font-mono text-gray-400 hover:text-gray-300 transition-colors group"
       >
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
           <span className="truncate" title={status.name}>{status.name}</span>
         </div>
-        <span className="text-gray-600">{expanded ? '\u25B4' : '\u25BE'}</span>
+        <span className={`text-sm transition-transform duration-200 ${expanded ? 'rotate-180' : ''} ${expanded ? 'text-gray-500' : 'text-accent group-hover:text-accent animate-pulse'}`}>
+          ▲
+        </span>
       </button>
 
       {/* Always visible: utilization + temp compact row */}
@@ -161,8 +201,14 @@ export default function GpuStatus() {
           {status.processes && status.processes.length === 0 && (
             <div className="text-xs font-mono text-gray-600 italic">No GPU processes</div>
           )}
+
         </div>
       )}
+
+      {/* Release VRAM — always visible */}
+      <div className="pl-4">
+        <ReleaseVramButton />
+      </div>
     </div>
   );
 }

@@ -51,6 +51,7 @@ export const api = {
   listQueue: () => request('/queue'),
   addToQueue: (data) => request('/queue', { method: 'POST', body: data }),
   removeFromQueue: (id) => request(`/queue/${id}`, { method: 'DELETE' }),
+  getIterationQueueStatus: (iterationId) => request(`/queue/iteration/${iterationId}`),
   updateQueueItem: (id, data) => request(`/queue/${id}`, { method: 'PATCH', body: data }),
   reorderQueue: (order) => request('/queue/reorder', { method: 'POST', body: { order } }),
   startQueue: async () => {
@@ -123,6 +124,7 @@ export const api = {
   // GPU Monitoring
   gpuStatus: () => request('/gpu/status'),
   gpuHistory: () => request('/gpu/history'),
+  releaseVram: () => request('/gpu/release-vram', { method: 'POST' }),
 
   // Contact Sheets
   createContactSheet: (data) => request('/contactsheet', { method: 'POST', body: data }),

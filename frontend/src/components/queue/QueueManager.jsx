@@ -122,22 +122,38 @@ function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove
       {/* Progress bar for rendering items */}
       {item.status === 'rendering' && (
         <div className="space-y-1">
-          <div className="w-full bg-gray-700 rounded-full h-1.5">
+          {/* Phase label */}
+          {item.progress?.phase && (
+            <span className="text-xs font-mono text-amber-400/80 uppercase tracking-wider">
+              {item.progress.phase === 'loading_model' ? 'Loading model...' :
+               item.progress.phase === 'loading_lora' ? 'Loading LoRA...' :
+               item.progress.phase === 'task_ready' ? 'Task ready' :
+               item.progress.phase === 'denoising' ? 'Denoising' :
+               item.progress.phase === 'denoise_phase' ? `Phase ${item.progress.currentPhase}/${item.progress.totalPhases} — ${item.progress.phaseLabel}` :
+               item.progress.phase === 'vae_decoding' ? 'VAE Decoding — generating frames' :
+               item.progress.phase === 'video_saved' ? 'Video saved' :
+               item.progress.phase}
+            </span>
+          )}
+          <div className="w-full bg-gray-700 rounded-full h-2">
             <div
-              className="bg-amber-400 h-1.5 rounded-full transition-all duration-500"
+              className="bg-amber-400 h-2 rounded-full transition-all duration-500"
               style={{ width: `${item.progress?.percent || 0}%` }}
             />
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono text-gray-500">
-              {item.progress?.percent || 0}%
+            <span className="text-xs font-mono text-gray-300">
+              <span className="text-amber-400 font-bold">{item.progress?.percent || 0}%</span>
               {item.progress?.step && item.progress?.totalSteps && (
                 <> — Step {item.progress.step}/{item.progress.totalSteps}</>
               )}
             </span>
             {item.progress?.secsPerStep && (
-              <span className="text-xs font-mono text-gray-600">
-                {item.progress.secsPerStep.toFixed(1)}s/step
+              <span className="text-xs font-mono text-gray-400">
+                <span className="text-green-400 font-bold">{item.progress.secsPerStep.toFixed(1)}s/step</span>
+                {item.progress.totalSteps && item.progress.step && (
+                  <> — <span className="text-accent">~{Math.round((item.progress.totalSteps - item.progress.step) * item.progress.secsPerStep)}s left</span></>
+                )}
               </span>
             )}
           </div>
@@ -207,17 +223,22 @@ export default function QueueManager() {
     setTimeout(() => setActionMsg(null), 3000);
   };
 
+  const [starting, setStarting] = useState(false);
   const handleStartPause = async () => {
     try {
       if (status?.running) {
         await api.pauseQueue();
         showAction('Queue paused');
       } else {
+        setStarting(true);
+        showAction('Starting queue — connecting to Wan2GP...');
         await api.startQueue();
         showAction('Queue started');
+        setStarting(false);
       }
       await fetchAll();
     } catch (err) {
+      setStarting(false);
       showAction(`Error: ${err.message}`);
     }
   };
@@ -304,14 +325,16 @@ export default function QueueManager() {
           )}
           <button
             onClick={handleStartPause}
-            disabled={queuedItems.length === 0 && !status?.running}
+            disabled={(queuedItems.length === 0 && !status?.running) || starting}
             className={`px-4 py-2 text-sm font-mono font-bold rounded transition-colors ${
-              status?.running
-                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30'
-                : 'bg-accent text-black hover:bg-accent/90 disabled:opacity-50'
+              starting
+                ? 'bg-accent/50 text-black/50 cursor-wait'
+                : status?.running
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30'
+                  : 'bg-accent text-black hover:bg-accent/90 disabled:opacity-50'
             }`}
           >
-            {status?.running ? 'Pause Queue' : 'Start Queue'}
+            {starting ? 'Starting...' : status?.running ? 'Pause Queue' : 'Start Queue'}
           </button>
         </div>
       </div>

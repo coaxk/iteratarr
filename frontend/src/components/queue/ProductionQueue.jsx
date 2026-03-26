@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../api';
 import CopyButton from '../common/CopyButton';
@@ -80,9 +81,15 @@ function ProductionCard({ item }) {
 }
 
 export default function ProductionQueue({ onNavigateToQueue }) {
-  const { data: renderQueue, loading: rqLoading } = useApi(() => api.listQueue(), []);
+  const { data: renderQueue, loading: rqLoading, refetch: refetchQueue } = useApi(() => api.listQueue(), []);
   const { data: prodQueue, loading: pqLoading } = useApi(() => api.listProductionQueue(), []);
-  const { data: queueStatus } = useApi(() => api.getQueueStatus(), []);
+  const { data: queueStatus, refetch: refetchStatus } = useApi(() => api.getQueueStatus(), []);
+
+  // Poll queue state every 5s to keep sidebar in sync
+  useEffect(() => {
+    const id = setInterval(() => { refetchQueue(); refetchStatus(); }, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   const activeRenderItems = (renderQueue || []).filter(i => i.status === 'queued' || i.status === 'rendering');
   const prodItems = prodQueue || [];

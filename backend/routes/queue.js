@@ -20,6 +20,21 @@ export function createQueueRoutes(store, config) {
   let activeProgress = null;
   let activeRenderId = 0;
 
+  // On startup: recover any items stuck in 'rendering' from a crash
+  (async () => {
+    try {
+      const items = await store.list('render_queue');
+      const stuck = items.filter(i => i.status === 'rendering');
+      for (const item of stuck) {
+        console.log(`[Queue] Recovering stuck item ${item.id.substring(0, 8)} — resetting to queued`);
+        await store.update('render_queue', item.id, { status: 'queued', started_at: null, progress: null });
+      }
+      if (stuck.length > 0) console.log(`[Queue] Recovered ${stuck.length} stuck item(s)`);
+    } catch (err) {
+      console.error('[Queue] Recovery check failed:', err.message);
+    }
+  })();
+
   /**
    * GET / — List all queue items, ordered by priority then queued_at
    */
@@ -53,6 +68,13 @@ export function createQueueRoutes(store, config) {
     if (!json_path) return res.status(400).json({ error: 'json_path required' });
 
     try {
+      // Prevent duplicate queue entries for the same iteration
+      if (iteration_id) {
+        const existing = await store.list('render_queue');
+        const dupe = existing.find(i => i.iteration_id === iteration_id && (i.status === 'queued' || i.status === 'rendering'));
+        if (dupe) return res.status(409).json({ error: 'This iteration is already in the queue' });
+      }
+
       const item = await store.create('render_queue', {
         json_path,
         clip_name: clip_name || json_path.split(/[/\\]/).pop().replace('.json', ''),
@@ -191,6 +213,26 @@ export function createQueueRoutes(store, config) {
   });
 
   /**
+   * GET /iteration/:iterationId — Check queue status for a specific iteration
+   */
+  router.get('/iteration/:iterationId', async (req, res) => {
+    try {
+      const items = await store.list('render_queue');
+      const match = items.find(i => i.iteration_id === req.params.iterationId && (i.status === 'queued' || i.status === 'rendering'));
+      const completed = items.find(i => i.iteration_id === req.params.iterationId && i.status === 'complete');
+      const failed = items.find(i => i.iteration_id === req.params.iterationId && i.status === 'failed');
+      const result = match || completed || failed;
+      if (result) {
+        res.json({ in_queue: true, ...result, progress: match?.id === activeItem?.id ? activeProgress : null });
+      } else {
+        res.json({ in_queue: false });
+      }
+    } catch {
+      res.json({ in_queue: false });
+    }
+  });
+
+  /**
    * POST /clear-completed — Remove all completed/failed items from queue
    */
   router.post('/clear-completed', async (req, res) => {
@@ -255,19 +297,29 @@ export function createQueueRoutes(store, config) {
 
       console.log(`[Queue] Processing: ${item.clip_name} (${item.json_path})`);
 
-      // Subscribe to progress
+      // Subscribe to progress — capture both step progress and phase info
       onProgress(renderId, (data) => {
         if (data.type === 'progress') {
           activeProgress = {
+            ...activeProgress,
             percent: data.percent,
             step: data.step,
             totalSteps: data.totalSteps,
             secsPerStep: data.secsPerStep
           };
-          // Persist progress periodically (every 10%)
           if (data.percent % 10 === 0) {
             store.update('render_queue', item.id, { progress: activeProgress }).catch(() => {});
           }
+        } else if (data.type === 'info') {
+          activeProgress = {
+            ...activeProgress,
+            phase: data.phase,
+            phaseLabel: data.phaseLabel || null,
+            currentPhase: data.currentPhase || null,
+            totalPhases: data.totalPhases || null,
+            message: data.message
+          };
+          store.update('render_queue', item.id, { progress: activeProgress }).catch(() => {});
         }
       });
 

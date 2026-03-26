@@ -126,6 +126,22 @@ function TelemetryToggle() {
   );
 }
 
+function QueueBadge({ active }) {
+  const [counts, setCounts] = useState(null);
+  useEffect(() => {
+    const poll = () => api.getQueueStatus().then(setCounts).catch(() => {});
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => clearInterval(id);
+  }, []);
+  if (!counts) return null;
+  const { queued, rendering, failed } = counts.counts || {};
+  const total = (queued || 0) + (rendering || 0);
+  if (failed > 0) return <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-red-500/20 text-red-400">!</span>;
+  if (total === 0) return null;
+  return <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${active ? 'bg-black/20 text-black' : 'bg-accent/20 text-accent'}`}>{total}</span>;
+}
+
 function AutoRenderToggle() {
   const { autoRender, toggleAutoRender } = useAutoRender();
 
@@ -165,11 +181,12 @@ export default function App() {
               <button
                 key={key}
                 onClick={() => { setView(key); setSelectedClip(null); }}
-                className={`w-full text-left px-3 py-2 rounded text-sm font-mono transition-colors ${
+                className={`w-full text-left px-3 py-2 rounded text-sm font-mono transition-colors flex items-center justify-between ${
                   view === key ? 'bg-accent text-black font-bold' : 'text-gray-400 hover:text-gray-200 hover:bg-surface-overlay'
                 }`}
               >
-                {label}
+                <span>{label}</span>
+                {key === 'queue' && <QueueBadge active={view === key} />}
               </button>
             ))}
           </nav>

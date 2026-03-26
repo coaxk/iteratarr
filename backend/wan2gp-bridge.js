@@ -81,6 +81,37 @@ function parseOutput(line) {
     return { type: 'info', phase: 'task_ready', message: trimmed };
   }
 
+  // Phase indicator: "Phase 1/2 High Noise" or "Phase 2/2 Low Noise"
+  const phaseMatch = trimmed.match(/Phase\s+(\d+)\/(\d+)\s+(.*)/i);
+  if (phaseMatch) {
+    return { type: 'info', phase: 'denoise_phase', currentPhase: parseInt(phaseMatch[1]), totalPhases: parseInt(phaseMatch[2]), phaseLabel: phaseMatch[3].trim(), message: trimmed };
+  }
+
+  // Denoising / VAE Decoding stage labels
+  if (trimmed.includes('Denoising')) {
+    return { type: 'info', phase: 'denoising', message: trimmed };
+  }
+  if (trimmed.includes('VAE Decoding') || trimmed.includes('VAE decoding')) {
+    return { type: 'info', phase: 'vae_decoding', message: 'VAE Decoding — generating video frames' };
+  }
+
+  // Video saved
+  if (trimmed.includes('Video saved')) {
+    return { type: 'info', phase: 'video_saved', message: trimmed };
+  }
+
+  // Task completed
+  const taskCompleteMatch = trimmed.match(/Task\s+(\d+)\s+completed/i);
+  if (taskCompleteMatch) {
+    return { type: 'info', phase: 'task_complete', taskNumber: parseInt(taskCompleteMatch[1]), message: trimmed };
+  }
+
+  // Queue completed summary
+  const queueCompleteMatch = trimmed.match(/Queue completed.*?(\d+)\/(\d+)\s+tasks?\s+in\s+(.*)/i);
+  if (queueCompleteMatch) {
+    return { type: 'info', phase: 'queue_complete', completed: parseInt(queueCompleteMatch[1]), total: parseInt(queueCompleteMatch[2]), duration: queueCompleteMatch[3], message: trimmed };
+  }
+
   return null;
 }
 
@@ -150,11 +181,22 @@ export function renderSingle(jsonPath, options = {}) {
     });
 
     proc.stderr.on('data', (data) => {
-      const text = data.toString().trim();
-      if (text) {
+      const lines = data.toString().split('\n');
+      for (const line of lines) {
+        const text = line.trim();
+        if (!text) continue;
         allOutput += text + '\n';
-        // Don't log CUDA/torch warnings as errors — they're informational
-        if (!text.includes('UserWarning') && !text.includes('FutureWarning')) {
+        // Parse stderr for progress (tqdm outputs to stderr)
+        const parsed = parseOutput(text);
+        if (parsed) {
+          if (parsed.type === 'progress') {
+            lastProgress = parsed;
+            if (renderId) emitProgress(renderId, parsed);
+            if (parsed.percent % 10 === 0) {
+              console.log(`[Wan2GP Bridge] ${parsed.percent}% (${parsed.step}/${parsed.totalSteps}) ${parsed.secsPerStep ? parsed.secsPerStep + 's/step' : ''}`);
+            }
+          }
+        } else if (!text.includes('UserWarning') && !text.includes('FutureWarning')) {
           console.error(`[Wan2GP Bridge] stderr: ${text.substring(0, 200)}`);
         }
       }

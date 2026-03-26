@@ -87,6 +87,13 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     setComparisonVideoPath(null);
     setComparisonIter(null);
 
+    // Check if this iteration is already in the queue
+    if (iteration.status === 'pending') {
+      api.getIterationQueueStatus(iteration.id).then(qs => {
+        if (qs.in_queue) setQueueAdded(qs.status); // 'queued' | 'rendering' | 'complete' | 'failed'
+      }).catch(() => {});
+    }
+
     // If iteration is 'pending' but has a render_path, check if video already exists
     // This catches renders done outside the bridge (directly in Wan2GP)
     if (iteration.status === 'pending' && iteration.render_path) {
@@ -373,24 +380,64 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         {iteration.change_from_parent && (
           <p className="text-xs text-accent font-mono mt-1 break-words">Changed: {iteration.change_from_parent}</p>
         )}
-        {/* Render action for pending iterations — hide once render is confirmed complete */}
-        {iteration.status === 'pending' && iteration.json_path && renderStatus !== 'complete' && (
-          <div className={`mt-2 border rounded px-3 py-2 space-y-2 ${
-            renderStatus === 'rendering'
-              ? 'border-blue-500/30 bg-blue-500/5'
-              : renderStatus === 'failed'
-                ? 'border-red-500/30 bg-red-500/5'
-                : 'border-accent/30 bg-accent/5'
-          }`}>
-            <div className="flex items-center justify-between">
-              <span className={`text-xs font-mono font-bold ${
-                renderStatus === 'rendering' ? 'text-blue-400 animate-pulse' :
-                renderStatus === 'failed' ? 'text-red-400' : 'text-accent'
-              }`}>
-                {renderStatus === 'rendering' ? 'Rendering...' :
-                 renderStatus === 'failed' ? 'Render failed' : 'Ready to render'}
-              </span>
-              {renderStatus !== 'rendering' && (
+        {/* Render / Queue status for pending iterations */}
+        {iteration.status === 'pending' && iteration.json_path && (() => {
+          // Queue states: null (not queued), 'queued', 'rendering', 'complete', 'failed'
+          const queueState = queueAdded; // queueAdded now holds the queue status string or false
+
+          if (renderStatus === 'complete' || queueState === 'complete') {
+            return (
+              <div className="mt-2 border border-green-500/30 bg-green-500/5 rounded px-3 py-2">
+                <span className="text-xs font-mono text-green-400 font-bold">Render complete</span>
+              </div>
+            );
+          }
+
+          if (queueState === 'queued') {
+            return (
+              <div className="mt-2 border border-accent/30 bg-accent/5 rounded px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono text-accent font-bold">In queue — waiting to render</span>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const qs = await api.getIterationQueueStatus(iteration.id);
+                        if (qs.in_queue && qs.id) {
+                          await api.removeFromQueue(qs.id);
+                          setQueueAdded(false);
+                        }
+                      } catch (err) { alert(`Remove failed: ${err.message}`); }
+                    }}
+                    className="px-2 py-0.5 text-xs font-mono text-gray-500 hover:text-red-400 border border-gray-600 hover:border-red-400/50 rounded transition-colors"
+                  >
+                    Remove from queue
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          if (queueState === 'rendering' || renderStatus === 'rendering') {
+            return (
+              <div className="mt-2 border border-blue-500/30 bg-blue-500/5 rounded px-3 py-2">
+                <span className="text-xs font-mono text-blue-400 font-bold animate-pulse">Rendering...</span>
+              </div>
+            );
+          }
+
+          if (queueState === 'failed' || renderStatus === 'failed') {
+            return (
+              <div className="mt-2 border border-red-500/30 bg-red-500/5 rounded px-3 py-2">
+                <span className="text-xs font-mono text-red-400 font-bold">Render failed</span>
+              </div>
+            );
+          }
+
+          // Default: not queued, ready to render
+          return (
+            <div className="mt-2 border border-accent/30 bg-accent/5 rounded px-3 py-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono text-accent font-bold">Ready to render</span>
                 <div className="flex gap-2">
                   <button
                     onClick={async () => {
@@ -402,26 +449,20 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                           seed: iteration.seed_used || null,
                           source: 'iteration'
                         });
-                        setQueueAdded(true);
-                        setTimeout(() => setQueueAdded(false), 3000);
+                        setQueueAdded('queued');
                       } catch (err) {
                         alert(`Queue failed: ${err.message}`);
                       }
                     }}
-                    className={`px-3 py-1 text-xs font-mono font-bold rounded transition-colors ${
-                      queueAdded
-                        ? 'bg-accent/20 text-accent'
-                        : 'bg-surface-overlay text-gray-300 border border-gray-600 hover:border-accent hover:text-accent'
-                    }`}
+                    className="bg-surface-overlay text-gray-300 border border-gray-600 hover:border-accent hover:text-accent px-3 py-1 text-xs font-mono font-bold rounded transition-colors"
                   >
-                    {queueAdded ? 'Queued' : 'Add to Queue'}
+                    Add to Queue
                   </button>
                   <button
                     onClick={async () => {
                       try {
                         await api.submitRender(iteration.json_path);
                         setRenderStatus('rendering');
-                        // Poll render status every 10s until complete
                         const poll = setInterval(async () => {
                           try {
                             const status = await api.getRenderStatus();
@@ -431,12 +472,12 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                             if (myRender?.status === 'complete') {
                               clearInterval(poll);
                               setRenderStatus('complete');
-                              onSaved?.(); // Trigger refetch to get updated iteration
+                              onSaved?.();
                             } else if (myRender?.status === 'failed' || myRender?.status === 'aborted') {
                               clearInterval(poll);
                               setRenderStatus('failed');
                             }
-                          } catch { /* ignore polling errors */ }
+                          } catch {}
                         }, 10000);
                       } catch (err) {
                         alert(`Render failed: ${err.message}`);
@@ -447,26 +488,18 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                     Render Now
                   </button>
                   <button
-                    onClick={async () => {
-                      await navigator.clipboard.writeText(iteration.json_path);
-                    }}
+                    onClick={() => navigator.clipboard.writeText(iteration.json_path)}
                     className="px-3 py-1 text-xs font-mono bg-surface-overlay text-gray-400 hover:text-gray-200 rounded transition-colors"
                     title="Copy JSON path for manual rendering"
                   >
-                    Copy JSON path
+                    Copy JSON
                   </button>
                 </div>
-              )}
+              </div>
+              <p className="text-xs font-mono text-gray-600 truncate" title={iteration.json_path}>{iteration.json_path}</p>
             </div>
-            <p className="text-xs font-mono text-gray-600 truncate" title={iteration.json_path}>{iteration.json_path}</p>
-          </div>
-        )}
-        {/* Render complete banner — shows briefly after render finishes */}
-        {renderStatus === 'complete' && (
-          <div className="mt-2 border border-green-500/30 bg-green-500/5 rounded px-3 py-2">
-            <span className="text-xs font-mono text-green-400 font-bold">Render complete</span>
-          </div>
-        )}
+          );
+        })()}
         {/* Tags */}
         <div className="mt-2">
           <TagInput

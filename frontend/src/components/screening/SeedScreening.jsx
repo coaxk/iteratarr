@@ -638,7 +638,20 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
                         className="h-40 w-auto rounded border-2 border-accent cursor-pointer hover:brightness-110 transition-all"
                       />
                     </a>
-                    <span className="absolute bottom-1 left-1 text-xs font-mono bg-black/70 text-accent px-1 rounded">Save</span>
+                    <button
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        try {
+                          const result = await api.createContactSheet({ frame_id: expandedRecord.id, metadata: { seed: expandedRecord.seed } });
+                          await navigator.clipboard.writeText(result.path);
+                        } catch {}
+                      }}
+                      className="absolute bottom-1 left-1 text-xs font-mono bg-black/80 text-accent px-1.5 py-0.5 rounded hover:bg-black transition-colors"
+                      title="Copy contact sheet path for Tenzing"
+                    >
+                      Copy path
+                    </button>
                   </div>
                 )}
               </div>

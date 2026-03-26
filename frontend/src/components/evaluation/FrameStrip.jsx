@@ -174,6 +174,29 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
               </span>
             </button>
           ))}
+          {/* Contact sheet thumbnail — draggable */}
+          {csExported ? (
+            <img
+              src={`/api/contactsheet/${csExported.filename}`}
+              alt="Contact sheet"
+              title="Drag to Tenzing"
+              className="h-20 w-auto rounded border-2 border-accent/50 cursor-grab flex-shrink-0"
+              draggable
+            />
+          ) : (
+            <button
+              onClick={async () => {
+                try {
+                  const result = await api.createContactSheet({ frame_id: iterationId });
+                  setCsExported(result);
+                } catch {}
+              }}
+              className="h-20 w-16 flex-shrink-0 rounded border border-dashed border-gray-600 hover:border-accent flex items-center justify-center text-gray-600 hover:text-accent transition-colors"
+              title="Generate contact sheet"
+            >
+              <span className="text-xs font-mono">CS</span>
+            </button>
+          )}
         </div>
       )}
 

@@ -644,7 +644,8 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
                         e.stopPropagation();
                         try {
                           const result = await api.createContactSheet({ frame_id: expandedRecord.id, metadata: { seed: expandedRecord.seed } });
-                          await navigator.clipboard.writeText(result.path);
+                          const dir = result.path.replace(/[/\\][^/\\]+$/, '');
+                          await navigator.clipboard.writeText(dir);
                         } catch {}
                       }}
                       className="absolute bottom-1 left-1 text-xs font-mono bg-black/80 text-accent px-1.5 py-0.5 rounded hover:bg-black transition-colors"

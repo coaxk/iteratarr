@@ -161,7 +161,11 @@ export function createFrameRoutes(dataDir) {
         .filter(f => /^frame_\d{3}\.png$/.test(f))
         .sort();
 
-      res.json({ frames, frames_dir: frames.length > 0 ? dir : null });
+      // Check for existing contact sheet
+      const csFile = files.find(f => f.startsWith('contact_sheet'));
+      const contact_sheet = csFile ? { filename: csFile, path: join(dir, csFile) } : null;
+
+      res.json({ frames, frames_dir: frames.length > 0 ? dir : null, contact_sheet });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

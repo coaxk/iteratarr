@@ -11,6 +11,7 @@ import EvaluationPanel from '../evaluation/EvaluationPanel';
 import SeedScreening from '../screening/SeedScreening';
 import BranchPillBar from './BranchPillBar';
 import BranchManageMenu from './BranchManageMenu';
+import BranchAnalytics from '../analytics/BranchAnalytics';
 
 export default function ClipDetail({ clip, onBack }) {
   // Branch state
@@ -35,6 +36,7 @@ export default function ClipDetail({ clip, onBack }) {
   const [goalSaving, setGoalSaving] = useState(false);
   const [currentGoal, setCurrentGoal] = useState(clip.goal || '');
   const [managingBranchId, setManagingBranchId] = useState(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
   // Auto-select the most recently active branch when branches load
@@ -315,6 +317,14 @@ export default function ClipDetail({ clip, onBack }) {
             >
               Compare
             </button>
+            {branches && branches.length > 1 && (
+              <button
+                onClick={() => setShowAnalytics(true)}
+                className="px-2 py-0.5 text-xs font-mono border border-gray-700 rounded text-gray-500 hover:text-purple-400 hover:border-purple-400/30 transition-colors"
+              >
+                Analytics
+              </button>
+            )}
           </div>
           {loading ? (
             <p className="text-gray-500 text-xs font-mono">Loading...</p>
@@ -399,6 +409,21 @@ export default function ClipDetail({ clip, onBack }) {
           onClose={() => {
             setShowComparison(false);
             setComparisonPreselect(null);
+          }}
+        />
+      )}
+
+      {/* Branch analytics modal */}
+      {showAnalytics && (
+        <BranchAnalytics
+          clip={clip}
+          onClose={() => setShowAnalytics(false)}
+          onFork={(result) => {
+            setShowAnalytics(false);
+            refetch();
+            refetchBranches();
+            setSelectedBranchId(result.branch.id);
+            setSelectedIteration(result.iteration);
           }}
         />
       )}

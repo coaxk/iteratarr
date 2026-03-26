@@ -33,7 +33,8 @@ export default function IterationLineage({ iterations, selectedId, onSelect, for
           &lsaquo;
         </button>
       )}
-      <div ref={scrollRef} className="flex items-center gap-2 overflow-x-auto py-2 scrollbar-hide flex-1">
+      <div ref={scrollRef} className="flex items-center gap-2 overflow-x-auto py-2 scrollbar-hide flex-1"
+        onWheel={(e) => { e.preventDefault(); scrollBy(e.deltaY > 0 ? 1 : -1); }}>
         {iterations.map((iter, i) => {
           const isSelected = iter.id === selectedId;
           const isLocked = iter.status === 'locked';

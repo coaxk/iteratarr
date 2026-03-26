@@ -178,11 +178,11 @@ export default function EpisodeTracker({ onSelectClip }) {
 
       {/* Kanban columns — hidden when viewing archive */}
       {!showArchive && <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 flex-1 overflow-x-auto">
+        <div className="flex gap-4 flex-1 min-w-0">
           {COLUMNS.map(col => {
             const status = CLIP_STATUSES[col];
             return (
-              <div key={col} className="flex-shrink-0 w-56">
+              <div key={col} className="flex-1 min-w-0">
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <div className={`w-2 h-2 rounded-full ${status.color}`} />
                   <h3 className="text-xs font-mono text-gray-400 uppercase tracking-wider">{status.label}</h3>

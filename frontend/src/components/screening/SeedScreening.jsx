@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../../api';
+import { getAutoRender } from '../../hooks/useAutoRender';
 import SeedCard from './SeedCard';
 
 /**
@@ -95,6 +96,7 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
   // Render status
   const [renderStatus, setRenderStatus] = useState(null);
   const [renderConfirm, setRenderConfirm] = useState(null);
+  const [queueConfirm, setQueueConfirm] = useState(null);
 
   // Reference images
   const [referenceImages, setReferenceImages] = useState([]);
@@ -204,6 +206,21 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
 
       // Reload screen records from API to get full records
       await loadScreenRecords();
+
+      // Auto-submit all generated seed renders to Wan2GP if auto-render is enabled
+      if (getAutoRender() && result.records?.length > 0) {
+        const paths = result.records.map(r => r.json_path).filter(Boolean);
+        if (paths.length > 0) {
+          try {
+            await api.submitBatchPaths(paths);
+            setRenderStatus(`Auto-submitted ${paths.length} seed renders to Wan2GP`);
+            setTimeout(() => setRenderStatus(null), 5000);
+          } catch (err) {
+            setRenderStatus(`Auto-render failed: ${err.message}`);
+            setTimeout(() => setRenderStatus(null), 5000);
+          }
+        }
+      }
     } catch (err) {
       setGenerateError(err.message);
     } finally {
@@ -259,6 +276,23 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
     }
   };
 
+  const handleAddToQueue = async (record) => {
+    try {
+      await api.addToQueue({
+        json_path: record.json_path,
+        clip_name: `${clip.name} — Seed ${record.seed}`,
+        iteration_id: null,
+        seed: record.seed,
+        source: 'screening'
+      });
+      setQueueConfirm(record.id);
+      setTimeout(() => setQueueConfirm(null), 3000);
+    } catch (err) {
+      setRenderStatus(`Queue failed: ${err.message}`);
+      setTimeout(() => setRenderStatus(null), 5000);
+    }
+  };
+
   // Load persisted reference images from clip record
   useEffect(() => {
     if (clip.reference_images?.length > 0) {
@@ -307,8 +341,11 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
       const record = screenRecords.find(r => r.id === expandedId);
       if (record?.frames?.length > 0) {
         api.createContactSheet({ frame_id: expandedId, metadata: { seed: record.seed } })
-          .then(result => setContactSheets(prev => ({ ...prev, [expandedId]: result.filename })))
-          .catch(() => {});
+          .then(result => {
+            console.log('[ContactSheet] Generated:', result.filename);
+            setContactSheets(prev => ({ ...prev, [expandedId]: result.filename }));
+          })
+          .catch(err => console.error('[ContactSheet] Failed:', err.message));
       }
     }
   }, [expandedId]);
@@ -423,22 +460,46 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
             </span>
           )}
           {screenRecords.some(r => !r.frames || r.frames.length === 0) && (
-            <button
-              onClick={async () => {
-                const unrendered = screenRecords.filter(r => !r.frames || r.frames.length === 0);
-                const paths = unrendered.map(r => r.json_path);
-                try {
-                  await api.submitBatchPaths(paths);
-                  setRenderStatus(`Submitted ${paths.length} renders to Wan2GP`);
-                  setTimeout(() => setRenderStatus(null), 5000);
-                } catch (err) {
-                  setRenderStatus(`Render failed: ${err.message}`);
-                }
-              }}
-              className="px-3 py-1.5 bg-score-high text-black text-xs font-mono font-bold rounded hover:bg-green-400 transition-colors"
-            >
-              Render All in Wan2GP
-            </button>
+            <>
+              <button
+                onClick={async () => {
+                  const unrendered = screenRecords.filter(r => !r.frames || r.frames.length === 0);
+                  try {
+                    for (const r of unrendered) {
+                      await api.addToQueue({
+                        json_path: r.json_path,
+                        clip_name: `${clip.name} — Seed ${r.seed}`,
+                        seed: r.seed,
+                        source: 'screening'
+                      });
+                    }
+                    setRenderStatus(`Added ${unrendered.length} seeds to render queue`);
+                    setTimeout(() => setRenderStatus(null), 5000);
+                  } catch (err) {
+                    setRenderStatus(`Queue failed: ${err.message}`);
+                  }
+                }}
+                className="px-3 py-1.5 border border-gray-600 text-gray-300 text-xs font-mono font-bold rounded hover:border-accent hover:text-accent transition-colors"
+              >
+                Queue All
+              </button>
+              <button
+                onClick={async () => {
+                  const unrendered = screenRecords.filter(r => !r.frames || r.frames.length === 0);
+                  const paths = unrendered.map(r => r.json_path);
+                  try {
+                    await api.submitBatchPaths(paths);
+                    setRenderStatus(`Submitted ${paths.length} renders to Wan2GP`);
+                    setTimeout(() => setRenderStatus(null), 5000);
+                  } catch (err) {
+                    setRenderStatus(`Render failed: ${err.message}`);
+                  }
+                }}
+                className="px-3 py-1.5 bg-score-high text-black text-xs font-mono font-bold rounded hover:bg-green-400 transition-colors"
+              >
+                Render All Now
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -467,9 +528,20 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
                   Copy
                 </button>
                 <button
+                  onClick={() => handleAddToQueue(r)}
+                  className={`px-1.5 py-0.5 rounded text-xs font-mono shrink-0 transition-colors ${
+                    queueConfirm === r.id
+                      ? 'bg-accent/20 text-accent'
+                      : 'bg-surface-overlay text-gray-400 border border-gray-600 hover:border-accent hover:text-accent'
+                  }`}
+                  title="Add to render queue for batch processing"
+                >
+                  {queueConfirm === r.id ? 'Queued' : 'Queue'}
+                </button>
+                <button
                   onClick={() => handleRender(r.json_path, r.id)}
                   className="px-1.5 py-0.5 rounded text-xs font-mono bg-accent text-black hover:bg-accent/90 shrink-0"
-                  title="Submit this seed to Wan2GP for rendering"
+                  title="Submit this seed to Wan2GP for rendering now"
                 >
                   Render
                 </button>

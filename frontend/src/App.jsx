@@ -7,13 +7,17 @@ import RopeEffectivenessChart from './components/trends/RopeEffectivenessChart';
 import ParameterScatterChart from './components/trends/ParameterScatterChart';
 import CreateProjectModal from './components/forms/CreateProjectModal';
 import ProductionQueue from './components/queue/ProductionQueue';
+import QueueManager from './components/queue/QueueManager';
 import TemplateLibrary from './components/templates/TemplateLibrary';
 import RenderStatus from './components/render/RenderStatus';
+import GpuStatus from './components/gpu/GpuStatus';
 import { useApi } from './hooks/useApi';
+import { useAutoRender } from './hooks/useAutoRender';
 import { api } from './api';
 
 const VIEWS = {
   episodes: 'Episode Tracker',
+  queue: 'Queue Manager',
   characters: 'Character Registry',
   templates: 'Templates',
   trends: 'Score Trends'
@@ -122,6 +126,23 @@ function TelemetryToggle() {
   );
 }
 
+function AutoRenderToggle() {
+  const { autoRender, toggleAutoRender } = useAutoRender();
+
+  return (
+    <div className="px-3 py-2 border-t border-gray-700">
+      <button
+        onClick={toggleAutoRender}
+        className="w-full flex items-center justify-between text-xs font-mono text-gray-500 hover:text-gray-400 transition-colors"
+        title="When enabled, generated iterations are automatically submitted to Wan2GP for rendering"
+      >
+        <span>Auto-Render: {autoRender ? 'On' : 'Off'}</span>
+        <span className={`w-2 h-2 rounded-full ${autoRender ? 'bg-accent' : 'bg-gray-600'}`} />
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const [view, setView] = useState('episodes');
   const [selectedClip, setSelectedClip] = useState(null);
@@ -165,7 +186,9 @@ export default function App() {
 
           {/* Render status + Telemetry toggle — pushed to bottom of sidebar */}
           <div className="mt-auto">
+            <GpuStatus />
             <RenderStatus />
+            <AutoRenderToggle />
             <TelemetryToggle />
           </div>
         </aside>
@@ -178,6 +201,7 @@ export default function App() {
           {view === 'episodes' && selectedClip && (
             <ClipDetail clip={selectedClip} onBack={() => setSelectedClip(null)} />
           )}
+          {view === 'queue' && <QueueManager />}
           {view === 'characters' && <CharacterRegistry />}
           {view === 'templates' && <TemplateLibrary />}
           {view === 'trends' && <TrendsView />}
@@ -185,7 +209,7 @@ export default function App() {
 
         {/* Right panel — Production Queue */}
         <aside className="w-64 bg-surface-raised border-l border-gray-700 p-3 overflow-y-auto">
-          <ProductionQueue />
+          <ProductionQueue onNavigateToQueue={() => { setView('queue'); setSelectedClip(null); }} />
         </aside>
       </div>
 

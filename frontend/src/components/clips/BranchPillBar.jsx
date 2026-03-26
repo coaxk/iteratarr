@@ -31,7 +31,8 @@ export default function BranchPillBar({ branches, selectedBranchId, onSelect, on
         </button>
       )}
 
-      <div ref={scrollRef} className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide flex-1 py-1">
+      <div ref={scrollRef} className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide flex-1 py-1"
+        onWheel={(e) => { e.preventDefault(); scrollBy(e.deltaY > 0 ? 1 : -1); }}>
         {/* All branches pill */}
         <button
           onClick={() => onSelect(null)}

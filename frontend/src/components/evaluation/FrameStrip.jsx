@@ -24,6 +24,7 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
   const [outputDir, setOutputDir] = useState(null);
   const [pollCount, setPollCount] = useState(0);
   const [csExported, setCsExported] = useState(null);
+  const thumbsRef = useRef(null);
   const MAX_POLLS = 40; // 40 * 15s = 10 minutes
 
   // Fetch Wan2GP output dir for browse starting point
@@ -63,6 +64,10 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
         if (data.frames?.length > 0) {
           setFrames(data.frames);
           if (data.frames_dir) setFramesDir(data.frames_dir);
+          // Load existing contact sheet from disk if available
+          if (data.contact_sheet) {
+            setCsExported(data.contact_sheet);
+          }
         } else if (renderPathProp) {
           const extracted = await tryExtract();
           if (!extracted && !cancelled) {
@@ -151,96 +156,116 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
         </div>
       )}
 
-      {/* Frame thumbnails */}
-      {frames.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {frames.map((filename, idx) => (
-            <button
-              key={filename}
-              onClick={() => setExpandedFrame(expandedFrame === filename ? null : filename)}
-              className="flex-shrink-0 group relative"
-            >
-              <img
-                src={frameSrc(filename)}
-                alt={`Frame ${idx + 1}`}
-                className={`h-20 w-auto rounded border transition-all ${
-                  expandedFrame === filename
-                    ? 'border-accent ring-1 ring-accent/50'
-                    : 'border-gray-700 group-hover:border-gray-500'
-                }`}
-              />
-              <span className="absolute bottom-0.5 right-1 text-xs font-mono text-gray-400 bg-black/70 px-1 rounded">
-                {idx + 1}
-              </span>
-            </button>
-          ))}
-          {/* Contact sheet thumbnail — draggable */}
-          {csExported ? (
-            <img
-              src={`/api/contactsheet/${csExported.filename}`}
-              alt="Contact sheet"
-              title="Drag to Tenzing"
-              className="h-20 w-auto rounded border-2 border-accent/50 cursor-grab flex-shrink-0"
-              draggable
-            />
-          ) : (
-            <button
-              onClick={async () => {
-                try {
-                  const result = await api.createContactSheet({ frame_id: iterationId });
-                  setCsExported(result);
-                } catch {}
-              }}
-              className="h-20 w-16 flex-shrink-0 rounded border border-dashed border-gray-600 hover:border-accent flex items-center justify-center text-gray-600 hover:text-accent transition-colors"
-              title="Generate contact sheet"
-            >
-              <span className="text-xs font-mono">CS</span>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Expanded frame view with navigation */}
-      {expandedFrame && (
-        <div className="relative">
-          <img
-            src={frameSrc(expandedFrame)}
-            alt="Expanded frame"
-            className="w-full rounded border border-gray-700"
-          />
-          <div className="absolute top-2 right-2 flex gap-1">
-            <button
-              onClick={() => {
-                const idx = frames.indexOf(expandedFrame);
-                if (idx > 0) setExpandedFrame(frames[idx - 1]);
-              }}
-              disabled={frames.indexOf(expandedFrame) === 0}
-              className="bg-black/70 text-gray-400 hover:text-gray-200 disabled:text-gray-600 rounded px-2 py-0.5 text-xs font-mono"
-            >
-              ← Prev
-            </button>
-            <span className="bg-black/70 text-gray-400 rounded px-2 py-0.5 text-xs font-mono">
-              {frames.indexOf(expandedFrame) + 1}/{frames.length}
-            </span>
-            <button
-              onClick={() => {
-                const idx = frames.indexOf(expandedFrame);
-                if (idx < frames.length - 1) setExpandedFrame(frames[idx + 1]);
-              }}
-              disabled={frames.indexOf(expandedFrame) === frames.length - 1}
-              className="bg-black/70 text-gray-400 hover:text-gray-200 disabled:text-gray-600 rounded px-2 py-0.5 text-xs font-mono"
-            >
-              Next →
-            </button>
-            <button
-              onClick={() => setExpandedFrame(null)}
-              className="bg-black/70 text-gray-400 hover:text-gray-200 rounded px-2 py-0.5 text-xs font-mono"
-            >
-              Close
-            </button>
+      {/* Frame thumbnails with nav arrows */}
+      {frames.length > 0 && (() => {
+        const scrollBy = (dir) => {
+          if (thumbsRef.current) thumbsRef.current.scrollBy({ left: dir * 120, behavior: 'smooth' });
+        };
+        return (
+          <div className="flex items-center gap-1">
+            <button onClick={() => scrollBy(-1)} className="shrink-0 text-gray-600 hover:text-accent text-xs font-mono px-1">←</button>
+            <div ref={thumbsRef} className="flex gap-1 overflow-hidden flex-1 min-w-0"
+              onWheel={(e) => { e.preventDefault(); scrollBy(e.deltaY > 0 ? 1 : -1); }}>
+              {frames.map((filename, idx) => (
+                <button
+                  key={filename}
+                  onClick={() => setExpandedFrame(expandedFrame === filename ? null : filename)}
+                  className="flex-shrink-0 group relative"
+                >
+                  <img
+                    src={frameSrc(filename)}
+                    alt={`Frame ${idx + 1}`}
+                    className={`h-20 w-auto rounded border transition-all ${
+                      expandedFrame === filename
+                        ? 'border-accent ring-1 ring-accent/50'
+                        : 'border-gray-700 group-hover:border-gray-500'
+                    }`}
+                  />
+                  <span className="absolute bottom-0.5 right-1 text-xs font-mono text-gray-400 bg-black/70 px-1 rounded">
+                    {idx + 1}
+                  </span>
+                </button>
+              ))}
+              {/* Contact sheet thumbnail — clickable into lightbox */}
+              {csExported ? (
+                <button
+                  onClick={() => setExpandedFrame(expandedFrame === '__cs__' ? null : '__cs__')}
+                  className="flex-shrink-0"
+                >
+                  <img
+                    src={`/api/contactsheet/${csExported.filename}`}
+                    alt="Contact sheet"
+                    title="Click to expand"
+                    className={`h-20 w-auto rounded border-2 transition-all ${
+                      expandedFrame === '__cs__'
+                        ? 'border-accent ring-1 ring-accent/50'
+                        : 'border-accent/50 hover:border-accent'
+                    }`}
+                  />
+                </button>
+              ) : (
+                <button
+                  onClick={async () => {
+                    try {
+                      const result = await api.createContactSheet({ frame_id: iterationId });
+                      setCsExported(result);
+                    } catch {}
+                  }}
+                  className="h-20 w-16 flex-shrink-0 rounded border border-dashed border-gray-600 hover:border-accent flex items-center justify-center text-gray-600 hover:text-accent transition-colors"
+                  title="Generate contact sheet"
+                >
+                  <span className="text-xs font-mono">CS</span>
+                </button>
+              )}
+            </div>
+            <button onClick={() => scrollBy(1)} className="shrink-0 text-gray-600 hover:text-accent text-xs font-mono px-1">→</button>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {/* Expanded frame / contact sheet view with navigation */}
+      {expandedFrame && (() => {
+        // Build navigation list: all frames + contact sheet
+        const navItems = [...frames];
+        if (csExported) navItems.push('__cs__');
+        const currentIdx = navItems.indexOf(expandedFrame);
+        const isCs = expandedFrame === '__cs__';
+
+        return (
+          <div className="relative">
+            <img
+              src={isCs ? `/api/contactsheet/${csExported.filename}` : frameSrc(expandedFrame)}
+              alt={isCs ? 'Contact sheet' : 'Expanded frame'}
+              className="w-full rounded border border-gray-700"
+            />
+            <div className="absolute top-2 right-2 flex gap-1">
+              <button
+                onClick={() => { if (currentIdx > 0) setExpandedFrame(navItems[currentIdx - 1]); }}
+                disabled={currentIdx <= 0}
+                className="bg-black/70 text-gray-400 hover:text-gray-200 disabled:text-gray-600 rounded px-2 py-0.5 text-xs font-mono"
+              >
+                ← Prev
+              </button>
+              <span className="bg-black/70 text-gray-400 rounded px-2 py-0.5 text-xs font-mono">
+                {isCs ? 'CS' : `${currentIdx + 1}/${frames.length}`}
+              </span>
+              <button
+                onClick={() => { if (currentIdx < navItems.length - 1) setExpandedFrame(navItems[currentIdx + 1]); }}
+                disabled={currentIdx >= navItems.length - 1}
+                className="bg-black/70 text-gray-400 hover:text-gray-200 disabled:text-gray-600 rounded px-2 py-0.5 text-xs font-mono"
+              >
+                Next →
+              </button>
+              <button
+                onClick={() => setExpandedFrame(null)}
+                className="bg-black/70 text-gray-400 hover:text-gray-200 rounded px-2 py-0.5 text-xs font-mono"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Frames directory — copyable path for Claude web upload */}
       {framesDir && frames.length > 0 && (

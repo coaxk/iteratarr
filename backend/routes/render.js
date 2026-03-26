@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { renderSingle, renderBatch, renderQueue, createQueueFile, checkWan2GP, onProgress } from '../wan2gp-bridge.js';
 import { join } from 'path';
+import { readdir } from 'fs/promises';
 
 // Track active renders
 const activeRenders = new Map();
@@ -33,6 +34,65 @@ function completeRender(id, success, error) {
     if (error) render.error = error;
     // Keep completed renders for 1 hour then clean up
     setTimeout(() => activeRenders.delete(id), 3600000);
+  }
+}
+
+/**
+ * After a render completes, find the matching iteration by json_path,
+ * update its status to 'rendered', set render_path to the output file,
+ * and record render duration.
+ */
+async function updateIterationAfterRender(store, jsonPath, outputDir) {
+  try {
+    const iterations = await store.list('iterations');
+    // Normalize paths for comparison (backslash vs forward slash)
+    const normalize = p => p?.replace(/\\/g, '/');
+    const match = iterations.find(i => normalize(i.json_path) === normalize(jsonPath));
+    if (!match) {
+      console.log(`[Render API] No iteration found for json_path: ${jsonPath}`);
+      return;
+    }
+
+    // Find the output MP4 — check render_path first, then scan output dir
+    let renderPath = match.render_path;
+    if (!renderPath && outputDir) {
+      // Look for most recently created MP4 in output dir
+      try {
+        const files = await readdir(outputDir, { withFileTypes: true });
+        const mp4s = files.filter(f => f.isFile() && f.name.toLowerCase().endsWith('.mp4'));
+        if (mp4s.length > 0) {
+          // Get stats to find newest
+          const { stat } = await import('fs/promises');
+          let newest = null;
+          let newestTime = 0;
+          for (const f of mp4s) {
+            const fullPath = join(outputDir, f.name);
+            const s = await stat(fullPath);
+            if (s.mtimeMs > newestTime) {
+              newestTime = s.mtimeMs;
+              newest = fullPath;
+            }
+          }
+          // Only use if created after the iteration (within last 2 hours)
+          if (newest && newestTime > Date.now() - 7200000) {
+            renderPath = newest;
+          }
+        }
+      } catch (e) {
+        console.log(`[Render API] Could not scan output dir: ${e.message}`);
+      }
+    }
+
+    const updates = { status: 'rendered' };
+    if (renderPath) updates.render_path = renderPath;
+
+    const created = new Date(match.created_at);
+    updates.render_duration_seconds = Math.round((Date.now() - created.getTime()) / 1000);
+
+    await store.update('iterations', match.id, updates);
+    console.log(`[Render API] Updated iteration ${match.iteration_number}: status=rendered${renderPath ? ', render_path=' + renderPath : ''}`);
+  } catch (err) {
+    console.error(`[Render API] Failed to update iteration after render: ${err.message}`);
   }
 }
 
@@ -80,9 +140,11 @@ export function createRenderRoutes(store, config) {
     const filename = json_path.split(/[/\\]/).pop();
     trackRender(id, { json_path, filename, type: 'single' });
 
-    renderSingle(json_path, { renderId: id }).then(result => {
+    renderSingle(json_path, { renderId: id }).then(async (result) => {
       console.log(`[Render API] Complete: ${filename}`);
       completeRender(id, true);
+      // Update iteration status and render_path when render completes
+      await updateIterationAfterRender(store, json_path, config.wan2gp_output_dir);
     }).catch(err => {
       console.error(`[Render API] Failed: ${filename} — ${err.message}`);
       completeRender(id, false, err.message);

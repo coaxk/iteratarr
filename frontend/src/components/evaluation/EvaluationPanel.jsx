@@ -45,6 +45,8 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [showFork, setShowFork] = useState(false);
   const [localTags, setLocalTags] = useState(iteration.tags || []);
   const [renderSubmitted, setRenderSubmitted] = useState(false);
+  const [renderStatus, setRenderStatus] = useState(null); // null | 'rendering' | 'complete' | 'failed'
+  const [queueAdded, setQueueAdded] = useState(false);
 
   const isEvaluated = !!iteration.evaluation;
   const hasChild = !!childIteration;
@@ -77,11 +79,32 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
       setGeneratedPath(null);
     }
     setLocalTags(iteration.tags || []);
+    setRenderSubmitted(false);
+    setQueueAdded(false);
     // Try to derive video paths from iteration data (render_path stored on iteration)
     setCurrentVideoPath(iteration.render_path || null);
     setPreviousVideoPath(parentIteration?.render_path || null);
     setComparisonVideoPath(null);
     setComparisonIter(null);
+
+    // If iteration is 'pending' but has a render_path, check if video already exists
+    // This catches renders done outside the bridge (directly in Wan2GP)
+    if (iteration.status === 'pending' && iteration.render_path) {
+      fetch(`/api/video?path=${encodeURIComponent(iteration.render_path)}`, { method: 'HEAD' })
+        .then(res => {
+          if (res.ok) {
+            setRenderStatus('complete');
+            // Update iteration status in the database silently — don't trigger refetch
+            // to avoid race conditions with FrameStrip loading
+            api.updateIteration(iteration.id, { status: 'rendered' }).catch(() => {});
+          } else {
+            setRenderStatus(null);
+          }
+        })
+        .catch(() => setRenderStatus(null));
+    } else {
+      setRenderStatus(null);
+    }
   }, [iteration.id]);
 
   const grandTotal =
@@ -219,6 +242,9 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           jsonPath={generatedPath}
           renderPath={renderPath}
           iterationNumber={generatedIterNum}
+          clipName={`Iteration #${generatedIterNum}`}
+          iterationId={generatedChild?.id || null}
+          seed={iteration.seed_used || null}
           onClose={() => setShowGenerated(false)}
           onGoToIteration={generatedChild && onGoToIteration ? () => {
             setShowGenerated(false);
@@ -347,42 +373,98 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         {iteration.change_from_parent && (
           <p className="text-xs text-accent font-mono mt-1 break-words">Changed: {iteration.change_from_parent}</p>
         )}
-        {/* Render action for pending iterations (not yet rendered) */}
-        {iteration.status === 'pending' && iteration.json_path && (
-          <div className="mt-2 border border-accent/30 bg-accent/5 rounded px-3 py-2 space-y-2">
+        {/* Render action for pending iterations — hide once render is confirmed complete */}
+        {iteration.status === 'pending' && iteration.json_path && renderStatus !== 'complete' && (
+          <div className={`mt-2 border rounded px-3 py-2 space-y-2 ${
+            renderStatus === 'rendering'
+              ? 'border-blue-500/30 bg-blue-500/5'
+              : renderStatus === 'failed'
+                ? 'border-red-500/30 bg-red-500/5'
+                : 'border-accent/30 bg-accent/5'
+          }`}>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-mono text-accent font-bold">Ready to render</span>
-              <div className="flex gap-2">
-                <button
-                  onClick={async () => {
-                    try {
-                      await api.submitRender(iteration.json_path);
-                      setRenderSubmitted(true);
-                      setTimeout(() => setRenderSubmitted(false), 3000);
-                    } catch (err) {
-                      alert(`Render failed: ${err.message}`);
-                    }
-                  }}
-                  className={`px-3 py-1 text-xs font-mono font-bold rounded transition-colors ${
-                    renderSubmitted
-                      ? 'bg-score-high/20 text-score-high'
-                      : 'bg-accent text-black hover:bg-accent/90'
-                  }`}
-                >
-                  {renderSubmitted ? 'Submitted' : 'Render Now'}
-                </button>
-                <button
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(iteration.json_path);
-                  }}
-                  className="px-3 py-1 text-xs font-mono bg-surface-overlay text-gray-400 hover:text-gray-200 rounded transition-colors"
-                  title="Copy JSON path for manual rendering"
-                >
-                  Copy JSON path
-                </button>
-              </div>
+              <span className={`text-xs font-mono font-bold ${
+                renderStatus === 'rendering' ? 'text-blue-400 animate-pulse' :
+                renderStatus === 'failed' ? 'text-red-400' : 'text-accent'
+              }`}>
+                {renderStatus === 'rendering' ? 'Rendering...' :
+                 renderStatus === 'failed' ? 'Render failed' : 'Ready to render'}
+              </span>
+              {renderStatus !== 'rendering' && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.addToQueue({
+                          json_path: iteration.json_path,
+                          clip_name: `Iteration #${iteration.iteration_number}`,
+                          iteration_id: iteration.id,
+                          seed: iteration.seed_used || null,
+                          source: 'iteration'
+                        });
+                        setQueueAdded(true);
+                        setTimeout(() => setQueueAdded(false), 3000);
+                      } catch (err) {
+                        alert(`Queue failed: ${err.message}`);
+                      }
+                    }}
+                    className={`px-3 py-1 text-xs font-mono font-bold rounded transition-colors ${
+                      queueAdded
+                        ? 'bg-accent/20 text-accent'
+                        : 'bg-surface-overlay text-gray-300 border border-gray-600 hover:border-accent hover:text-accent'
+                    }`}
+                  >
+                    {queueAdded ? 'Queued' : 'Add to Queue'}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.submitRender(iteration.json_path);
+                        setRenderStatus('rendering');
+                        // Poll render status every 10s until complete
+                        const poll = setInterval(async () => {
+                          try {
+                            const status = await api.getRenderStatus();
+                            const myRender = status.renders?.find(r =>
+                              r.json_path && r.json_path.replace(/\\/g, '/') === iteration.json_path.replace(/\\/g, '/')
+                            );
+                            if (myRender?.status === 'complete') {
+                              clearInterval(poll);
+                              setRenderStatus('complete');
+                              onSaved?.(); // Trigger refetch to get updated iteration
+                            } else if (myRender?.status === 'failed' || myRender?.status === 'aborted') {
+                              clearInterval(poll);
+                              setRenderStatus('failed');
+                            }
+                          } catch { /* ignore polling errors */ }
+                        }, 10000);
+                      } catch (err) {
+                        alert(`Render failed: ${err.message}`);
+                      }
+                    }}
+                    className="px-3 py-1 bg-accent text-black text-xs font-mono font-bold rounded hover:bg-accent/90"
+                  >
+                    Render Now
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(iteration.json_path);
+                    }}
+                    className="px-3 py-1 text-xs font-mono bg-surface-overlay text-gray-400 hover:text-gray-200 rounded transition-colors"
+                    title="Copy JSON path for manual rendering"
+                  >
+                    Copy JSON path
+                  </button>
+                </div>
+              )}
             </div>
             <p className="text-xs font-mono text-gray-600 truncate" title={iteration.json_path}>{iteration.json_path}</p>
+          </div>
+        )}
+        {/* Render complete banner — shows briefly after render finishes */}
+        {renderStatus === 'complete' && (
+          <div className="mt-2 border border-green-500/30 bg-green-500/5 rounded px-3 py-2">
+            <span className="text-xs font-mono text-green-400 font-bold">Render complete</span>
           </div>
         )}
         {/* Tags */}
@@ -420,9 +502,6 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
             setComparisonVideoPath(iter.render_path);
           }}
         />
-
-        {/* Render frame thumbnails */}
-        <FrameStrip iterationId={iteration.id} renderPath={iteration.render_path} />
 
         {/* Import evaluation — between frames and scoring */}
         {!isReadOnly && !isEvaluated && !aiScores && (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import FileBrowserModal from '../forms/FileBrowserModal';
+import FrameStrip from './FrameStrip';
 import { api } from '../../api';
 
 /**
@@ -146,20 +147,30 @@ export default function VideoDiff({
     <div className="border border-gray-700 rounded p-3 space-y-2">
       <span className="text-xs font-mono text-gray-500 uppercase tracking-wide">Render Comparison</span>
       <div className="flex gap-3">
-        <VideoPanel
-          label={previousLabel}
-          path={previousVideoPath}
-          side="previous"
-          iterationId={previousIterationId}
-          onBrowse={() => setBrowsing('previous')}
-        />
-        <VideoPanel
-          label={currentLabel}
-          path={currentVideoPath}
-          side="current"
-          iterationId={currentIterationId}
-          onBrowse={() => setBrowsing('current')}
-        />
+        <div className="flex-1 min-w-0 space-y-2">
+          <VideoPanel
+            label={previousLabel}
+            path={previousVideoPath}
+            side="previous"
+            iterationId={previousIterationId}
+            onBrowse={() => setBrowsing('previous')}
+          />
+          {previousIterationId && (
+            <FrameStrip key={`prev-${previousIterationId}`} iterationId={previousIterationId} renderPath={previousVideoPath} />
+          )}
+        </div>
+        <div className="flex-1 min-w-0 space-y-2">
+          <VideoPanel
+            label={currentLabel}
+            path={currentVideoPath}
+            side="current"
+            iterationId={currentIterationId}
+            onBrowse={() => setBrowsing('current')}
+          />
+          {currentIterationId && (
+            <FrameStrip key={`cur-${currentIterationId}`} iterationId={currentIterationId} renderPath={currentVideoPath} />
+          )}
+        </div>
       </div>
 
       {/* Iteration slider for left (comparison) video */}

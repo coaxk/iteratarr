@@ -44,8 +44,23 @@ export const api = {
   getCharacter: (id) => request(`/characters/${id}`),
   updateCharacter: (id, data) => request(`/characters/${id}`, { method: 'PATCH', body: data }),
 
-  // Production Queue
+  // Production Queue (legacy — locked iterations)
+  listProductionQueue: () => request('/production-queue'),
+
+  // Render Queue (queue manager)
   listQueue: () => request('/queue'),
+  addToQueue: (data) => request('/queue', { method: 'POST', body: data }),
+  removeFromQueue: (id) => request(`/queue/${id}`, { method: 'DELETE' }),
+  updateQueueItem: (id, data) => request(`/queue/${id}`, { method: 'PATCH', body: data }),
+  reorderQueue: (order) => request('/queue/reorder', { method: 'POST', body: { order } }),
+  startQueue: async () => {
+    const status = await request('/render/status');
+    if (!status.available) throw new Error('Wan2GP is not running. Open Pinokio → start Wan2GP before starting the queue.');
+    return request('/queue/start', { method: 'POST' });
+  },
+  pauseQueue: () => request('/queue/pause', { method: 'POST' }),
+  getQueueStatus: () => request('/queue/status'),
+  clearCompletedQueue: () => request('/queue/clear-completed', { method: 'POST' }),
 
   // Config
   getConfigPaths: () => request('/config/paths'),
@@ -68,9 +83,21 @@ export const api = {
 
   // Wan2GP render bridge
   getRenderStatus: () => request('/render/status'),
-  submitRender: (jsonPath) => request('/render/single', { method: 'POST', body: { json_path: jsonPath } }),
-  submitBatchRender: (data) => request('/render/batch', { method: 'POST', body: data }),
-  submitBatchPaths: (paths) => request('/render/batch', { method: 'POST', body: { json_paths: paths } }),
+  submitRender: async (jsonPath) => {
+    const status = await request('/render/status');
+    if (!status.available) throw new Error('Wan2GP is not running. Open Pinokio → start Wan2GP, then try again.');
+    return request('/render/single', { method: 'POST', body: { json_path: jsonPath } });
+  },
+  submitBatchRender: async (data) => {
+    const status = await request('/render/status');
+    if (!status.available) throw new Error('Wan2GP is not running. Open Pinokio → start Wan2GP, then try again.');
+    return request('/render/batch', { method: 'POST', body: data });
+  },
+  submitBatchPaths: async (paths) => {
+    const status = await request('/render/status');
+    if (!status.available) throw new Error('Wan2GP is not running. Open Pinokio → start Wan2GP, then try again.');
+    return request('/render/batch', { method: 'POST', body: { json_paths: paths } });
+  },
 
   // Seed Screening
   generateSeedScreen: (clipId, data) => request(`/clips/${clipId}/seed-screen`, { method: 'POST', body: data }),
@@ -87,6 +114,15 @@ export const api = {
   deleteBranch: (clipId, branchId) => request(`/clips/${clipId}/branches/${branchId}`, { method: 'DELETE' }),
   getBranchIterations: (branchId) => request(`/branches/${branchId}/iterations`),
   forkBranch: (clipId, data) => request(`/clips/${clipId}/fork`, { method: 'POST', body: data }),
+
+  // Analytics
+  getBranchAnalytics: (clipId) => request(`/analytics/branches/${clipId}`),
+  compareBranches: (clipId, branchId1, branchId2) =>
+    request(`/analytics/branches/${clipId}/compare?branches=${branchId1},${branchId2}`),
+
+  // GPU Monitoring
+  gpuStatus: () => request('/gpu/status'),
+  gpuHistory: () => request('/gpu/history'),
 
   // Contact Sheets
   createContactSheet: (data) => request('/contactsheet', { method: 'POST', body: data }),

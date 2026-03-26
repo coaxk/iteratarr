@@ -301,6 +301,18 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
     });
   };
 
+  // Auto-generate contact sheet when expanding a record with frames
+  useEffect(() => {
+    if (expandedId && !contactSheets[expandedId]) {
+      const record = screenRecords.find(r => r.id === expandedId);
+      if (record?.frames?.length > 0) {
+        api.createContactSheet({ frame_id: expandedId, metadata: { seed: record.seed } })
+          .then(result => setContactSheets(prev => ({ ...prev, [expandedId]: result.filename })))
+          .catch(() => {});
+      }
+    }
+  }, [expandedId]);
+
   const frameSrc = (screenId, filename) => `/api/frames/${screenId}/${filename}`;
 
   const expandedRecord = expandedId ? screenRecords.find(r => r.id === expandedId) : null;
@@ -611,34 +623,18 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
                     onClick={() => setLightboxIndex(idx)}
                   />
                 ))}
-                {/* Contact sheet — auto-generate on first expand, draggable */}
-                {contactSheets[expandedRecord.id] ? (
-                  <img
-                    src={`/api/contactsheet/${contactSheets[expandedRecord.id]}`}
-                    alt="Contact sheet"
-                    title="Contact sheet — drag to Tenzing or click to copy path"
-                    className="h-40 w-auto rounded border-2 border-accent/50 cursor-grab flex-shrink-0"
-                    draggable
-                    onClick={async () => {
-                      const result = await api.createContactSheet({ frame_id: expandedRecord.id, metadata: { seed: expandedRecord.seed } });
-                      await navigator.clipboard.writeText(result.path);
-                    }}
-                  />
-                ) : (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const result = await api.createContactSheet({ frame_id: expandedRecord.id, metadata: { seed: expandedRecord.seed } });
-                        setContactSheets(prev => ({ ...prev, [expandedRecord.id]: result.filename }));
-                      } catch {}
-                    }}
-                    className="h-40 w-28 flex-shrink-0 rounded border-2 border-dashed border-gray-600 hover:border-accent flex flex-col items-center justify-center gap-1 text-gray-600 hover:text-accent transition-colors"
-                    title="Generate contact sheet"
-                  >
-                    <span className="text-2xl">⊞</span>
-                    <span className="text-xs font-mono">Contact</span>
-                    <span className="text-xs font-mono">Sheet</span>
-                  </button>
+                {/* Contact sheet — auto-generated, draggable to Tenzing */}
+                {contactSheets[expandedRecord.id] && (
+                  <div className="flex-shrink-0 relative">
+                    <img
+                      src={`/api/contactsheet/${contactSheets[expandedRecord.id]}`}
+                      alt="Contact sheet — drag to Tenzing"
+                      title="Drag this to Tenzing's chat"
+                      className="h-40 w-auto rounded border-2 border-accent cursor-grab"
+                      draggable
+                    />
+                    <span className="absolute bottom-1 left-1 text-xs font-mono bg-black/70 text-accent px-1 rounded">CS</span>
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-2">

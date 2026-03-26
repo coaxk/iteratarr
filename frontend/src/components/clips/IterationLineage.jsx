@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react';
 
-export default function IterationLineage({ iterations, selectedId, onSelect, forkPoints = new Set() }) {
+export default function IterationLineage({ iterations, selectedId, onSelect, forkPoints = new Set(), showBranchId = false }) {
   const scrollRef = useRef(null);
   const selectedRef = useRef(null);
 
@@ -62,6 +62,11 @@ export default function IterationLineage({ iterations, selectedId, onSelect, for
                 {/* Tag indicator dot */}
                 {hasTags && (
                   <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-accent/70 border border-surface" />
+                )}
+                {showBranchId && iter.seed_used && (
+                  <span className="text-xs font-mono text-gray-600 truncate max-w-[60px]" title={`Seed: ${iter.seed_used}`}>
+                    {String(iter.seed_used).slice(-4)}
+                  </span>
                 )}
                 <span className="text-xs font-mono text-gray-400">#{iter.iteration_number}</span>
                 {score !== undefined && (

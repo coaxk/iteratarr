@@ -44,6 +44,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [lockCharacterUpdates, setLockCharacterUpdates] = useState(null);
   const [showFork, setShowFork] = useState(false);
   const [localTags, setLocalTags] = useState(iteration.tags || []);
+  const [renderSubmitted, setRenderSubmitted] = useState(false);
 
   const isEvaluated = !!iteration.evaluation;
   const hasChild = !!childIteration;
@@ -345,6 +346,44 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         </p>
         {iteration.change_from_parent && (
           <p className="text-xs text-accent font-mono mt-1 break-words">Changed: {iteration.change_from_parent}</p>
+        )}
+        {/* Render action for pending iterations (not yet rendered) */}
+        {iteration.status === 'pending' && iteration.json_path && (
+          <div className="mt-2 border border-accent/30 bg-accent/5 rounded px-3 py-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono text-accent font-bold">Ready to render</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      await api.submitRender(iteration.json_path);
+                      setRenderSubmitted(true);
+                      setTimeout(() => setRenderSubmitted(false), 3000);
+                    } catch (err) {
+                      alert(`Render failed: ${err.message}`);
+                    }
+                  }}
+                  className={`px-3 py-1 text-xs font-mono font-bold rounded transition-colors ${
+                    renderSubmitted
+                      ? 'bg-score-high/20 text-score-high'
+                      : 'bg-accent text-black hover:bg-accent/90'
+                  }`}
+                >
+                  {renderSubmitted ? 'Submitted' : 'Render Now'}
+                </button>
+                <button
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(iteration.json_path);
+                  }}
+                  className="px-3 py-1 text-xs font-mono bg-surface-overlay text-gray-400 hover:text-gray-200 rounded transition-colors"
+                  title="Copy JSON path for manual rendering"
+                >
+                  Copy JSON path
+                </button>
+              </div>
+            </div>
+            <p className="text-xs font-mono text-gray-600 truncate" title={iteration.json_path}>{iteration.json_path}</p>
+          </div>
         )}
         {/* Tags */}
         <div className="mt-2">

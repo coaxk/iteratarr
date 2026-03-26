@@ -40,7 +40,7 @@ export function createContactSheetRoutes(config) {
         if (existsSync(framesDir)) {
           const { readdirSync } = await import('fs');
           const files = readdirSync(framesDir)
-            .filter(f => f.endsWith('.png') || f.endsWith('.jpg'))
+            .filter(f => (f.endsWith('.png') || f.endsWith('.jpg')) && !f.startsWith('contact_sheet'))
             .sort()
             .map(f => join(framesDir, f));
           framePaths = files;
@@ -71,7 +71,7 @@ export function createContactSheetRoutes(config) {
       else { cols = 4; rows = Math.ceil(count / 4); }
 
       // Get dimensions from first frame
-      const firstMeta = await sharp(frameBuffers[0]).metadata();
+      const firstMeta = await sharp(frameBuffers[0], { limitInputPixels: false }).metadata();
       const cellW = firstMeta.width;
       const cellH = firstMeta.height;
       const gap = 3;
@@ -108,7 +108,7 @@ export function createContactSheetRoutes(config) {
         const y = metaStripH + row * (cellH + gap);
 
         // Resize frame to match cell dimensions
-        const resized = await sharp(frameBuffers[i])
+        const resized = await sharp(frameBuffers[i], { limitInputPixels: false })
           .resize(cellW, cellH, { fit: 'cover' })
           .toBuffer();
 
@@ -128,6 +128,7 @@ export function createContactSheetRoutes(config) {
 
       // Create the composite image
       const result = await sharp({
+        limitInputPixels: false,
         create: {
           width: canvasW,
           height: canvasH,

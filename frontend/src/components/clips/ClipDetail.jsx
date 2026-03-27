@@ -26,7 +26,6 @@ export default function ClipDetail({ clip, onBack }) {
   );
   const [selectedIteration, setSelectedIteration] = useState(null);
   const [liveScore, setLiveScore] = useState(null);
-  const [clipTab, setClipTab] = useState(clip.status === 'screening' ? 'screening' : 'iterations'); // 'screening' | 'iterations' | 'trends'
   // Seed HQ navigation: null = HQ overview, branchId = drill into branch
   const [drillBranchId, setDrillBranchId] = useState(null);
   const [showSeedGen, setShowSeedGen] = useState(false);

@@ -38,7 +38,12 @@ function BranchTree({ branches, allBranches, onEnter, onManage, parentId = null,
 
   if (atThisLevel.length === 0) return null;
 
-  return atThisLevel.map(branch => {
+  // Sort root-level branches by best score (strongest first), keep fork children in creation order
+  const sorted = parentId === null
+    ? [...atThisLevel].sort((a, b) => (b.best_score || 0) - (a.best_score || 0))
+    : atThisLevel;
+
+  return sorted.map(branch => {
     const children = branches.filter(b => b.source_branch_id === branch.id);
     return (
       <BranchNode
@@ -64,7 +69,10 @@ function BranchNode({ branch, children, allBranches, branches, onEnter, onManage
   return (
     <div>
       <div
-        className="flex items-center gap-2 px-3 py-2 rounded hover:bg-surface-overlay transition-colors group"
+        className={`flex items-center gap-2 px-3 py-2 rounded hover:bg-surface-overlay transition-colors group ${
+          branch.status === 'abandoned' || branch.status === 'superseded' ? 'opacity-40' :
+          branch.status === 'stalled' ? 'opacity-60' : ''
+        }`}
         style={{ paddingLeft: `${12 + depth * 20}px` }}
       >
         {/* Expand/collapse for branches with children */}
@@ -248,9 +256,11 @@ export default function SeedHQ({ clip, branches, seedScreens, onEnterBranch, onG
   }
 
   // Add branches (some seeds may not have seed screens — e.g., forked branches)
+  // Filter out legacy seed=-1 migration artifacts
   if (branches) {
     for (const branch of branches) {
       const seed = branch.seed;
+      if (seed === -1 || seed === '-1') continue; // Skip legacy migration entries
       if (!seedMap[seed]) seedMap[seed] = { seed, branches: [], seedScreen: null };
       seedMap[seed].branches.push(branch);
     }

@@ -416,6 +416,15 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
             </div>
           )}
 
+          {/* LoRA reminder */}
+          {baseJsonText.trim() && (
+            <div className="border border-amber-500/30 bg-amber-500/5 rounded px-3 py-2">
+              <p className="text-xs font-mono text-amber-400">
+                Check your <span className="font-bold">activated_loras</span> — make sure the right LoRA pair (high + low) is selected for this character before generating.
+              </p>
+            </div>
+          )}
+
           {/* Generate button */}
           <button
             onClick={handleGenerate}

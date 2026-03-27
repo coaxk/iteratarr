@@ -9,6 +9,7 @@ import ComparisonView from './ComparisonView';
 import ScoreRing from '../evaluation/ScoreRing';
 import EvaluationPanel from '../evaluation/EvaluationPanel';
 import SeedScreening from '../screening/SeedScreening';
+import SeedHQ from './SeedHQ';
 import BranchPillBar from './BranchPillBar';
 import BranchManageMenu from './BranchManageMenu';
 import BranchAnalytics from '../analytics/BranchAnalytics';
@@ -26,6 +27,10 @@ export default function ClipDetail({ clip, onBack }) {
   const [selectedIteration, setSelectedIteration] = useState(null);
   const [liveScore, setLiveScore] = useState(null);
   const [clipTab, setClipTab] = useState(clip.status === 'screening' ? 'screening' : 'iterations'); // 'screening' | 'iterations' | 'trends'
+  // Seed HQ navigation: null = HQ overview, branchId = drill into branch
+  const [drillBranchId, setDrillBranchId] = useState(null);
+  const [showSeedGen, setShowSeedGen] = useState(false);
+  const { data: seedScreens, refetch: refetchSeeds } = useApi(() => api.getSeedScreen(clip.id), [clip.id]);
   const [viewMode, setViewMode] = useState('lineage'); // 'lineage' | 'table'
   const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
   const [showComparison, setShowComparison] = useState(false);
@@ -41,9 +46,16 @@ export default function ClipDetail({ clip, onBack }) {
   const [clipNameDraft, setClipNameDraft] = useState(clip.name);
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
-  // Auto-select the most recently active branch when branches load
+  // When drilling into a branch, sync selectedBranchId
   useEffect(() => {
-    if (branches?.length > 0 && selectedBranchId === null) {
+    if (drillBranchId) {
+      setSelectedBranchId(drillBranchId);
+    }
+  }, [drillBranchId]);
+
+  // Auto-select the most recently active branch when branches load (only when already in branch view)
+  useEffect(() => {
+    if (branches?.length > 0 && selectedBranchId === null && drillBranchId) {
       const active = branches
         .filter(b => b.status === 'active' || b.status === 'locked')
         .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
@@ -268,48 +280,77 @@ export default function ClipDetail({ clip, onBack }) {
         </div>
       </div>
 
-      {/* Clip-level tab bar */}
-      <div className="flex border-b border-gray-700">
-        {['screening', 'iterations'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setClipTab(tab)}
-            className={`px-4 py-2 text-xs font-mono uppercase tracking-wider transition-colors ${
-              clipTab === tab
-                ? 'text-accent border-b-2 border-accent -mb-px'
-                : 'text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            {tab === 'screening' ? 'Seed Screening' : 'Iterations'}
-          </button>
-        ))}
-      </div>
-
-      {/* Seed Screening tab */}
-      {clipTab === 'screening' && (
-        <SeedScreening
+      {/* ═══════════════════════════════════════════════════
+         SEED HQ — the tree view (when not drilled into a branch)
+         ═══════════════════════════════════════════════════ */}
+      {!drillBranchId && !showSeedGen && (
+        <SeedHQ
           clip={clip}
-          onSeedSelected={(iteration) => {
-            setClipTab('iterations');
-            refetch();
-            refetchBranches();
+          branches={branches}
+          seedScreens={seedScreens}
+          onEnterBranch={(branchId) => {
+            setDrillBranchId(branchId);
+            setSelectedBranchId(branchId);
+            setSelectedIteration(null);
           }}
-          onBack={() => setClipTab('iterations')}
+          onGenerateSeeds={() => setShowSeedGen(true)}
+          onRefresh={() => { refetchBranches(); refetchSeeds(); }}
+          onManageBranch={setManagingBranchId}
+          onLaunchBranch={async (seed) => {
+            try {
+              const result = await api.selectSeed(clip.id, { seed });
+              refetchBranches();
+              refetchSeeds();
+              setDrillBranchId(result.iteration?.branch_id || null);
+            } catch (err) {
+              alert(`Launch failed: ${err.message}`);
+            }
+          }}
         />
       )}
 
-      {/* Branch pill bar — shown on iterations tab when branches exist */}
-      {clipTab === 'iterations' && branches && branches.length > 0 && (
+      {/* Seed generation flow (modal-like, replaces HQ temporarily) */}
+      {showSeedGen && (
+        <SeedScreening
+          clip={clip}
+          onSeedSelected={(iteration) => {
+            setShowSeedGen(false);
+            refetch();
+            refetchBranches();
+            refetchSeeds();
+          }}
+          onBack={() => setShowSeedGen(false)}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════════════════
+         BRANCH DETAIL — drilled into a specific branch
+         ═══════════════════════════════════════════════════ */}
+      {drillBranchId && (
+        <button
+          onClick={() => { setDrillBranchId(null); setSelectedIteration(null); }}
+          className="text-xs font-mono text-gray-500 hover:text-accent transition-colors"
+        >
+          &larr; Back to Seed HQ
+        </button>
+      )}
+
+      {/* Branch pill bar — shown when inside a branch (for switching between branches) */}
+      {drillBranchId && branches && branches.length > 0 && (
         <BranchPillBar
           branches={branches}
           selectedBranchId={selectedBranchId}
-          onSelect={setSelectedBranchId}
+          onSelect={(id) => {
+            setDrillBranchId(id);
+            setSelectedBranchId(id);
+            setSelectedIteration(null);
+          }}
           onManage={setManagingBranchId}
         />
       )}
 
-      {/* Iterations tab — lineage/table + score ring */}
-      {clipTab === 'iterations' && <div className="flex items-center gap-4">
+      {/* Iterations — shown when drilled into a branch */}
+      {drillBranchId && <div className="flex items-center gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-1">
             <h3 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Iteration History</h3>
@@ -402,7 +443,7 @@ export default function ClipDetail({ clip, onBack }) {
       </div>}
 
       {/* Evaluation panel for the selected iteration */}
-      {clipTab === 'iterations' && selectedIteration && (
+      {drillBranchId && selectedIteration && (
         <EvaluationPanel
           iteration={selectedIteration}
           childIteration={childIteration}

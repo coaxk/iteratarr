@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useApi } from '../../hooks/useApi';
 import { api } from '../../api';
 import { BRANCH_STATUSES, GRAND_MAX } from '../../constants';
 
@@ -15,6 +16,19 @@ import { BRANCH_STATUSES, GRAND_MAX } from '../../constants';
  *   onRefresh() — trigger data refetch
  */
 
+function TrendPill({ trend }) {
+  if (!trend) return null;
+  const config = {
+    rising:    { style: 'bg-green-400/15 text-green-400 border-green-400/30', label: '↗ Rising', tip: 'Scores trending up — momentum is building' },
+    plateau:   { style: 'bg-yellow-400/15 text-yellow-400 border-yellow-400/30', label: '→ Plateau', tip: 'Scores have levelled off — try a different rope' },
+    declining: { style: 'bg-red-400/15 text-red-400 border-red-400/30', label: '↘ Declining', tip: 'Scores dropping — consider pruning or forking' },
+    fresh:     { style: 'bg-blue-400/15 text-blue-400 border-blue-400/30', label: '• Fresh', tip: 'Too early to call — needs more iterations' },
+  };
+  const c = config[trend];
+  if (!c) return null;
+  return <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border shrink-0 cursor-help ${c.style}`} title={c.tip}>{c.label}</span>;
+}
+
 function ScoreBadge({ score }) {
   if (score == null) return null;
   const pct = score / GRAND_MAX;
@@ -29,7 +43,7 @@ function ScoreBadge({ score }) {
  * BranchTree — recursive tree renderer for branches.
  * Builds parent→child relationships via source_branch_id and renders with indentation.
  */
-function BranchTree({ branches, allBranches, onEnter, onManage, parentId = null, depth = 0 }) {
+function BranchTree({ branches, allBranches, onEnter, onManage, branchTrends, mostRecentBranchId, allIterations, parentId = null, depth = 0 }) {
   // Find branches at this level: root branches (no source or source outside this seed) when parentId=null,
   // or children of parentId
   const atThisLevel = parentId === null
@@ -54,17 +68,31 @@ function BranchTree({ branches, allBranches, onEnter, onManage, parentId = null,
         branches={branches}
         onEnter={onEnter}
         onManage={onManage}
+        branchTrends={branchTrends}
+        mostRecentBranchId={mostRecentBranchId}
+        allIterations={allIterations}
         depth={depth}
       />
     );
   });
 }
 
-function BranchNode({ branch, children, allBranches, branches, onEnter, onManage, depth }) {
+function BranchNode({ branch, children, allBranches, branches, onEnter, onManage, branchTrends, mostRecentBranchId, allIterations, depth }) {
   const [collapsed, setCollapsed] = useState(false);
   const statusInfo = BRANCH_STATUSES[branch.status] || BRANCH_STATUSES.active;
   const isFork = branch.created_from === 'fork';
   const hasChildren = children.length > 0;
+  const isMostRecent = branch.id === mostRecentBranchId;
+
+  // Compute trend directly from allIterations
+  const trend = (() => {
+    if (!allIterations) return null;
+    const scored = allIterations
+      .filter(i => i.branch_id === branch.id && i.evaluation?.scores?.grand_total != null)
+      .sort((a, b) => a.iteration_number - b.iteration_number)
+      .map(i => i.evaluation.scores.grand_total);
+    return computeTrend(scored);
+  })();
 
   return (
     <div>
@@ -72,7 +100,7 @@ function BranchNode({ branch, children, allBranches, branches, onEnter, onManage
         className={`flex items-center gap-2 px-3 py-2 rounded hover:bg-surface-overlay transition-colors group ${
           branch.status === 'abandoned' || branch.status === 'superseded' ? 'opacity-40' :
           branch.status === 'stalled' ? 'opacity-60' : ''
-        }`}
+        } ${isMostRecent ? 'border-l-2 border-accent bg-accent/5' : ''}`}
         style={{ paddingLeft: `${12 + depth * 20}px` }}
       >
         {/* Expand/collapse for branches with children */}
@@ -117,6 +145,9 @@ function BranchNode({ branch, children, allBranches, branches, onEnter, onManage
         {/* Best score */}
         <ScoreBadge score={branch.best_score} />
 
+        {/* Trend indicator */}
+        <TrendPill trend={trend} />
+
         {/* Status label */}
         <span className={`text-xs font-mono px-1.5 py-0.5 rounded shrink-0 ${statusInfo.bgColor || 'bg-gray-600'} ${statusInfo.textColor || 'text-gray-300'}`}>
           {statusInfo.label}
@@ -127,7 +158,7 @@ function BranchNode({ branch, children, allBranches, branches, onEnter, onManage
           const source = allBranches?.find(b => b.id === branch.source_branch_id);
           if (!source) return null;
           return (
-            <span className="text-[10px] font-mono text-purple-400/50 shrink-0 hidden group-hover:inline">
+            <span className="text-[10px] font-mono text-purple-400/30 group-hover:text-purple-400/60 shrink-0 transition-colors">
               from {source.name || `seed-${source.seed}`}
             </span>
           );
@@ -136,7 +167,7 @@ function BranchNode({ branch, children, allBranches, branches, onEnter, onManage
         {/* Enter arrow */}
         <button
           onClick={() => onEnter(branch.id)}
-          className="text-gray-600 hover:text-accent text-sm font-mono shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="text-gray-700 group-hover:text-accent text-sm font-mono shrink-0 transition-colors"
         >
           &rarr;
         </button>
@@ -144,7 +175,7 @@ function BranchNode({ branch, children, allBranches, branches, onEnter, onManage
         {/* Manage */}
         <button
           onClick={() => onManage(branch.id)}
-          className="text-gray-700 hover:text-gray-400 text-xs font-mono shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="text-gray-800 group-hover:text-gray-500 text-xs font-mono shrink-0 transition-colors"
           title="Manage branch"
         >
           &#9881;
@@ -158,6 +189,9 @@ function BranchNode({ branch, children, allBranches, branches, onEnter, onManage
           allBranches={allBranches}
           onEnter={onEnter}
           onManage={onManage}
+          branchTrends={branchTrends}
+          mostRecentBranchId={mostRecentBranchId}
+          allIterations={allIterations}
           parentId={branch.id}
           depth={depth + 1}
         />
@@ -166,7 +200,7 @@ function BranchNode({ branch, children, allBranches, branches, onEnter, onManage
   );
 }
 
-function SeedGroup({ seed, branches, seedScreen, onEnterBranch, onManageBranch, onLaunchBranch, allBranches }) {
+function SeedGroup({ seed, branches, seedScreen, onEnterBranch, onManageBranch, onLaunchBranch, allBranches, branchTrends, mostRecentBranchId, allIterations }) {
   const hasBranches = branches.length > 0;
   const hasFrames = seedScreen?.frames?.length > 0;
   const rating = seedScreen?.rating;
@@ -235,6 +269,9 @@ function SeedGroup({ seed, branches, seedScreen, onEnterBranch, onManageBranch, 
             allBranches={allBranches}
             onEnter={onEnterBranch}
             onManage={onManageBranch}
+            branchTrends={branchTrends}
+            mostRecentBranchId={mostRecentBranchId}
+            allIterations={allIterations}
           />
         </div>
       )}
@@ -242,7 +279,40 @@ function SeedGroup({ seed, branches, seedScreen, onEnterBranch, onManageBranch, 
   );
 }
 
+/** Compute branch trend from score history: 'rising' | 'plateau' | 'declining' | 'fresh' | null */
+function computeTrend(scores) {
+  if (!scores || scores.length < 2) return scores?.length === 1 ? 'fresh' : null;
+  const recent = scores.slice(-3);
+  if (recent.length < 2) return 'fresh';
+  const deltas = [];
+  for (let i = 1; i < recent.length; i++) deltas.push(recent[i] - recent[i - 1]);
+  const avgDelta = deltas.reduce((s, d) => s + d, 0) / deltas.length;
+  if (avgDelta > 2) return 'rising';
+  if (avgDelta < -2) return 'declining';
+  return 'plateau';
+}
+
+const TREND_DISPLAY = {
+  rising:    { icon: '\u2197', color: 'text-green-400', label: 'Rising' },
+  plateau:   { icon: '\u2192', color: 'text-yellow-400', label: 'Plateau' },
+  declining: { icon: '\u2198', color: 'text-red-400', label: 'Declining' },
+  fresh:     { icon: '\u2022', color: 'text-blue-400', label: 'Fresh' },
+};
+
 export default function SeedHQ({ clip, branches, seedScreens, onEnterBranch, onGenerateSeeds, onRefresh, onManageBranch, onLaunchBranch }) {
+  // Fetch ALL iterations for this clip to compute branch trends
+  const { data: allIterations } = useApi(() => api.getClipIterations(clip.id), [clip.id]);
+
+  // branchTrends kept as empty object — trends computed directly in BranchNode from allIterations
+  const branchTrends = {};
+
+  // Find most recently worked on branch
+  const mostRecentBranchId = branches?.length > 0
+    ? [...branches]
+        .filter(b => b.status === 'active')
+        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0]?.id
+    : null;
+
   // Group branches by seed
   const seedMap = {};
 
@@ -322,6 +392,9 @@ export default function SeedHQ({ clip, branches, seedScreens, onEnterBranch, onG
           onManageBranch={onManageBranch}
           onLaunchBranch={onLaunchBranch}
           allBranches={branches}
+          branchTrends={branchTrends}
+          mostRecentBranchId={mostRecentBranchId}
+          allIterations={allIterations}
         />
       ))}
     </div>

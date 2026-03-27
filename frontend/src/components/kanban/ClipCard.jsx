@@ -21,7 +21,10 @@ export default function ClipCard({ clip, onClick, onDelete, onArchive, isDraggin
         <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
           {onArchive && (
             <button
-              onClick={(e) => { e.stopPropagation(); onArchive(clip); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(`Archive "${clip.name}"? You can restore it from the archive drawer.`)) onArchive(clip);
+              }}
               className="w-5 h-5 flex items-center justify-center rounded text-gray-600 hover:text-amber-400 hover:bg-amber-400/10 text-xs"
               title="Archive clip"
             >
@@ -30,7 +33,10 @@ export default function ClipCard({ clip, onClick, onDelete, onArchive, isDraggin
           )}
           {onDelete && (
             <button
-              onClick={(e) => { e.stopPropagation(); onDelete(clip); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(`Delete "${clip.name}"? This cannot be undone.`)) onDelete(clip);
+              }}
               className="w-5 h-5 flex items-center justify-center rounded text-gray-600 hover:text-score-low hover:bg-score-low/10 text-xs"
               title="Delete clip"
             >

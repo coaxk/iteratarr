@@ -54,8 +54,10 @@ function ProvenSettings({ settings }) {
   );
 }
 
-export default function CharacterCard({ character }) {
+export default function CharacterCard({ character, onUpdated, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editData, setEditData] = useState({});
 
   const loraCount = character.lora_files?.length || 0;
 
@@ -128,10 +130,68 @@ export default function CharacterCard({ character }) {
           <ProvenSettings settings={character.proven_settings} />
 
           {/* Notes */}
-          {character.notes && (
+          {character.notes && !editing && (
             <div>
               <span className="text-xs font-mono text-gray-500 block mb-1">Notes</span>
               <p className="text-xs font-mono text-gray-400 whitespace-pre-wrap">{character.notes}</p>
+            </div>
+          )}
+
+          {/* Edit form */}
+          {editing ? (
+            <div className="space-y-2 border-t border-gray-700/50 pt-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-mono text-gray-500 block mb-0.5">Name</label>
+                  <input value={editData.name ?? character.name} onChange={e => setEditData(d => ({...d, name: e.target.value}))}
+                    className="w-full bg-surface border border-gray-600 rounded px-2 py-1 text-xs font-mono text-gray-200" />
+                </div>
+                <div>
+                  <label className="text-xs font-mono text-gray-500 block mb-0.5">Trigger Word</label>
+                  <input value={editData.trigger_word ?? character.trigger_word} onChange={e => setEditData(d => ({...d, trigger_word: e.target.value}))}
+                    className="w-full bg-surface border border-gray-600 rounded px-2 py-1 text-xs font-mono text-gray-200" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-mono text-gray-500 block mb-0.5">LoRA Directory</label>
+                <input value={editData.lora_dir ?? character.lora_dir ?? ''} onChange={e => setEditData(d => ({...d, lora_dir: e.target.value}))}
+                  className="w-full bg-surface border border-gray-600 rounded px-2 py-1 text-xs font-mono text-gray-200" />
+              </div>
+              <div>
+                <label className="text-xs font-mono text-gray-500 block mb-0.5">Notes</label>
+                <textarea value={editData.notes ?? character.notes ?? ''} onChange={e => setEditData(d => ({...d, notes: e.target.value}))} rows={2}
+                  className="w-full bg-surface border border-gray-600 rounded px-2 py-1 text-xs font-mono text-gray-200 resize-none" />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={async () => {
+                  try {
+                    const { api } = await import('../../api');
+                    await api.updateCharacter(character.id, editData);
+                    setEditing(false);
+                    setEditData({});
+                    onUpdated?.();
+                  } catch (err) { alert(err.message); }
+                }} className="px-3 py-1 bg-accent text-black text-xs font-mono font-bold rounded">Save</button>
+                <button onClick={() => { setEditing(false); setEditData({}); }} className="px-3 py-1 text-xs font-mono text-gray-500">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2 border-t border-gray-700/50 pt-3">
+              <button onClick={() => setEditing(true)}
+                className="px-3 py-1 text-xs font-mono text-gray-500 hover:text-gray-300 border border-gray-700 rounded transition-colors">
+                Edit
+              </button>
+              <button onClick={async () => {
+                if (!window.confirm(`Delete character "${character.name}"? This cannot be undone.`)) return;
+                try {
+                  const { api } = await import('../../api');
+                  await api.deleteCharacter(character.id);
+                  onDeleted?.();
+                } catch (err) { alert(err.message); }
+              }}
+                className="px-3 py-1 text-xs font-mono text-gray-600 hover:text-score-low border border-gray-700 hover:border-score-low/30 rounded transition-colors">
+                Delete
+              </button>
             </div>
           )}
         </div>

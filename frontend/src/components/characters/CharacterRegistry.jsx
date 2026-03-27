@@ -40,7 +40,7 @@ export default function CharacterRegistry() {
       ) : (
         <div className="space-y-2">
           {list.map(character => (
-            <CharacterCard key={character.id} character={character} />
+            <CharacterCard key={character.id} character={character} onUpdated={refetch} onDeleted={refetch} />
           ))}
         </div>
       )}

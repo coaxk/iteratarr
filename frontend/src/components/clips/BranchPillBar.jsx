@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { BRANCH_STATUSES, SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constants';
 
 /**
@@ -21,6 +21,15 @@ export default function BranchPillBar({ branches, selectedBranchId, onSelect, on
     scrollRef.current?.scrollBy({ left: dir * 200, behavior: 'smooth' });
   };
 
+  // Attach wheel listener with passive: false so preventDefault works
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handler = (e) => { e.preventDefault(); e.stopPropagation(); scrollBy(e.deltaY > 0 ? 1 : -1); };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
+
   const needsScroll = branches.length > 4;
 
   return (
@@ -31,8 +40,7 @@ export default function BranchPillBar({ branches, selectedBranchId, onSelect, on
         </button>
       )}
 
-      <div ref={scrollRef} className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide flex-1 py-1"
-        onWheel={(e) => { e.preventDefault(); scrollBy(e.deltaY > 0 ? 1 : -1); }}>
+      <div ref={scrollRef} className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide flex-1 py-1">
         {/* All branches pill */}
         <button
           onClick={() => onSelect(null)}

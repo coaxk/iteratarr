@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { renderSingle, onProgress, offProgress } from '../wan2gp-bridge.js';
+import { existsSync } from 'fs';
+import { execFile } from 'child_process';
 
 /**
  * Queue Manager routes — manages the render queue for batch overnight processing.
@@ -331,6 +333,35 @@ export function createQueueRoutes(store, config) {
           progress: { percent: 100 }
         });
         console.log(`[Queue] Complete: ${item.clip_name}`);
+
+        // Update iteration status + extract frames for thumbnail
+        if (item.iteration_id) {
+          try {
+            const iter = await store.get('iterations', item.iteration_id);
+            const updates = { status: 'rendered' };
+            if (iter.render_path && existsSync(iter.render_path)) {
+              updates.render_duration_seconds = Math.round((Date.now() - new Date(iter.created_at).getTime()) / 1000);
+            }
+            await store.update('iterations', item.iteration_id, updates);
+
+            // Auto-extract frames if render exists
+            if (iter.render_path && existsSync(iter.render_path)) {
+              try {
+                await fetch(`http://localhost:${config.port || 3847}/api/frames/extract`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ video_path: iter.render_path, iteration_id: item.iteration_id, count: 4 })
+                });
+                console.log(`[Queue] Frames extracted for ${item.clip_name}`);
+              } catch {
+                // Try direct extraction via the extract endpoint using internal fetch
+                console.log(`[Queue] Frame extraction skipped — will extract on view`);
+              }
+            }
+          } catch (e) {
+            console.log(`[Queue] Iteration update failed: ${e.message}`);
+          }
+        }
       } catch (err) {
         await store.update('render_queue', item.id, {
           status: 'failed',

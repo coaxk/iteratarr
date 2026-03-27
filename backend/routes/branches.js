@@ -173,13 +173,14 @@ export function createBranchRoutes(store, config = {}) {
         .replace(/[^a-zA-Z0-9\-. ]/g, '')
         .replace(/\s+/g, '-')
         .toLowerCase();
-      forkJson.output_filename = `${safeClipName}_iter_01`;
+      // Create branch (need name first for file paths)
+      const branchName = name || `seed-${seed}${existing.length > 0 ? `-fork-${existing.length + 1}` : ''}`;
+      const safeBranchName = branchName.replace(/[^a-zA-Z0-9\-]/g, '-').toLowerCase();
+
+      forkJson.output_filename = `${safeClipName}_${safeBranchName}_iter_01`;
 
       // Strip junk fields
       Object.keys(forkJson).forEach(k => { if (!WAN2GP_FIELDS.has(k)) delete forkJson[k]; });
-
-      // Create branch
-      const branchName = name || `seed-${seed}${existing.length > 0 ? `-fork-${existing.length + 1}` : ''}`;
       const branch = await store.create('branches', {
         clip_id: clipId,
         seed,
@@ -198,12 +199,12 @@ export function createBranchRoutes(store, config = {}) {
       // Write iter_01 JSON to disk
       let iterPath = null;
       let renderPath = null;
-      const iterFilename = `${safeClipName}_iter_01.json`;
+      const iterFilename = `${safeClipName}_${safeBranchName}_iter_01.json`;
       try {
         const scene = await store.get('scenes', clip.scene_id);
         const paths = getClipPaths(config, clip, scene);
-        // Use branch-specific subdirectory
-        const branchIterDir = join(paths.iterations, `branch-${seed}`);
+        // Use branch-specific subdirectory (branch name, not just seed — avoids collisions)
+        const branchIterDir = join(paths.iterations, `branch-${safeBranchName}`);
         await mkdir(branchIterDir, { recursive: true });
         iterPath = join(branchIterDir, iterFilename);
         await writeFile(iterPath, JSON.stringify(forkJson, null, 2));
@@ -215,13 +216,9 @@ export function createBranchRoutes(store, config = {}) {
         await writeFile(iterPath, JSON.stringify(forkJson, null, 2));
       }
 
-      // Render path — if same seed as source, reuse source render
-      if (seed === sourceIter.seed_used && sourceIter.render_path) {
-        renderPath = sourceIter.render_path;
-      } else {
-        const outputDir = config.wan2gp_output_dir || join(config.wan2gp_json_dir || '.', 'outputs');
-        renderPath = join(outputDir, `${safeClipName}_iter_01.mp4`);
-      }
+      // Render path — always unique per branch (branch name in filename)
+      const outputDir = config.wan2gp_output_dir || join(config.wan2gp_json_dir || '.', 'outputs');
+      renderPath = join(outputDir, `${safeClipName}_${safeBranchName}_iter_01.mp4`);
 
       // Create iteration record
       const iteration = await store.create('iterations', {
@@ -259,12 +256,19 @@ export function createBranchRoutes(store, config = {}) {
         return res.status(404).json({ error: 'Branch not found for this clip' });
       }
 
-      // Check for existing iterations
+      // Check for existing iterations — cascade delete if branch is abandoned
       const iterations = await store.list('iterations', i => i.branch_id === branch.id);
       if (iterations.length > 0) {
-        return res.status(400).json({
-          error: `Cannot delete branch with ${iterations.length} iteration(s). Delete iterations first or mark branch as abandoned.`
-        });
+        if (branch.status !== 'abandoned') {
+          return res.status(400).json({
+            error: `Cannot delete branch with ${iterations.length} iteration(s). Abandon the branch first to enable deletion.`
+          });
+        }
+        // Cascade delete iterations for abandoned branches
+        for (const iter of iterations) {
+          await store.delete('iterations', iter.id);
+        }
+        console.log(`[Branches] Cascade deleted ${iterations.length} iteration(s) from abandoned branch ${branch.name || req.params.id}`);
       }
 
       await store.delete('branches', req.params.id);

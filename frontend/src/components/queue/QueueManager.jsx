@@ -37,6 +37,27 @@ function formatTime(isoString) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+/** Thumbnail preview for completed renders — loads first frame from the iteration */
+function CompletedThumbnail({ iterationId }) {
+  const [frameSrc, setFrameSrc] = useState(null);
+  useEffect(() => {
+    if (!iterationId) return;
+    api.listFrames(iterationId).then(data => {
+      if (data.frames?.length > 0) {
+        setFrameSrc(`/api/frames/${iterationId}/${data.frames[0]}`);
+      }
+    }).catch(() => {});
+  }, [iterationId]);
+  if (!frameSrc) return null;
+  return (
+    <img
+      src={frameSrc}
+      alt="Render preview"
+      className="h-16 w-auto rounded border border-gray-700 shrink-0"
+    />
+  );
+}
+
 function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove, isActive }) {
   const cfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.queued;
   const duration = item.started_at && item.completed_at
@@ -79,6 +100,9 @@ function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove
             <span className="text-sm font-mono text-gray-200 font-bold truncate" title={item.clip_name}>
               {item.clip_name}
             </span>
+            {item.seed && (
+              <span className="text-xs font-mono text-gray-600 shrink-0">seed:{item.seed}</span>
+            )}
             <span className={`text-xs font-mono px-1.5 py-0.5 rounded shrink-0 ${cfg.bg} ${cfg.text}`}>
               {cfg.label}
             </span>
@@ -106,6 +130,11 @@ function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove
             )}
           </div>
         </div>
+
+        {/* Thumbnail preview for completed renders */}
+        {item.status === 'complete' && item.iteration_id && (
+          <CompletedThumbnail iterationId={item.iteration_id} />
+        )}
 
         {/* Remove button — only for queued/complete/failed items */}
         {item.status !== 'rendering' && (

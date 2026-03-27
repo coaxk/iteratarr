@@ -444,7 +444,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                       try {
                         await api.addToQueue({
                           json_path: iteration.json_path,
-                          clip_name: `Iteration #${iteration.iteration_number}`,
+                          clip_name: iteration.json_filename?.replace('.json', '') || `Iteration #${iteration.iteration_number}`,
                           iteration_id: iteration.id,
                           seed: iteration.seed_used || null,
                           source: 'iteration'
@@ -461,31 +461,33 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                   <button
                     onClick={async () => {
                       try {
-                        await api.submitRender(iteration.json_path);
-                        setRenderStatus('rendering');
-                        const poll = setInterval(async () => {
-                          try {
-                            const status = await api.getRenderStatus();
-                            const myRender = status.renders?.find(r =>
-                              r.json_path && r.json_path.replace(/\\/g, '/') === iteration.json_path.replace(/\\/g, '/')
-                            );
-                            if (myRender?.status === 'complete') {
-                              clearInterval(poll);
-                              setRenderStatus('complete');
-                              onSaved?.();
-                            } else if (myRender?.status === 'failed' || myRender?.status === 'aborted') {
-                              clearInterval(poll);
-                              setRenderStatus('failed');
-                            }
-                          } catch {}
-                        }, 10000);
+                        setRenderStatus('submitting');
+                        // Add to queue at top priority + auto-start
+                        await api.addToQueue({
+                          json_path: iteration.json_path,
+                          clip_name: iteration.json_filename?.replace('.json', '') || `Iteration #${iteration.iteration_number}`,
+                          iteration_id: iteration.id,
+                          seed: iteration.seed_used || null,
+                          source: 'iteration',
+                          priority: 0
+                        });
+                        // Auto-start queue if not running
+                        try { await api.startQueue(); } catch {}
+                        setQueueAdded('queued');
+                        setRenderStatus(null);
                       } catch (err) {
+                        setRenderStatus(null);
                         alert(`Render failed: ${err.message}`);
                       }
                     }}
-                    className="px-3 py-1 bg-accent text-black text-xs font-mono font-bold rounded hover:bg-accent/90"
+                    disabled={renderStatus === 'submitting'}
+                    className={`px-3 py-1 text-xs font-mono font-bold rounded transition-colors ${
+                      renderStatus === 'submitting'
+                        ? 'bg-accent/50 text-black/50 cursor-wait'
+                        : 'bg-accent text-black hover:bg-accent/90'
+                    }`}
                   >
-                    Render Now
+                    {renderStatus === 'submitting' ? 'Submitting...' : 'Render Now'}
                   </button>
                   <button
                     onClick={() => navigator.clipboard.writeText(iteration.json_path)}

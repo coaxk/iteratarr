@@ -27,6 +27,19 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
   const thumbsRef = useRef(null);
   const MAX_POLLS = 40; // 40 * 15s = 10 minutes
 
+  // Attach wheel listener with passive: false so preventDefault works
+  useEffect(() => {
+    const el = thumbsRef.current;
+    if (!el) return;
+    const handler = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      el.scrollBy({ left: (e.deltaY > 0 ? 1 : -1) * 120, behavior: 'smooth' });
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  });
+
   // Fetch Wan2GP output dir for browse starting point
   useEffect(() => {
     api.getConfigPaths().then(p => setOutputDir(p.wan2gp_output_dir)).catch(() => {});
@@ -164,8 +177,7 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
         return (
           <div className="flex items-center gap-1">
             <button onClick={() => scrollBy(-1)} className="shrink-0 text-gray-600 hover:text-accent text-xs font-mono px-1">←</button>
-            <div ref={thumbsRef} className="flex gap-1 overflow-hidden flex-1 min-w-0"
-              onWheel={(e) => { e.preventDefault(); scrollBy(e.deltaY > 0 ? 1 : -1); }}>
+            <div ref={thumbsRef} className="flex gap-1 overflow-hidden flex-1 min-w-0">
               {frames.map((filename, idx) => (
                 <button
                   key={filename}

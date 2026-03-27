@@ -37,6 +37,8 @@ export default function ClipDetail({ clip, onBack }) {
   const [currentGoal, setCurrentGoal] = useState(clip.goal || '');
   const [managingBranchId, setManagingBranchId] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [renamingClip, setRenamingClip] = useState(false);
+  const [clipNameDraft, setClipNameDraft] = useState(clip.name);
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
   // Auto-select the most recently active branch when branches load
@@ -183,7 +185,29 @@ export default function ClipDetail({ clip, onBack }) {
       {/* Clip info header */}
       <div className="border border-gray-700 rounded p-3">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-mono text-gray-200">{clip.name}</h2>
+          {renamingClip ? (
+            <div className="flex items-center gap-2">
+              <input
+                value={clipNameDraft}
+                onChange={(e) => setClipNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    api.updateClip(clip.id, { name: clipNameDraft }).then(() => { clip.name = clipNameDraft; setRenamingClip(false); }).catch(() => {});
+                  }
+                  if (e.key === 'Escape') setRenamingClip(false);
+                }}
+                autoFocus
+                className="bg-surface border border-gray-600 rounded px-2 py-1 text-lg font-mono text-gray-200"
+              />
+              <button onClick={() => { api.updateClip(clip.id, { name: clipNameDraft }).then(() => { clip.name = clipNameDraft; setRenamingClip(false); }).catch(() => {}); }}
+                className="px-2 py-1 bg-accent text-black text-xs font-mono font-bold rounded">Save</button>
+              <button onClick={() => setRenamingClip(false)} className="text-xs font-mono text-gray-500">Cancel</button>
+            </div>
+          ) : (
+            <h2 className="text-lg font-mono text-gray-200 cursor-pointer hover:text-accent transition-colors" onClick={() => setRenamingClip(true)} title="Click to rename">
+              {clip.name}
+            </h2>
+          )}
           <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${status.color} text-black font-bold`}>
             {status.label}
           </span>

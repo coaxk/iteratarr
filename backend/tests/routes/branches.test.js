@@ -206,7 +206,9 @@ describe('Branches API', () => {
     });
 
     expect(res.status).toBe(201);
-    expect(res.body.iteration.render_path).toBe('/tmp/original-render.mp4');
+    // Render path is now always unique per branch (includes branch name)
+    expect(res.body.iteration.render_path).toContain('_iter_01.mp4');
+    expect(res.body.iteration.render_path).not.toBe('/tmp/original-render.mp4');
   });
 
   it('POST /api/clips/:clipId/fork rejects missing source_iteration_id', async () => {

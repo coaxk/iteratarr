@@ -159,13 +159,19 @@ export default function BranchManageMenu({ clipId, branchId, onClose, onUpdated 
           </button>
         ))}
 
-        {/* Delete — only if no iterations */}
-        {(branch.iteration_count || 0) === 0 && (
+        {/* Delete — empty branches or abandoned branches */}
+        {((branch.iteration_count || 0) === 0 || branch.status === 'abandoned') && (
           <button
-            onClick={handleDelete}
+            onClick={() => {
+              const count = branch.iteration_count || 0;
+              if (count > 0) {
+                if (!window.confirm(`Delete branch "${branch.name || branch.seed}" and its ${count} iteration${count !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+              }
+              handleDelete();
+            }}
             className="w-full text-left px-3 py-1.5 rounded text-xs font-mono text-score-low hover:bg-score-low/10 transition-colors"
           >
-            Delete branch
+            Delete branch{(branch.iteration_count || 0) > 0 ? ` (${branch.iteration_count} iteration${branch.iteration_count !== 1 ? 's' : ''})` : ''}
           </button>
         )}
 

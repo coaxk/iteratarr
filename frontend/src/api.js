@@ -126,6 +126,10 @@ export const api = {
   gpuStatus: () => request('/gpu/status'),
   gpuHistory: () => request('/gpu/history'),
   releaseVram: () => request('/gpu/release-vram', { method: 'POST' }),
+  abortRender: () => request('/gpu/abort', { method: 'POST' }),
+  pauseRender: () => request('/gpu/pause', { method: 'POST' }),
+  resumeRender: () => request('/gpu/resume', { method: 'POST' }),
+  wan2gpInfo: () => request('/gpu/wan2gp'),
 
   // Contact Sheets
   createContactSheet: (data) => request('/contactsheet', { method: 'POST', body: data }),

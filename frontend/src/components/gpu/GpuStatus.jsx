@@ -62,6 +62,55 @@ function VramBar({ used, total }) {
   );
 }
 
+function RenderControls({ gpuUtil }) {
+  const [acting, setActing] = useState(null);
+  // Only show when GPU is actively rendering (>50% utilization)
+  if (gpuUtil < 50) return null;
+
+  const handleAction = async (action, apiCall) => {
+    setActing(action);
+    try {
+      await apiCall();
+      setTimeout(() => setActing(null), 2000);
+    } catch {
+      setActing(null);
+    }
+  };
+
+  return (
+    <div className="flex gap-1">
+      <button
+        onClick={() => handleAction('pause', api.pauseRender)}
+        disabled={acting}
+        className="flex-1 px-1.5 py-1 text-[10px] font-mono rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20 disabled:opacity-50 transition-colors"
+        title="Pause current Wan2GP render"
+      >
+        {acting === 'pause' ? 'Paused' : '⏸ Pause'}
+      </button>
+      <button
+        onClick={() => handleAction('resume', api.resumeRender)}
+        disabled={acting}
+        className="flex-1 px-1.5 py-1 text-[10px] font-mono rounded bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 disabled:opacity-50 transition-colors"
+        title="Resume paused render"
+      >
+        {acting === 'resume' ? 'Resumed' : '▶ Resume'}
+      </button>
+      <button
+        onClick={() => {
+          if (window.confirm('Abort the current render? This cannot be undone.')) {
+            handleAction('abort', api.abortRender);
+          }
+        }}
+        disabled={acting}
+        className="flex-1 px-1.5 py-1 text-[10px] font-mono rounded bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 disabled:opacity-50 transition-colors"
+        title="Abort current render"
+      >
+        {acting === 'abort' ? 'Aborted' : '⏹ Abort'}
+      </button>
+    </div>
+  );
+}
+
 function ReleaseVramButton() {
   const [releasing, setReleasing] = useState(false);
   const [result, setResult] = useState(null);
@@ -204,6 +253,11 @@ export default function GpuStatus() {
 
         </div>
       )}
+
+      {/* Render controls — show when GPU is active */}
+      <div className="pl-4">
+        <RenderControls gpuUtil={status.utilization.gpu} />
+      </div>
 
       {/* Release VRAM — always visible */}
       <div className="pl-4">

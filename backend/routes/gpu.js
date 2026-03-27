@@ -1,9 +1,6 @@
 import { Router } from 'express';
 import { getGpuStatus, getGpuHistory, startGpuPolling } from '../gpu-monitor.js';
-
-// Wan2GP Gradio API for VRAM release
-const WAN2GP_GRADIO_PORT = 42003;
-const WAN2GP_RELEASE_URL = `http://localhost:${WAN2GP_GRADIO_PORT}/gradio_api/call/release_ram_and_notify`;
+import wan2gp from '../wan2gp-api.js';
 
 export function createGpuRoutes() {
   const router = Router();
@@ -29,18 +26,51 @@ export function createGpuRoutes() {
   // POST /api/gpu/release-vram — tell Wan2GP to unload models from VRAM/RAM
   router.post('/release-vram', async (req, res) => {
     try {
-      const response = await fetch(WAN2GP_RELEASE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: [null] })
-      });
-      if (!response.ok) {
-        return res.status(502).json({ error: 'Wan2GP is not running or release endpoint unavailable' });
-      }
-      const result = await response.json();
+      const result = await wan2gp.releaseVram();
       res.json({ released: true, event_id: result.event_id });
     } catch (err) {
       res.status(502).json({ error: 'Wan2GP is not running. Open Pinokio → start Wan2GP first.' });
+    }
+  });
+
+  // POST /api/gpu/abort — abort current Wan2GP generation
+  router.post('/abort', async (req, res) => {
+    try {
+      const result = await wan2gp.abortGeneration();
+      res.json({ aborted: true, event_id: result.event_id });
+    } catch (err) {
+      res.status(502).json({ error: 'Wan2GP is not running.' });
+    }
+  });
+
+  // POST /api/gpu/pause — pause current generation
+  router.post('/pause', async (req, res) => {
+    try {
+      const result = await wan2gp.pauseGeneration();
+      res.json({ paused: true, event_id: result.event_id });
+    } catch (err) {
+      res.status(502).json({ error: 'Wan2GP is not running.' });
+    }
+  });
+
+  // POST /api/gpu/resume — resume paused generation
+  router.post('/resume', async (req, res) => {
+    try {
+      const result = await wan2gp.resumeGeneration();
+      res.json({ resumed: true, event_id: result.event_id });
+    } catch (err) {
+      res.status(502).json({ error: 'Wan2GP is not running.' });
+    }
+  });
+
+  // GET /api/gpu/wan2gp — Wan2GP connection info
+  router.get('/wan2gp', async (req, res) => {
+    try {
+      const available = await wan2gp.isAvailable();
+      const port = await wan2gp.getPort();
+      res.json({ available, port, api_prefix: '/gradio_api' });
+    } catch {
+      res.json({ available: false, port: null });
     }
   });
 

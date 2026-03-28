@@ -533,7 +533,14 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
       else if (attribution.next_change_json_field && attribution.next_change_value !== undefined) {
         // Only apply if it's a single field name (not comma-separated)
         if (!attribution.next_change_json_field.includes(',') && attribution.next_change_json_field in nextJson) {
-          nextJson[attribution.next_change_json_field] = attribution.next_change_value;
+          // Coerce value to match the original type (prevents string "8.5" overwriting number 6.1)
+          let val = attribution.next_change_value;
+          const origType = typeof nextJson[attribution.next_change_json_field];
+          if (origType === 'number' && typeof val === 'string') {
+            const parsed = Number(val);
+            if (!isNaN(parsed)) val = parsed;
+          }
+          nextJson[attribution.next_change_json_field] = val;
         }
       }
       // Ensure iteration mode — but don't overwrite if next_changes explicitly set these

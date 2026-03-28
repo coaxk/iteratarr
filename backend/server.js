@@ -17,6 +17,7 @@ import { createContactSheetRoutes } from './routes/contactsheet.js';
 import { createQueueRoutes } from './routes/queue.js';
 import { createGpuRoutes } from './routes/gpu.js';
 import { createAnalyticsRoutes } from './routes/analytics.js';
+import { createVisionRoutes } from './routes/vision.js';
 import { createWatcher } from './watcher.js';
 import { createTelemetry } from './telemetry/index.js';
 import config from './config.js';
@@ -62,6 +63,7 @@ app.use('/api/contactsheet', createContactSheetRoutes(config));
 app.use('/api/queue', createQueueRoutes(store, config));
 app.use('/api/gpu', createGpuRoutes());
 app.use('/api/analytics', createAnalyticsRoutes(store));
+app.use('/api/vision', createVisionRoutes(store, config));
 
 // Video file serving — streams MP4 files from allowed directories
 import { resolve, relative, extname } from 'path';

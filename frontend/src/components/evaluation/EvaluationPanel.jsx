@@ -20,7 +20,7 @@ const defaultScores = (fields) => Object.fromEntries(fields.map(f => [f.key, 3])
 import CopyButton from '../common/CopyButton';
 const CopyBtn = ({ text }) => <CopyButton text={text} />;
 
-export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], allIterations = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange, clipId, onForked, isForkPoint = false }) {
+export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], allIterations = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange, clipId, clip, onForked, isForkPoint = false }) {
   const [identity, setIdentity] = useState(defaultScores(IDENTITY_FIELDS));
   const [location, setLocation] = useState(defaultScores(LOCATION_FIELDS));
   const [motion, setMotion] = useState(defaultScores(MOTION_FIELDS));
@@ -45,6 +45,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [showFork, setShowFork] = useState(false);
   const [localTags, setLocalTags] = useState(iteration.tags || []);
   const [renderSubmitted, setRenderSubmitted] = useState(false);
+  const [autoScoring, setAutoScoring] = useState(false);
   const [renderStatus, setRenderStatus] = useState(null); // null | 'rendering' | 'complete' | 'failed'
   const [queueAdded, setQueueAdded] = useState(false);
 
@@ -538,14 +539,51 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           }}
         />
 
-        {/* Import evaluation — between frames and scoring */}
+        {/* Import / Auto-score — between frames and scoring */}
         {!isReadOnly && !isEvaluated && !aiScores && (
-          <button
-            onClick={() => setShowImport(true)}
-            className="w-full py-2.5 border border-dashed border-accent/40 rounded text-sm font-mono text-accent hover:bg-accent/5 hover:border-accent/60 transition-colors"
-          >
-            Import Evaluation from Tenzing / Claude
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowImport(true)}
+              className="flex-1 py-2.5 border border-dashed border-accent/40 rounded text-sm font-mono text-accent hover:bg-accent/5 hover:border-accent/60 transition-colors"
+            >
+              Import from Tenzing / Claude
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  setAutoScoring(true);
+                  const characterName = (typeof clip !== 'undefined' && clip?.characters?.[0]) || null;
+                  const result = await api.visionScore(iteration.id, characterName);
+                  // Pre-fill scores like Tenzing import
+                  setAiScores({
+                    identity: { ...result.scores.identity },
+                    location: { ...result.scores.location },
+                    motion: { ...result.scores.motion }
+                  });
+                  setIdentity(prev => ({ ...prev, ...result.scores.identity }));
+                  setLocation(prev => ({ ...prev, ...result.scores.location }));
+                  setMotion(prev => ({ ...prev, ...result.scores.motion }));
+                  if (result.attribution) setAttribution(result.attribution);
+                  if (result.qualitative_notes) setNotes(result.qualitative_notes);
+                  setScoringSource('vision_api');
+                  setShowImportConfirm(true);
+                  setTimeout(() => setShowImportConfirm(false), 8000);
+                } catch (err) {
+                  alert(`Auto-score failed: ${err.message}`);
+                } finally {
+                  setAutoScoring(false);
+                }
+              }}
+              disabled={autoScoring}
+              className={`flex-1 py-2.5 border border-dashed rounded text-sm font-mono transition-colors ${
+                autoScoring
+                  ? 'border-blue-400/40 text-blue-400 bg-blue-400/5 animate-pulse'
+                  : 'border-purple-400/40 text-purple-400 hover:bg-purple-400/5 hover:border-purple-400/60'
+              }`}
+            >
+              {autoScoring ? 'Scoring with Vision API...' : 'Auto-Score with Vision API'}
+            </button>
+          </div>
         )}
 
         {/* Score sliders */}

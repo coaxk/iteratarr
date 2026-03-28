@@ -460,6 +460,7 @@ export default function ClipDetail({ clip, onBack }) {
           onGoToIteration={(iter) => setSelectedIteration(iter)}
           onScoreChange={setLiveScore}
           clipId={clip.id}
+          clip={clip}
           isForkPoint={!!(branches || []).find(b => b.source_iteration_id === selectedIteration?.id)}
           onForked={(result) => {
             refetch();

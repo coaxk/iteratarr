@@ -43,6 +43,13 @@ export default function ClipDetail({ clip, onBack }) {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [renamingClip, setRenamingClip] = useState(false);
   const [clipNameDraft, setClipNameDraft] = useState(clip.name);
+  const [hasUnsavedScores, setHasUnsavedScores] = useState(false);
+
+  const guardNavigation = (action) => {
+    if (hasUnsavedScores && !window.confirm('You have unsaved Vision API scores. Leave without saving?')) return;
+    setHasUnsavedScores(false);
+    action();
+  };
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
   // When drilling into a branch, sync selectedBranchId
@@ -333,7 +340,7 @@ export default function ClipDetail({ clip, onBack }) {
          ═══════════════════════════════════════════════════ */}
       {drillBranchId && (
         <button
-          onClick={() => { setDrillBranchId(null); setSelectedIteration(null); }}
+          onClick={() => guardNavigation(() => { setDrillBranchId(null); setSelectedIteration(null); })}
           className="text-xs font-mono text-gray-500 hover:text-accent transition-colors"
         >
           &larr; Back to Seed HQ
@@ -409,7 +416,7 @@ export default function ClipDetail({ clip, onBack }) {
               <IterationTable
                 iterations={filteredIterations}
                 selectedId={selectedIteration?.id}
-                onSelect={setSelectedIteration}
+                onSelect={(iter) => guardNavigation(() => setSelectedIteration(iter))}
                 comparedIds={comparedIds}
                 onComparedChange={setComparedIds}
                 onCompareSelected={(ids) => {
@@ -422,7 +429,7 @@ export default function ClipDetail({ clip, onBack }) {
             <IterationLineage
               iterations={iterations || []}
               selectedId={selectedIteration?.id}
-              onSelect={setSelectedIteration}
+              onSelect={(iter) => guardNavigation(() => setSelectedIteration(iter))}
               forkPoints={new Set((branches || []).filter(b => b.source_iteration_id).map(b => b.source_iteration_id))}
               showBranchId={selectedBranchId === null}
             />
@@ -459,6 +466,7 @@ export default function ClipDetail({ clip, onBack }) {
           onLocked={() => { refetch(); refetchBranches(); }}
           onGoToIteration={(iter) => setSelectedIteration(iter)}
           onScoreChange={setLiveScore}
+          onUnsavedScoresChange={setHasUnsavedScores}
           clipId={clip.id}
           clip={clip}
           isForkPoint={!!(branches || []).find(b => b.source_iteration_id === selectedIteration?.id)}

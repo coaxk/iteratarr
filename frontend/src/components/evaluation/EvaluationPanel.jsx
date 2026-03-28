@@ -20,7 +20,7 @@ const defaultScores = (fields) => Object.fromEntries(fields.map(f => [f.key, 3])
 import CopyButton from '../common/CopyButton';
 const CopyBtn = ({ text }) => <CopyButton text={text} />;
 
-export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], allIterations = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange, clipId, clip, onForked, isForkPoint = false }) {
+export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], allIterations = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange, onUnsavedScoresChange, clipId, clip, onForked, isForkPoint = false }) {
   const [identity, setIdentity] = useState(defaultScores(IDENTITY_FIELDS));
   const [location, setLocation] = useState(defaultScores(LOCATION_FIELDS));
   const [motion, setMotion] = useState(defaultScores(MOTION_FIELDS));
@@ -48,6 +48,22 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [autoScoring, setAutoScoring] = useState(false);
   const [renderProgress, setRenderProgress] = useState(null);
   const pollCleanupRef = useRef(null);
+
+  // Signal unsaved scores to parent + warn before navigating away
+  useEffect(() => {
+    onUnsavedScoresChange?.(!!(aiScores && !isEvaluated));
+  }, [aiScores, isEvaluated]);
+
+  useEffect(() => {
+    if (!aiScores || isEvaluated) return;
+    const handler = (e) => {
+      e.preventDefault();
+      e.returnValue = 'You have unsaved Vision API scores. Leave without saving?';
+      return e.returnValue;
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [aiScores, isEvaluated]);
   const [renderStatus, setRenderStatus] = useState(null); // null | 'rendering' | 'complete' | 'failed'
   const [queueAdded, setQueueAdded] = useState(false);
 

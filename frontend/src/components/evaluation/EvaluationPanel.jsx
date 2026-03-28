@@ -46,6 +46,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [localTags, setLocalTags] = useState(iteration.tags || []);
   const [renderSubmitted, setRenderSubmitted] = useState(false);
   const [autoScoring, setAutoScoring] = useState(false);
+  const [visionUseFrames, setVisionUseFrames] = useState(false);
   const [visionAvailable, setVisionAvailable] = useState(null); // null=checking, true/false
   const [renderProgress, setRenderProgress] = useState(null);
   const pollCleanupRef = useRef(null);
@@ -310,7 +311,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           jsonPath={generatedPath}
           renderPath={renderPath}
           iterationNumber={generatedIterNum}
-          clipName={`Iteration #${generatedIterNum}`}
+          clipName={generatedChild?.json_filename?.replace('.json', '') || `Iteration #${generatedIterNum}`}
           iterationId={generatedChild?.id || null}
           seed={iteration.seed_used || null}
           onClose={() => setShowGenerated(false)}
@@ -375,7 +376,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           </p>
           <p className="text-xs font-mono text-gray-400 mt-1">
             {scoringSource === 'vision_api'
-              ? 'AI has pre-filled all scores. Review each category — your adjustments are what gets recorded. Pay special attention to identity fields where AI may over-score.'
+              ? 'Scored against character reference photos + scoring rubric. Identity fields compare the render to real photos of the person. Review and adjust — your final scores are what gets recorded.'
               : 'Scores, attribution, and notes have been pre-filled. Review and adjust anything you disagree with before saving.'}
           </p>
         </div>
@@ -536,7 +537,34 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           if (queueState === 'failed' || renderStatus === 'failed') {
             return (
               <div className="mt-2 border border-red-500/30 bg-red-500/5 rounded px-3 py-2">
-                <span className="text-xs font-mono text-red-400 font-bold">Render failed</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono text-red-400 font-bold">Render failed</span>
+                  <button
+                    onClick={async () => {
+                      try {
+                        // Remove failed queue item, re-add and start
+                        const qs = await api.getIterationQueueStatus(iteration.id);
+                        if (qs.in_queue && qs.id) await api.removeFromQueue(qs.id);
+                        await api.addToQueue({
+                          json_path: iteration.json_path,
+                          clip_name: iteration.json_filename?.replace('.json', '') || `Iteration #${iteration.iteration_number}`,
+                          iteration_id: iteration.id,
+                          seed: iteration.seed_used || null,
+                          source: 'iteration',
+                          priority: 0
+                        });
+                        try { await api.startQueue(); } catch {}
+                        setQueueAdded('queued');
+                        setRenderStatus(null);
+                      } catch (err) {
+                        alert(`Retry failed: ${err.message}`);
+                      }
+                    }}
+                    className="px-3 py-1 text-xs font-mono font-bold bg-red-500/20 text-red-400 border border-red-500/30 rounded hover:bg-red-500/30 transition-colors"
+                  >
+                    Retry Render
+                  </button>
+                </div>
               </div>
             );
           }
@@ -661,7 +689,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                 try {
                   setAutoScoring(true);
                   const characterName = (typeof clip !== 'undefined' && clip?.characters?.[0]) || null;
-                  const result = await api.visionScore(iteration.id, characterName);
+                  const result = await api.visionScore(iteration.id, characterName, visionUseFrames);
                   // Pre-fill scores like Tenzing import
                   setAiScores({
                     identity: { ...result.scores.identity },
@@ -707,10 +735,16 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
               title={visionAvailable === false ? 'Vision API not configured — set ANTHROPIC_API_KEY to enable' : 'Uses Claude Vision API to auto-score frames (~$0.01-0.03 per score)'}
             >
               {autoScoring ? 'Scoring with Vision API...' : visionAvailable === false ? 'Vision API (not configured)' : 'Auto-Score with Vision API'}
-              {!autoScoring && visionAvailable && <span className="block text-[10px] text-purple-400/50 mt-0.5">~$0.02 per score</span>}
+              {!autoScoring && visionAvailable && <span className="block text-[10px] text-purple-400/50 mt-0.5">{visionUseFrames ? '~$0.05 (individual frames)' : '~$0.02 (contact sheet)'}</span>}
               {visionAvailable === false && <span className="block text-[10px] text-gray-700 mt-0.5">PRO feature — requires API key</span>}
             </button>
           </div>
+        )}
+        {!isReadOnly && !isEvaluated && !aiScores && visionAvailable && (
+          <label className="flex items-center gap-2 text-xs font-mono text-gray-600 cursor-pointer">
+            <input type="checkbox" checked={visionUseFrames} onChange={(e) => setVisionUseFrames(e.target.checked)} className="rounded" />
+            Use individual frames instead of contact sheet (more detail, higher cost)
+          </label>
         )}
 
         {/* Score sliders */}

@@ -85,7 +85,10 @@ export default function IterationLineage({ iterations, selectedId, onSelect, for
                     {score}/75
                   </span>
                 )}
-                {!iter.evaluation && iter.status !== 'pending' && (
+                {!iter.evaluation && iter.status === 'failed' && (
+                  <span className="text-[10px] font-mono text-red-400" title="Render failed">failed</span>
+                )}
+                {!iter.evaluation && iter.status !== 'pending' && iter.status !== 'failed' && (
                   <span className="text-[10px] font-mono text-amber-400 animate-pulse" title="Rendered — awaiting scoring">score</span>
                 )}
                 {isLocked && <span className="text-xs text-score-high font-mono font-bold">LOCKED</span>}

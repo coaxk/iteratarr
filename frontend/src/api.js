@@ -133,7 +133,7 @@ export const api = {
 
   // Vision API auto-scoring
   visionStatus: () => request('/vision/status'),
-  visionScore: (iterationId, characterName) => request('/vision/score', { method: 'POST', body: { iteration_id: iterationId, character_name: characterName } }),
+  visionScore: (iterationId, characterName, useFrames = false) => request('/vision/score', { method: 'POST', body: { iteration_id: iterationId, character_name: characterName, use_frames: useFrames } }),
   visionEstimate: (iterationId) => request(`/vision/estimate/${iterationId}`),
   visionBatch: (iterationIds, characterName) => request('/vision/batch', { method: 'POST', body: { iteration_ids: iterationIds, character_name: characterName } }),
 

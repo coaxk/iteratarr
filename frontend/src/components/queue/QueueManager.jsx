@@ -209,9 +209,28 @@ function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove
       )}
 
       {/* Error message for failed items */}
-      {item.status === 'failed' && item.error && (
-        <div className="border border-score-low/30 bg-score-low/5 rounded px-2 py-1">
-          <p className="text-xs font-mono text-score-low truncate" title={item.error}>{item.error}</p>
+      {item.status === 'failed' && (
+        <div className="border border-score-low/30 bg-score-low/5 rounded px-2 py-1 space-y-1">
+          {item.error && <p className="text-xs font-mono text-score-low truncate" title={item.error}>{item.error}</p>}
+          <button
+            onClick={async () => {
+              try {
+                await onRemove(item.id);
+                await api.addToQueue({
+                  json_path: item.json_path,
+                  clip_name: item.clip_name,
+                  iteration_id: item.iteration_id,
+                  seed: item.seed,
+                  source: item.source,
+                  priority: 0
+                });
+                fetchAll();
+              } catch {}
+            }}
+            className="text-xs font-mono text-score-low hover:text-red-300 underline"
+          >
+            Retry
+          </button>
         </div>
       )}
 

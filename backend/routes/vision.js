@@ -78,7 +78,7 @@ export function createVisionRoutes(store, config) {
    * Body: { iteration_id, character_name?, force? }
    */
   router.post('/score', async (req, res) => {
-    const { iteration_id, character_name, force } = req.body;
+    const { iteration_id, character_name, force, use_frames } = req.body;
     if (!iteration_id) return res.status(400).json({ error: 'iteration_id required' });
 
     // Rate limit check
@@ -106,18 +106,26 @@ export function createVisionRoutes(store, config) {
       if (existsSync(framesDir)) {
         const files = await readdir(framesDir);
 
-        // Try contact sheet first
-        const cs = files.find(f => f.startsWith('contact_sheet'));
-        if (cs) {
-          framePaths = [join(framesDir, cs)];
-          method = 'contact_sheet';
-        } else {
-          // Fall back to individual frames
+        if (use_frames) {
+          // Forced individual frames mode — for A/B testing vs contact sheet
           framePaths = files
             .filter(f => /^frame_\d{3}\.png$/.test(f))
             .sort()
             .map(f => join(framesDir, f));
           method = 'individual_frames';
+        } else {
+          // Default: contact sheet first (cheaper)
+          const cs = files.find(f => f.startsWith('contact_sheet'));
+          if (cs) {
+            framePaths = [join(framesDir, cs)];
+            method = 'contact_sheet';
+          } else {
+            framePaths = files
+              .filter(f => /^frame_\d{3}\.png$/.test(f))
+              .sort()
+              .map(f => join(framesDir, f));
+            method = 'individual_frames';
+          }
         }
       }
 
@@ -157,16 +165,37 @@ export function createVisionRoutes(store, config) {
             context.referenceImagePaths = char.reference_images;
           } else {
             // Try to find training images from the lora-trainer characters directory
-            const { readdirSync, statSync } = await import('fs');
+            const { readdirSync } = await import('fs');
             const charDirName = character_name.toLowerCase().split(' ')[0]; // "Jack Doohan" -> "jack"
             const trainingDir = join('C:/Projects/lora-trainer/characters', charDirName);
             try {
               if (existsSync(trainingDir)) {
-                const photos = readdirSync(trainingDir)
-                  .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
-                  .slice(0, 3) // max 3 reference photos
-                  .map(f => join(trainingDir, f));
-                if (photos.length > 0) context.referenceImagePaths = photos;
+                // Check direct files first, then subdirectories (reference-images/, etc.)
+                let photos = [];
+                const scanDir = (dir) => {
+                  const files = readdirSync(dir);
+                  for (const f of files) {
+                    const fp = join(dir, f);
+                    if (/\.(jpg|jpeg|png|webp)$/i.test(f) && !f.startsWith('_')) {
+                      photos.push(fp);
+                    } else if (existsSync(fp) && !f.startsWith('.')) {
+                      try {
+                        const sub = readdirSync(fp);
+                        for (const sf of sub) {
+                          if (/\.(jpg|jpeg|png|webp)$/i.test(sf) && !sf.startsWith('_')) {
+                            photos.push(join(fp, sf));
+                          }
+                        }
+                      } catch {}
+                    }
+                    if (photos.length >= 3) break;
+                  }
+                };
+                scanDir(trainingDir);
+                if (photos.length > 0) {
+                  context.referenceImagePaths = photos.slice(0, 3);
+                  console.log(`[Vision] Loaded ${context.referenceImagePaths.length} reference photos for ${character_name}`);
+                }
               }
             } catch {}
           }

@@ -14,11 +14,13 @@ export function createClipRoutes(store) {
       const sceneIds = new Set(scenes.map(s => s.id));
       clips = clips.filter(c => sceneIds.has(c.scene_id));
     }
-    // Enrich with branch + fork counts
+    // Enrich with branch + fork counts + unscored count
     for (const clip of clips) {
       const branches = await store.list('branches', b => b.clip_id === clip.id);
       clip.branch_count = branches.length;
       clip.fork_count = branches.filter(b => b.created_from === 'fork').length;
+      const iterations = await store.list('iterations', i => i.clip_id === clip.id);
+      clip.unscored_count = iterations.filter(i => i.status !== 'pending' && !i.evaluation).length;
     }
     res.json(clips);
   });

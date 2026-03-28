@@ -44,6 +44,11 @@ export const api = {
   getCharacter: (id) => request(`/characters/${id}`),
   updateCharacter: (id, data) => request(`/characters/${id}`, { method: 'PATCH', body: data }),
   deleteCharacter: (id) => request(`/characters/${id}`, { method: 'DELETE' }),
+  getCharacterPhotos: (id) => request(`/characters/${id}/photos`),
+  uploadCharacterPhotos: (id, photos) => request(`/characters/${id}/photos`, { method: 'POST', body: { photos } }),
+  deleteCharacterPhoto: (id, filename) => request(`/characters/${id}/photos/${filename}`, { method: 'DELETE' }),
+  generateBaselineJson: (id, seed) => request(`/characters/${id}/baseline-json`, { method: 'POST', body: { seed } }),
+  testCharacter: (id) => request(`/characters/${id}/test`, { method: 'POST' }),
 
   // Production Queue (legacy — locked iterations)
   listProductionQueue: () => request('/production-queue'),

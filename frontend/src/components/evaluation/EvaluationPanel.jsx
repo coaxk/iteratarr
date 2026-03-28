@@ -214,6 +214,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
       setGeneratedIterNum(next.iteration_number);
       setGeneratedChild(next);
       setShowGenerated(true);
+      onUnsavedScoresChange?.(false);
       onSaved?.();
     } catch (err) {
       alert(`Save & Generate failed: ${err.message}`);
@@ -252,6 +253,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         qualitative_notes: notes,
         scoring_source: scoringSource
       });
+      onUnsavedScoresChange?.(false);
       onSaved?.();
     } catch (err) {
       alert(`Save failed: ${err.message}`);

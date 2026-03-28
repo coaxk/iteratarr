@@ -160,18 +160,25 @@ export function createVisionRoutes(store, config) {
           const char = characters.find(c => c.name === character_name);
           if (char?.locked_identity_block) context.characterDescription = char.locked_identity_block;
 
-          // Load reference images from character's training data for ground truth comparison
-          if (char?.reference_images?.length > 0) {
-            context.referenceImagePaths = char.reference_images;
-          } else {
-            // Try to find training images from the lora-trainer characters directory
-            const { readdirSync } = await import('fs');
-            const charDirName = character_name.toLowerCase().split(' ')[0]; // "Jack Doohan" -> "jack"
+          // Load reference images — check character data dir first, then training dir
+          const charPhotoDir = join(config.iteratarr_data_dir, 'characters', char.id);
+          const { readdirSync } = await import('fs');
+          let photos = [];
+          // Source 1: Character data directory (uploaded reference photos)
+          try {
+            if (existsSync(charPhotoDir)) {
+              photos = readdirSync(charPhotoDir)
+                .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
+                .slice(0, 3)
+                .map(f => join(charPhotoDir, f));
+            }
+          } catch {}
+          // Source 2: Fall back to lora-trainer directory
+          if (photos.length === 0) {
+            const charDirName = character_name.toLowerCase().split(' ')[0];
             const trainingDir = join('C:/Projects/lora-trainer/characters', charDirName);
             try {
               if (existsSync(trainingDir)) {
-                // Check direct files first, then subdirectories (reference-images/, etc.)
-                let photos = [];
                 const scanDir = (dir) => {
                   const files = readdirSync(dir);
                   for (const f of files) {
@@ -179,25 +186,18 @@ export function createVisionRoutes(store, config) {
                     if (/\.(jpg|jpeg|png|webp)$/i.test(f) && !f.startsWith('_')) {
                       photos.push(fp);
                     } else if (existsSync(fp) && !f.startsWith('.')) {
-                      try {
-                        const sub = readdirSync(fp);
-                        for (const sf of sub) {
-                          if (/\.(jpg|jpeg|png|webp)$/i.test(sf) && !sf.startsWith('_')) {
-                            photos.push(join(fp, sf));
-                          }
-                        }
-                      } catch {}
+                      try { for (const sf of readdirSync(fp)) { if (/\.(jpg|jpeg|png|webp)$/i.test(sf) && !sf.startsWith('_')) photos.push(join(fp, sf)); } } catch {}
                     }
                     if (photos.length >= 3) break;
                   }
                 };
                 scanDir(trainingDir);
-                if (photos.length > 0) {
-                  context.referenceImagePaths = photos.slice(0, 3);
-                  console.log(`[Vision] Loaded ${context.referenceImagePaths.length} reference photos for ${character_name}`);
-                }
               }
             } catch {}
+          }
+          if (photos.length > 0) {
+            context.referenceImagePaths = photos.slice(0, 3);
+            console.log(`[Vision] Loaded ${context.referenceImagePaths.length} reference photos for ${character_name}`);
           }
         } catch {}
       }

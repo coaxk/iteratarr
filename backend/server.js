@@ -49,7 +49,7 @@ app.get('/api/config/paths', (req, res) => res.json({
 app.use('/api/projects', createProjectRoutes(store));
 app.use('/api/clips', createClipRoutes(store));
 app.use('/api/iterations', createIterationRoutes(store, config, telemetry));
-app.use('/api/characters', createCharacterRoutes(store, telemetry));
+app.use('/api/characters', createCharacterRoutes(store, config, telemetry));
 app.use('/api/export', createExportRoutes(store, config));
 app.use('/api/telemetry', createTelemetryRoutes(telemetry, config));
 app.use('/api/frames', createFrameRoutes(config.iteratarr_data_dir));

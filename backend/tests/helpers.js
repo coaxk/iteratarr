@@ -12,6 +12,7 @@ import { createTelemetry } from '../telemetry/index.js';
 import { createTelemetryRoutes } from '../routes/telemetry.js';
 
 export function createTestApp(dataDir, config = {}) {
+  config = { iteratarr_data_dir: dataDir, ...config };
   const store = createStore(dataDir);
   const telemetry = createTelemetry(store, config);
   const app = express();
@@ -21,7 +22,7 @@ export function createTestApp(dataDir, config = {}) {
   app.use('/api/projects', createProjectRoutes(store));
   app.use('/api/clips', createClipRoutes(store));
   app.use('/api/iterations', createIterationRoutes(store, config, telemetry));
-  app.use('/api/characters', createCharacterRoutes(store));
+  app.use('/api/characters', createCharacterRoutes(store, config));
   app.use('/api/templates', createTemplateRoutes(store));
   app.use('/api/clips', createSeedScreenRoutes(store, config));
   app.use('/api/clips', createBranchRoutes(store, config));

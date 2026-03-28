@@ -163,6 +163,13 @@ export default function App() {
   const [view, setView] = useState('episodes');
   const [selectedClip, setSelectedClip] = useState(null);
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [hasUnsavedScores, setHasUnsavedScores] = useState(false);
+
+  const guardedNavigate = (action) => {
+    if (hasUnsavedScores && !window.confirm('You have unsaved Vision API scores. Leave without saving?')) return;
+    setHasUnsavedScores(false);
+    action();
+  };
 
   return (
     <div className="h-screen flex flex-col bg-surface text-gray-200">
@@ -180,7 +187,7 @@ export default function App() {
             {Object.entries(VIEWS).map(([key, label]) => (
               <button
                 key={key}
-                onClick={() => { setView(key); setSelectedClip(null); }}
+                onClick={() => guardedNavigate(() => { setView(key); setSelectedClip(null); })}
                 className={`w-full text-left px-3 py-2 rounded text-sm font-mono transition-colors flex items-center justify-between ${
                   view === key ? 'bg-accent text-black font-bold' : 'text-gray-400 hover:text-gray-200 hover:bg-surface-overlay'
                 }`}
@@ -216,7 +223,7 @@ export default function App() {
             <EpisodeTracker onSelectClip={(clip) => setSelectedClip(clip)} />
           )}
           {view === 'episodes' && selectedClip && (
-            <ClipDetail clip={selectedClip} onBack={() => setSelectedClip(null)} />
+            <ClipDetail clip={selectedClip} onBack={() => guardedNavigate(() => setSelectedClip(null))} onUnsavedScoresChange={setHasUnsavedScores} />
           )}
           {view === 'queue' && <QueueManager />}
           {view === 'characters' && <CharacterRegistry />}

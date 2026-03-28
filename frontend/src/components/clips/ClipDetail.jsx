@@ -14,7 +14,7 @@ import BranchPillBar from './BranchPillBar';
 import BranchManageMenu from './BranchManageMenu';
 import BranchAnalytics from '../analytics/BranchAnalytics';
 
-export default function ClipDetail({ clip, onBack }) {
+export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parentUnsavedCallback }) {
   // Branch state
   const [selectedBranchId, setSelectedBranchId] = useState(null);
   const { data: branches, refetch: refetchBranches } = useApi(() => api.listBranches(clip.id), [clip.id]);
@@ -43,7 +43,11 @@ export default function ClipDetail({ clip, onBack }) {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [renamingClip, setRenamingClip] = useState(false);
   const [clipNameDraft, setClipNameDraft] = useState(clip.name);
-  const [hasUnsavedScores, setHasUnsavedScores] = useState(false);
+  const [hasUnsavedScores, setHasUnsavedScoresLocal] = useState(false);
+  const setHasUnsavedScores = (val) => {
+    setHasUnsavedScoresLocal(val);
+    parentUnsavedCallback?.(val);
+  };
 
   const guardNavigation = (action) => {
     if (hasUnsavedScores && !window.confirm('You have unsaved Vision API scores. Leave without saving?')) return;

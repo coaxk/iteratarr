@@ -170,11 +170,11 @@ export default function GeneratedModal({ jsonPath, renderPath, iterationNumber, 
                     : 'bg-surface-overlay text-gray-300 border border-gray-600 hover:border-accent hover:text-accent'
               }`}
             >
-              {queueAdded ? 'Added to Queue' : submitting ? 'Adding...' : 'Add to Queue'}
+              {queueAdded ? 'Added to Render Queue' : submitting ? 'Adding...' : 'Add to Render Queue'}
             </button>
           )}
-          {/* Render Now */}
-          {wan2gpAvailable && jsonPath && !queueAdded && (
+          {/* Render Now — always visible (routes through queue, doesn't need Wan2GP check) */}
+          {jsonPath && !queueAdded && (
             <button
               onClick={handleRender}
               disabled={renderSubmitted || submitting}

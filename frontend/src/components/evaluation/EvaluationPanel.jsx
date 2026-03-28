@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ScoreGroup from './ScoreGroup';
 import ScoreRing from './ScoreRing';
 import AttributionPanel from './AttributionPanel';
@@ -46,6 +46,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [localTags, setLocalTags] = useState(iteration.tags || []);
   const [renderSubmitted, setRenderSubmitted] = useState(false);
   const [autoScoring, setAutoScoring] = useState(false);
+  const pollCleanupRef = useRef(null);
   const [renderStatus, setRenderStatus] = useState(null); // null | 'rendering' | 'complete' | 'failed'
   const [queueAdded, setQueueAdded] = useState(false);
 
@@ -54,6 +55,9 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const isReadOnly = isEvaluated && hasChild;
 
   useEffect(() => {
+    // Clean up any previous render status polling
+    if (pollCleanupRef.current) { pollCleanupRef.current(); pollCleanupRef.current = null; }
+
     if (iteration.evaluation) {
       const ev = iteration.evaluation;
       if (ev.scores?.identity) setIdentity(ev.scores.identity);
@@ -88,37 +92,46 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     setComparisonVideoPath(null);
     setComparisonIter(null);
 
-    // Check if this iteration is already in the queue or being rendered directly
+    // Single unified status check — polls when rendering
     if (iteration.status === 'pending') {
-      api.getIterationQueueStatus(iteration.id).then(qs => {
-        if (qs.in_queue) setQueueAdded(qs.status);
-      }).catch(() => {});
-      // Also check direct render status (for renders that bypassed queue)
-      api.getRenderStatus().then(rs => {
-        const myRender = rs.renders?.find(r =>
-          r.json_path && iteration.json_path &&
-          r.json_path.replace(/\\/g, '/') === iteration.json_path.replace(/\\/g, '/') &&
-          r.status === 'rendering'
-        );
-        if (myRender) setRenderStatus('rendering');
-      }).catch(() => {});
-    }
+      setRenderStatus('checking');
+      setQueueAdded(false);
 
-    // If iteration is 'pending' but has a render_path, check if video already exists
-    // This catches renders done outside the bridge (directly in Wan2GP)
-    if (iteration.status === 'pending' && iteration.render_path) {
-      fetch(`/api/video?path=${encodeURIComponent(iteration.render_path)}`, { method: 'HEAD' })
-        .then(res => {
-          if (res.ok) {
+      const runCheck = () => {
+        const checks = [
+          api.getIterationQueueStatus(iteration.id).catch(() => ({ in_queue: false })),
+          api.getRenderStatus().catch(() => ({ renders: [] })),
+          iteration.render_path
+            ? fetch(`/api/video?path=${encodeURIComponent(iteration.render_path)}`, { method: 'HEAD' }).then(r => r.ok).catch(() => false)
+            : Promise.resolve(false)
+        ];
+
+        Promise.all(checks).then(([qs, rs, videoExists]) => {
+          if (videoExists) {
             setRenderStatus('complete');
-            // Update iteration status in the database silently — don't trigger refetch
-            // to avoid race conditions with FrameStrip loading
             api.updateIteration(iteration.id, { status: 'rendered' }).catch(() => {});
+          } else if (qs.in_queue) {
+            setQueueAdded(qs.status);
+            setRenderStatus(qs.status === 'rendering' ? 'rendering' : null);
           } else {
-            setRenderStatus(null);
+            const normalize = p => p?.replace(/\\/g, '/');
+            const myRenders = rs.renders?.filter(r =>
+              r.json_path && iteration.json_path &&
+              normalize(r.json_path) === normalize(iteration.json_path)
+            ) || [];
+            const active = myRenders.find(r => r.status === 'rendering');
+            const complete = myRenders.find(r => r.status === 'complete');
+            if (active) setRenderStatus('rendering');
+            else if (complete) setRenderStatus('complete');
+            else setRenderStatus(null);
           }
-        })
-        .catch(() => setRenderStatus(null));
+        });
+      };
+
+      runCheck();
+      // Poll every 10s to detect render completion
+      const pollId = setInterval(runCheck, 10000);
+      pollCleanupRef.current = () => clearInterval(pollId);
     } else {
       setRenderStatus(null);
     }
@@ -312,12 +325,20 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         </div>
       )}
 
-      {/* Import confirmation banner — shows briefly after import */}
+      {/* Import confirmation banner — shows after import or auto-score */}
       {showImportConfirm && (
-        <div className="border border-score-high/50 bg-score-high/10 rounded px-3 py-2">
-          <p className="text-sm font-mono text-score-high font-bold">Evaluation imported successfully</p>
+        <div className={`border rounded px-3 py-2 ${
+          scoringSource === 'vision_api'
+            ? 'border-purple-400/50 bg-purple-400/10'
+            : 'border-score-high/50 bg-score-high/10'
+        }`}>
+          <p className={`text-sm font-mono font-bold ${scoringSource === 'vision_api' ? 'text-purple-400' : 'text-score-high'}`}>
+            {scoringSource === 'vision_api' ? 'Vision API scoring complete' : 'Evaluation imported successfully'}
+          </p>
           <p className="text-xs font-mono text-gray-400 mt-1">
-            Scores, attribution, and notes have been pre-filled. Review and adjust anything you disagree with before saving.
+            {scoringSource === 'vision_api'
+              ? 'AI has pre-filled all scores. Review each category — your adjustments are what gets recorded. Pay special attention to identity fields where AI may over-score.'
+              : 'Scores, attribution, and notes have been pre-filled. Review and adjust anything you disagree with before saving.'}
           </p>
         </div>
       )}
@@ -395,6 +416,14 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           // Queue states: null (not queued), 'queued', 'rendering', 'complete', 'failed'
           const queueState = queueAdded; // queueAdded now holds the queue status string or false
 
+          if (renderStatus === 'checking') {
+            return (
+              <div className="mt-2 border border-gray-600 bg-surface-overlay rounded px-3 py-2">
+                <span className="text-xs font-mono text-gray-400 animate-pulse">Checking render status...</span>
+              </div>
+            );
+          }
+
           if (renderStatus === 'complete' || queueState === 'complete') {
             return (
               <div className="mt-2 border border-green-500/30 bg-green-500/5 rounded px-3 py-2">
@@ -466,7 +495,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                     }}
                     className="bg-surface-overlay text-gray-300 border border-gray-600 hover:border-accent hover:text-accent px-3 py-1 text-xs font-mono font-bold rounded transition-colors"
                   >
-                    Add to Queue
+                    Add to Render Queue
                   </button>
                   <button
                     onClick={async () => {

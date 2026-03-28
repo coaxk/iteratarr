@@ -46,8 +46,14 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [localTags, setLocalTags] = useState(iteration.tags || []);
   const [renderSubmitted, setRenderSubmitted] = useState(false);
   const [autoScoring, setAutoScoring] = useState(false);
+  const [visionAvailable, setVisionAvailable] = useState(null); // null=checking, true/false
   const [renderProgress, setRenderProgress] = useState(null);
   const pollCleanupRef = useRef(null);
+
+  // Check Vision API availability once
+  useEffect(() => {
+    api.visionStatus().then(s => setVisionAvailable(s.available)).catch(() => setVisionAvailable(false));
+  }, []);
 
   // Signal unsaved scores to parent + warn before navigating away
   useEffect(() => {
@@ -650,6 +656,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
             </button>
             <button
               onClick={async () => {
+                if (!visionAvailable) return;
                 try {
                   setAutoScoring(true);
                   const characterName = (typeof clip !== 'undefined' && clip?.characters?.[0]) || null;
@@ -688,16 +695,19 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                   setAutoScoring(false);
                 }
               }}
-              disabled={autoScoring}
+              disabled={autoScoring || visionAvailable === false}
               className={`flex-1 py-2.5 border border-dashed rounded text-sm font-mono transition-colors ${
-                autoScoring
-                  ? 'border-blue-400/40 text-blue-400 bg-blue-400/5 animate-pulse'
-                  : 'border-purple-400/40 text-purple-400 hover:bg-purple-400/5 hover:border-purple-400/60'
+                visionAvailable === false
+                  ? 'border-gray-700 text-gray-600 cursor-not-allowed'
+                  : autoScoring
+                    ? 'border-blue-400/40 text-blue-400 bg-blue-400/5 animate-pulse'
+                    : 'border-purple-400/40 text-purple-400 hover:bg-purple-400/5 hover:border-purple-400/60'
               }`}
-              title="Uses Claude Vision API to auto-score frames (~$0.01-0.03 per score)"
+              title={visionAvailable === false ? 'Vision API not configured — set ANTHROPIC_API_KEY to enable' : 'Uses Claude Vision API to auto-score frames (~$0.01-0.03 per score)'}
             >
-              {autoScoring ? 'Scoring with Vision API...' : 'Auto-Score with Vision API'}
-              {!autoScoring && <span className="block text-[10px] text-purple-400/50 mt-0.5">~$0.02 per score</span>}
+              {autoScoring ? 'Scoring with Vision API...' : visionAvailable === false ? 'Vision API (not configured)' : 'Auto-Score with Vision API'}
+              {!autoScoring && visionAvailable && <span className="block text-[10px] text-purple-400/50 mt-0.5">~$0.02 per score</span>}
+              {visionAvailable === false && <span className="block text-[10px] text-gray-700 mt-0.5">PRO feature — requires API key</span>}
             </button>
           </div>
         )}

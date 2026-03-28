@@ -226,7 +226,7 @@ export default function App() {
             <ClipDetail clip={selectedClip} onBack={() => guardedNavigate(() => setSelectedClip(null))} onUnsavedScoresChange={setHasUnsavedScores} />
           )}
           {view === 'queue' && <QueueManager />}
-          {view === 'characters' && <CharacterRegistry />}
+          {view === 'characters' && <CharacterRegistry onNavigateToClip={(clip) => { setSelectedClip(clip); setView('episodes'); }} />}
           {view === 'templates' && <TemplateLibrary />}
           {view === 'trends' && <TrendsView />}
         </main>

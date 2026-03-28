@@ -4,7 +4,7 @@ import { api } from '../../api';
 import CharacterCard from './CharacterCard';
 import CreateCharacterModal from '../forms/CreateCharacterModal';
 
-export default function CharacterRegistry() {
+export default function CharacterRegistry({ onNavigateToClip }) {
   const { data: characters, loading, error, refetch } = useApi(() => api.listCharacters(), []);
   const { data: clips } = useApi(() => api.listClips(), []);
   const [showCreate, setShowCreate] = useState(false);
@@ -49,7 +49,7 @@ export default function CharacterRegistry() {
       ) : (
         <div className="space-y-2">
           {list.map(character => (
-            <CharacterCard key={character.id} character={character} clipCount={clipCounts[character.name] || 0} onUpdated={refetch} onDeleted={refetch} />
+            <CharacterCard key={character.id} character={character} clipCount={clipCounts[character.name] || 0} onUpdated={refetch} onDeleted={refetch} onNavigateToClip={onNavigateToClip} />
           ))}
         </div>
       )}

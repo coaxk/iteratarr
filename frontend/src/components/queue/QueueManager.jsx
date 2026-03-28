@@ -49,16 +49,19 @@ function CompletedThumbnail({ iterationId, jsonPath }) {
         }
       }).catch(() => {});
     } else if (jsonPath) {
-      // Seed screening — derive render path from JSON path and try to extract
-      const renderPath = jsonPath.replace('.json', '.mp4');
-      const screenId = jsonPath.split(/[/\\]/).pop().replace('.json', '');
+      // Seed screening — derive render path from JSON basename in Wan2GP output dir
+      const basename = jsonPath.split(/[/\\]/).pop().replace('.json', '');
+      const screenId = basename;
       api.listFrames(screenId).then(data => {
         if (data.frames?.length > 0) {
           setFrameSrc(`/api/frames/${screenId}/${data.frames[0]}`);
         } else {
-          // Try extracting from the render
-          api.extractFrames(renderPath, screenId, 1).then(r => {
-            if (r.frames?.length > 0) setFrameSrc(`/api/frames/${screenId}/${r.frames[0]}`);
+          // Try Wan2GP output directory
+          api.getConfigPaths().then(paths => {
+            const renderPath = `${paths.wan2gp_output_dir}/${basename}.mp4`;
+            api.extractFrames(renderPath, screenId, 1).then(r => {
+              if (r.frames?.length > 0) setFrameSrc(`/api/frames/${screenId}/${r.frames[0]}`);
+            }).catch(() => {});
           }).catch(() => {});
         }
       }).catch(() => {});

@@ -653,7 +653,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
               onClick={() => setShowImport(true)}
               className="flex-1 py-2.5 border border-dashed border-accent/40 rounded text-sm font-mono text-accent hover:bg-accent/5 hover:border-accent/60 transition-colors"
             >
-              Import from Tenzing / Claude
+              Import Evaluation (Claude / manual JSON)
             </button>
             <button
               onClick={async () => {

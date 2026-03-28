@@ -113,8 +113,25 @@ export async function scoreFrames(framePaths, context = {}) {
     throw new Error('No valid frame images found');
   }
 
+  // Load reference images if provided (LoRA training photos for ground truth comparison)
+  const referenceImages = [];
+  if (context.referenceImagePaths?.length > 0) {
+    for (const refPath of context.referenceImagePaths.slice(0, 3)) { // max 3 reference photos
+      try {
+        if (existsSync(refPath)) {
+          const ext = refPath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+          const base64 = await loadImageBase64(refPath);
+          referenceImages.push({ type: 'image', source: { type: 'base64', media_type: ext, data: base64 } });
+        }
+      } catch {}
+    }
+  }
+
   // Build the user message with context
   let userPrompt = 'Score these frames from an AI-generated video render.';
+  if (referenceImages.length > 0) {
+    userPrompt += `\n\nREFERENCE PHOTOS: I have included ${referenceImages.length} real photo(s) of the target character. Compare the rendered frames against these reference photos for identity accuracy. The render should look like THIS person.`;
+  }
   if (context.characterDescription) {
     userPrompt += `\n\nTARGET CHARACTER: ${context.characterDescription}`;
   }
@@ -146,6 +163,8 @@ export async function scoreFrames(framePaths, context = {}) {
       messages: [{
         role: 'user',
         content: [
+          ...referenceImages,
+          ...(referenceImages.length > 0 ? [{ type: 'text', text: 'Above: reference photos of the real person. Below: AI-generated video frames to score.' }] : []),
           ...images,
           { type: 'text', text: userPrompt }
         ]
@@ -176,11 +195,21 @@ export async function scoreFrames(framePaths, context = {}) {
       throw new Error('Invalid score structure returned');
     }
 
-    // Clamp all scores to 1-5
+    // Known score field keys — strip anything else (total, max, etc.)
+    const validFields = {
+      identity: ['face_match', 'head_shape', 'jaw', 'cheekbones', 'eyes_brow', 'skin_texture', 'hair', 'frame_consistency'],
+      location: ['location_correct', 'lighting_correct', 'wardrobe_correct', 'geometry_correct'],
+      motion: ['action_executed', 'smoothness', 'camera_movement']
+    };
+
+    // Strip junk fields and clamp scores to 1-5
     for (const group of ['identity', 'location', 'motion']) {
-      for (const [key, val] of Object.entries(parsed.scores[group])) {
-        parsed.scores[group][key] = Math.max(1, Math.min(5, Math.round(val)));
+      const cleaned = {};
+      for (const key of validFields[group]) {
+        const val = parsed.scores[group][key];
+        cleaned[key] = val != null ? Math.max(1, Math.min(5, Math.round(val))) : 3;
       }
+      parsed.scores[group] = cleaned;
     }
 
     // Compute grand total

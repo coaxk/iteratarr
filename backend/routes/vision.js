@@ -151,6 +151,25 @@ export function createVisionRoutes(store, config) {
           const characters = await store.list('characters');
           const char = characters.find(c => c.name === character_name);
           if (char?.locked_identity_block) context.characterDescription = char.locked_identity_block;
+
+          // Load reference images from character's training data for ground truth comparison
+          if (char?.reference_images?.length > 0) {
+            context.referenceImagePaths = char.reference_images;
+          } else {
+            // Try to find training images from the lora-trainer characters directory
+            const { readdirSync, statSync } = await import('fs');
+            const charDirName = character_name.toLowerCase().split(' ')[0]; // "Jack Doohan" -> "jack"
+            const trainingDir = join('C:/Projects/lora-trainer/characters', charDirName);
+            try {
+              if (existsSync(trainingDir)) {
+                const photos = readdirSync(trainingDir)
+                  .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
+                  .slice(0, 3) // max 3 reference photos
+                  .map(f => join(trainingDir, f));
+                if (photos.length > 0) context.referenceImagePaths = photos;
+              }
+            } catch {}
+          }
         } catch {}
       }
 

@@ -6,12 +6,21 @@ import CreateCharacterModal from '../forms/CreateCharacterModal';
 
 export default function CharacterRegistry() {
   const { data: characters, loading, error, refetch } = useApi(() => api.listCharacters(), []);
+  const { data: clips } = useApi(() => api.listClips(), []);
   const [showCreate, setShowCreate] = useState(false);
 
   if (loading) return <p className="text-gray-500 font-mono text-sm">Loading characters...</p>;
   if (error) return <p className="text-red-400 font-mono text-sm">Error: {error}</p>;
 
   const list = characters || [];
+
+  // Count clips per character
+  const clipCounts = {};
+  for (const clip of (clips || [])) {
+    for (const char of (clip.characters || [])) {
+      clipCounts[char] = (clipCounts[char] || 0) + 1;
+    }
+  }
 
   return (
     <div>
@@ -40,7 +49,7 @@ export default function CharacterRegistry() {
       ) : (
         <div className="space-y-2">
           {list.map(character => (
-            <CharacterCard key={character.id} character={character} onUpdated={refetch} onDeleted={refetch} />
+            <CharacterCard key={character.id} character={character} clipCount={clipCounts[character.name] || 0} onUpdated={refetch} onDeleted={refetch} />
           ))}
         </div>
       )}

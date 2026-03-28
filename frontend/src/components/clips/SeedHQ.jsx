@@ -200,11 +200,53 @@ function BranchNode({ branch, children, allBranches, branches, onEnter, onManage
   );
 }
 
+function SeedGroupThumbnail({ seedScreen, branches, allIterations }) {
+  const [frameSrc, setFrameSrc] = useState(null);
+
+  useEffect(() => {
+    // Try seed screen frames first
+    if (seedScreen?.frames?.length > 0) {
+      setFrameSrc(`/api/frames/${seedScreen.id}/${seedScreen.frames[0]}`);
+      return;
+    }
+    // Try seed screen render_path — extract frames if needed
+    if (seedScreen?.id) {
+      api.listFrames(seedScreen.id).then(data => {
+        if (data.frames?.length > 0) {
+          setFrameSrc(`/api/frames/${seedScreen.id}/${data.frames[0]}`);
+        } else if (seedScreen.render_path) {
+          // Extract frames from the rendered video
+          api.extractFrames(seedScreen.render_path, seedScreen.id, 1).then(r => {
+            if (r.frames?.length > 0) setFrameSrc(`/api/frames/${seedScreen.id}/${r.frames[0]}`);
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+      return;
+    }
+    // Fall back to first branch's first iteration
+    if (branches?.length > 0 && allIterations) {
+      const branchIter = allIterations.find(i => i.branch_id === branches[0].id);
+      if (branchIter) {
+        api.listFrames(branchIter.id).then(data => {
+          if (data.frames?.length > 0) setFrameSrc(`/api/frames/${branchIter.id}/${data.frames[0]}`);
+        }).catch(() => {});
+      }
+    }
+  }, [seedScreen?.id, branches?.length]);
+
+  if (frameSrc) {
+    return <img src={frameSrc} alt="Seed thumbnail" className="h-12 w-auto rounded border border-gray-700 shrink-0" />;
+  }
+  return (
+    <div className="h-12 w-16 rounded border border-gray-700 bg-surface flex items-center justify-center shrink-0">
+      <span className="text-xs font-mono text-gray-700">?</span>
+    </div>
+  );
+}
+
 function SeedGroup({ seed, branches, seedScreen, onEnterBranch, onManageBranch, onLaunchBranch, allBranches, branchTrends, mostRecentBranchId, allIterations }) {
   const hasBranches = branches.length > 0;
-  const hasFrames = seedScreen?.frames?.length > 0;
   const rating = seedScreen?.rating;
-  const firstFrame = hasFrames ? `/api/frames/${seedScreen.id}/${seedScreen.frames[0]}` : null;
 
   // Best score across all branches for this seed
   const bestScore = branches.reduce((max, b) => Math.max(max, b.best_score || 0), 0) || null;
@@ -213,14 +255,8 @@ function SeedGroup({ seed, branches, seedScreen, onEnterBranch, onManageBranch, 
     <div className="border border-gray-700 rounded-lg overflow-hidden">
       {/* Seed header */}
       <div className="flex items-center gap-3 px-4 py-3 bg-surface-raised">
-        {/* Thumbnail */}
-        {firstFrame ? (
-          <img src={firstFrame} alt={`Seed ${seed}`} className="h-12 w-auto rounded border border-gray-700 shrink-0" />
-        ) : (
-          <div className="h-12 w-16 rounded border border-gray-700 bg-surface flex items-center justify-center shrink-0">
-            <span className="text-xs font-mono text-gray-700">?</span>
-          </div>
-        )}
+        {/* Thumbnail — auto-extracts from seed screen render or branch iteration */}
+        <SeedGroupThumbnail seedScreen={seedScreen} branches={branches} allIterations={allIterations} />
 
         {/* Seed number */}
         <div className="flex-1 min-w-0">

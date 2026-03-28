@@ -14,6 +14,7 @@ export default function EpisodeTracker({ onSelectClip }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showArchive, setShowArchive] = useState(false);
   const [restoring, setRestoring] = useState(null);
+  const [characterFilter, setCharacterFilter] = useState(null);
 
   const handleDeleteClip = async (clip) => {
     if (deleteConfirm?.id === clip.id) {
@@ -61,10 +62,18 @@ export default function EpisodeTracker({ onSelectClip }) {
   if (loading) return <p className="text-gray-500 font-mono text-sm">Loading clips...</p>;
   if (error) return <p className="text-red-400 font-mono text-sm">Error: {error}</p>;
 
+  // Extract unique characters for filter
+  const allCharacters = [...new Set((clips || []).flatMap(c => c.characters || []))].sort();
+
+  // Filter and group clips
+  const filtered = characterFilter
+    ? (clips || []).filter(c => (c.characters || []).includes(characterFilter))
+    : (clips || []);
+
   const grouped = {};
   for (const col of COLUMNS) grouped[col] = [];
   const archivedClips = [];
-  for (const clip of (clips || [])) {
+  for (const clip of filtered) {
     const status = clip.status || 'not_started';
     if (status === 'archived') {
       archivedClips.push(clip);
@@ -82,6 +91,30 @@ export default function EpisodeTracker({ onSelectClip }) {
           <p className="text-xs font-mono text-gray-600 mt-0.5">Drag clips between columns to update status. Click a clip to open it.</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Character filter pills */}
+          {allCharacters.length > 1 && (
+            <div className="flex items-center gap-1 mr-2">
+              <button
+                onClick={() => setCharacterFilter(null)}
+                className={`px-2 py-1 text-xs font-mono rounded transition-colors ${
+                  !characterFilter ? 'bg-accent/20 text-accent' : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                All
+              </button>
+              {allCharacters.map(char => (
+                <button
+                  key={char}
+                  onClick={() => setCharacterFilter(characterFilter === char ? null : char)}
+                  className={`px-2 py-1 text-xs font-mono rounded transition-colors ${
+                    characterFilter === char ? 'bg-accent/20 text-accent' : 'text-gray-600 hover:text-gray-300'
+                  }`}
+                >
+                  {char}
+                </button>
+              ))}
+            </div>
+          )}
           {archivedClips.length > 0 && (
             <button
               onClick={() => setShowArchive(!showArchive)}

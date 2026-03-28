@@ -54,7 +54,7 @@ function ProvenSettings({ settings }) {
   );
 }
 
-export default function CharacterCard({ character, onUpdated, onDeleted }) {
+export default function CharacterCard({ character, clipCount = 0, onUpdated, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState({});
@@ -75,6 +75,9 @@ export default function CharacterCard({ character, onUpdated, onDeleted }) {
           </span>
         </div>
         <div className="flex items-center gap-3 shrink-0 ml-3">
+          {clipCount > 0 && (
+            <span className="text-xs font-mono text-gray-600">{clipCount} clip{clipCount !== 1 ? 's' : ''}</span>
+          )}
           {loraCount > 0 && (
             <span className="text-xs font-mono text-gray-500">{loraCount} LoRA{loraCount !== 1 ? 's' : ''}</span>
           )}

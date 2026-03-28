@@ -225,7 +225,13 @@ export default function ClipDetail({ clip, onBack }) {
         </div>
         <div className="flex gap-4 text-xs font-mono text-gray-400">
           {clip.location && <span>Location: {clip.location}</span>}
-          {clip.characters?.length > 0 && <span>Characters: {clip.characters.join(', ')}</span>}
+          {clip.characters?.length > 0 && (
+            <span className="flex items-center gap-1">
+              Characters: {clip.characters.map((c, i) => (
+                <span key={i} className="px-1.5 py-0.5 bg-accent/10 text-accent rounded text-xs font-mono">{c}</span>
+              ))}
+            </span>
+          )}
         </div>
 
         {/* Creative brief / goal */}

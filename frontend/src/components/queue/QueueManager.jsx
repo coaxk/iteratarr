@@ -37,17 +37,33 @@ function formatTime(isoString) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-/** Thumbnail preview for completed renders — loads first frame from the iteration */
-function CompletedThumbnail({ iterationId }) {
+/** Thumbnail preview for completed renders — loads first frame from iteration or render path */
+function CompletedThumbnail({ iterationId, jsonPath }) {
   const [frameSrc, setFrameSrc] = useState(null);
   useEffect(() => {
-    if (!iterationId) return;
-    api.listFrames(iterationId).then(data => {
-      if (data.frames?.length > 0) {
-        setFrameSrc(`/api/frames/${iterationId}/${data.frames[0]}`);
-      }
-    }).catch(() => {});
-  }, [iterationId]);
+    if (iterationId) {
+      // Standard iteration — check for extracted frames
+      api.listFrames(iterationId).then(data => {
+        if (data.frames?.length > 0) {
+          setFrameSrc(`/api/frames/${iterationId}/${data.frames[0]}`);
+        }
+      }).catch(() => {});
+    } else if (jsonPath) {
+      // Seed screening — derive render path from JSON path and try to extract
+      const renderPath = jsonPath.replace('.json', '.mp4');
+      const screenId = jsonPath.split(/[/\\]/).pop().replace('.json', '');
+      api.listFrames(screenId).then(data => {
+        if (data.frames?.length > 0) {
+          setFrameSrc(`/api/frames/${screenId}/${data.frames[0]}`);
+        } else {
+          // Try extracting from the render
+          api.extractFrames(renderPath, screenId, 1).then(r => {
+            if (r.frames?.length > 0) setFrameSrc(`/api/frames/${screenId}/${r.frames[0]}`);
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }, [iterationId, jsonPath]);
   if (!frameSrc) return null;
   return (
     <img
@@ -133,7 +149,7 @@ function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove
 
         {/* Thumbnail preview for completed renders */}
         {item.status === 'complete' && item.iteration_id && (
-          <CompletedThumbnail iterationId={item.iteration_id} />
+          <CompletedThumbnail iterationId={item.iteration_id} jsonPath={item.json_path} />
         )}
 
         {/* Remove button — only for queued/complete/failed items */}

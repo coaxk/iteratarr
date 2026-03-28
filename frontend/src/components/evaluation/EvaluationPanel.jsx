@@ -50,6 +50,13 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [renderProgress, setRenderProgress] = useState(null);
   const pollCleanupRef = useRef(null);
 
+  const [renderStatus, setRenderStatus] = useState(null); // null | 'rendering' | 'complete' | 'failed'
+  const [queueAdded, setQueueAdded] = useState(false);
+
+  const isEvaluated = !!iteration.evaluation;
+  const hasChild = !!childIteration;
+  const isReadOnly = isEvaluated && hasChild;
+
   // Check Vision API availability once
   useEffect(() => {
     api.visionStatus().then(s => setVisionAvailable(s.available)).catch(() => setVisionAvailable(false));
@@ -70,12 +77,6 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [aiScores, isEvaluated]);
-  const [renderStatus, setRenderStatus] = useState(null); // null | 'rendering' | 'complete' | 'failed'
-  const [queueAdded, setQueueAdded] = useState(false);
-
-  const isEvaluated = !!iteration.evaluation;
-  const hasChild = !!childIteration;
-  const isReadOnly = isEvaluated && hasChild;
 
   useEffect(() => {
     // Clean up any previous render status polling

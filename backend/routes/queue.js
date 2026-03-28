@@ -369,6 +369,10 @@ export function createQueueRoutes(store, config) {
           error: err.message
         });
         console.error(`[Queue] Failed: ${item.clip_name} — ${err.message}`);
+        // Update iteration status to failed
+        if (item.iteration_id) {
+          try { await store.update('iterations', item.iteration_id, { status: 'failed' }); } catch {}
+        }
       } finally {
         offProgress(renderId);
         activeItem = null;

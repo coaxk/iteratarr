@@ -542,7 +542,8 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                   <button
                     onClick={async () => {
                       try {
-                        // Remove failed queue item, re-add and start
+                        // Reset iteration status, remove failed queue item, re-add and start
+                        await api.updateIteration(iteration.id, { status: 'pending' });
                         const qs = await api.getIterationQueueStatus(iteration.id);
                         if (qs.in_queue && qs.id) await api.removeFromQueue(qs.id);
                         await api.addToQueue({

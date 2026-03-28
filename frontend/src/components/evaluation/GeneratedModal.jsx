@@ -55,18 +55,33 @@ export default function GeneratedModal({ jsonPath, renderPath, iterationNumber, 
       });
   }, [wan2gpAvailable, jsonPath, renderSubmitted]);
 
+  const [submitting, setSubmitting] = useState(false);
+
   const handleRender = async () => {
     try {
-      await api.submitRender(jsonPath);
+      setSubmitting(true);
+      // Route through queue at priority 0 + auto-start
+      await api.addToQueue({
+        json_path: jsonPath,
+        clip_name: clipName || `Iteration #${iterationNumber}`,
+        iteration_id: iterationId || null,
+        seed: seed || null,
+        source: 'iteration',
+        priority: 0
+      });
+      try { await api.startQueue(); } catch {}
       setRenderSubmitted(true);
       setRenderError(null);
     } catch (err) {
       setRenderError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleAddToQueue = async () => {
     try {
+      setSubmitting(true);
       await api.addToQueue({
         json_path: jsonPath,
         clip_name: clipName || `Iteration #${iterationNumber}`,
@@ -78,6 +93,8 @@ export default function GeneratedModal({ jsonPath, renderPath, iterationNumber, 
       setRenderError(null);
     } catch (err) {
       setRenderError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -129,39 +146,57 @@ export default function GeneratedModal({ jsonPath, renderPath, iterationNumber, 
           )}
         </div>
 
-        {/* Actions — 3-tier render buttons */}
+        {/* Post-action guidance */}
+        {(renderSubmitted || queueAdded) && onGoToIteration && (
+          <div className="px-4 py-2 border-t border-green-500/20 bg-green-500/5">
+            <p className="text-xs font-mono text-green-400">
+              {renderSubmitted ? 'Render queued and starting.' : 'Added to queue.'} Go to Iteration #{iterationNumber} to track progress.
+            </p>
+          </div>
+        )}
+
+        {/* Actions */}
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-700">
-          {/* Add to Queue — always available */}
-          {jsonPath && (
+          {/* Add to Queue */}
+          {jsonPath && !renderSubmitted && (
             <button
               onClick={handleAddToQueue}
-              disabled={queueAdded}
+              disabled={queueAdded || submitting}
               className={`px-4 py-2 text-sm font-mono font-bold rounded transition-colors ${
                 queueAdded
                   ? 'bg-accent/20 text-accent'
-                  : 'bg-surface-overlay text-gray-300 border border-gray-600 hover:border-accent hover:text-accent'
+                  : submitting
+                    ? 'bg-surface-overlay text-gray-500 cursor-wait'
+                    : 'bg-surface-overlay text-gray-300 border border-gray-600 hover:border-accent hover:text-accent'
               }`}
             >
-              {queueAdded ? 'Added to Queue' : 'Add to Queue'}
+              {queueAdded ? 'Added to Queue' : submitting ? 'Adding...' : 'Add to Queue'}
             </button>
           )}
-          {/* Render Now — only when Wan2GP available */}
-          {wan2gpAvailable && jsonPath && (
+          {/* Render Now */}
+          {wan2gpAvailable && jsonPath && !queueAdded && (
             <button
               onClick={handleRender}
-              disabled={renderSubmitted}
+              disabled={renderSubmitted || submitting}
               className={`px-4 py-2 text-sm font-mono font-bold rounded transition-colors ${
                 renderSubmitted
                   ? 'bg-score-high/20 text-score-high'
-                  : 'bg-accent text-black hover:bg-accent/90'
+                  : submitting
+                    ? 'bg-accent/50 text-black/50 cursor-wait'
+                    : 'bg-accent text-black hover:bg-accent/90'
               }`}
             >
-              {renderSubmitted ? 'Render Submitted' : 'Render Now'}
+              {renderSubmitted ? 'Render Queued' : submitting ? 'Submitting...' : 'Render Now'}
             </button>
           )}
+          {/* Go to iteration — always visible, highlighted after action */}
           {onGoToIteration && (
             <button onClick={onGoToIteration}
-              className="px-4 py-2 bg-accent text-black text-sm font-mono font-bold rounded hover:bg-accent/90">
+              className={`px-4 py-2 text-sm font-mono font-bold rounded transition-colors ${
+                renderSubmitted || queueAdded
+                  ? 'bg-accent text-black hover:bg-accent/90 animate-pulse'
+                  : 'bg-surface-overlay text-gray-300 border border-gray-600 hover:text-accent hover:border-accent'
+              }`}>
               Go to Iteration #{iterationNumber} &rarr;
             </button>
           )}

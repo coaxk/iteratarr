@@ -58,8 +58,11 @@ You MUST respond with ONLY a valid JSON object in this exact format, no other te
     "motion": { "action_executed": N, "smoothness": N, "camera_movement": N }
   },
   "attribution": {
+    "lowest_element": "the_key_of_the_lowest_scoring_field",
     "rope": "rope_N",
-    "description": "Brief description of what should change next"
+    "confidence": "low|medium|high",
+    "next_change_description": "Specific description of what single change to make next",
+    "next_change_value": "The specific new value to set in the JSON field (e.g. a new prompt fragment, a number like 6.1, etc.)"
   },
   "qualitative_notes": "2-3 sentences about what you observed"
 }`;

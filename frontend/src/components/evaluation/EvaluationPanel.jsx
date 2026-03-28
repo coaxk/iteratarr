@@ -88,10 +88,19 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     setComparisonVideoPath(null);
     setComparisonIter(null);
 
-    // Check if this iteration is already in the queue
+    // Check if this iteration is already in the queue or being rendered directly
     if (iteration.status === 'pending') {
       api.getIterationQueueStatus(iteration.id).then(qs => {
-        if (qs.in_queue) setQueueAdded(qs.status); // 'queued' | 'rendering' | 'complete' | 'failed'
+        if (qs.in_queue) setQueueAdded(qs.status);
+      }).catch(() => {});
+      // Also check direct render status (for renders that bypassed queue)
+      api.getRenderStatus().then(rs => {
+        const myRender = rs.renders?.find(r =>
+          r.json_path && iteration.json_path &&
+          r.json_path.replace(/\\/g, '/') === iteration.json_path.replace(/\\/g, '/') &&
+          r.status === 'rendering'
+        );
+        if (myRender) setRenderStatus('rendering');
       }).catch(() => {});
     }
 
@@ -563,7 +572,21 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                   setIdentity(prev => ({ ...prev, ...result.scores.identity }));
                   setLocation(prev => ({ ...prev, ...result.scores.location }));
                   setMotion(prev => ({ ...prev, ...result.scores.motion }));
-                  if (result.attribution) setAttribution(result.attribution);
+                  if (result.attribution) {
+                    // Map Vision API rope shorthand (rope_1) to full ID (rope_1_prompt_position)
+                    const ropeMap = { rope_1: 'rope_1_prompt_position', rope_2: 'rope_2_attention_weighting', rope_3: 'rope_3_lora_multipliers', rope_4: 'rope_4a_cfg_high', rope_4a: 'rope_4a_cfg_high', rope_4b: 'rope_4b_cfg_low', rope_5: 'rope_5_steps_skipping', rope_6: 'rope_6_alt_prompt' };
+                    const mappedRope = ropeMap[result.attribution.rope] || result.attribution.rope;
+                    const ropeField = ROPES.find(r => r.id === mappedRope)?.field || null;
+                    setAttribution({
+                      ...result.attribution,
+                      rope: mappedRope,
+                      lowest_element: result.attribution.lowest_element || null,
+                      confidence: result.attribution.confidence || 'medium',
+                      next_change_description: result.attribution.next_change_description || result.attribution.description || '',
+                      next_change_json_field: ropeField,
+                      next_change_value: result.attribution.next_change_value || ''
+                    });
+                  }
                   if (result.qualitative_notes) setNotes(result.qualitative_notes);
                   setScoringSource('vision_api');
                   setShowImportConfirm(true);

@@ -53,6 +53,7 @@ export const api = {
   addToQueue: (data) => request('/queue', { method: 'POST', body: data }),
   removeFromQueue: (id) => request(`/queue/${id}`, { method: 'DELETE' }),
   getIterationQueueStatus: (iterationId) => request(`/queue/iteration/${iterationId}`),
+  retryQueueItem: (id) => request(`/queue/retry/${id}`, { method: 'POST' }),
   updateQueueItem: (id, data) => request(`/queue/${id}`, { method: 'PATCH', body: data }),
   reorderQueue: (order) => request('/queue/reorder', { method: 'POST', body: { order } }),
   startQueue: async () => {

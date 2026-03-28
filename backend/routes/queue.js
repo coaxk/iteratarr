@@ -235,6 +235,49 @@ export function createQueueRoutes(store, config) {
   });
 
   /**
+   * POST /retry/:id — Retry a failed queue item (removes old, creates new, auto-starts)
+   */
+  router.post('/retry/:id', async (req, res) => {
+    try {
+      const item = await store.get('render_queue', req.params.id);
+      if (item.status !== 'failed') {
+        return res.status(400).json({ error: 'Can only retry failed items' });
+      }
+
+      // Reset iteration status if linked
+      if (item.iteration_id) {
+        try { await store.update('iterations', item.iteration_id, { status: 'pending' }); } catch {}
+      }
+
+      // Remove the failed item
+      await store.delete('render_queue', req.params.id);
+
+      // Create a new queue item with same data
+      const newItem = await store.create('render_queue', {
+        json_path: item.json_path,
+        clip_name: item.clip_name,
+        iteration_id: item.iteration_id,
+        seed: item.seed,
+        source: item.source,
+        priority: 0,
+        status: 'queued',
+        queued_at: new Date().toISOString(),
+        started_at: null,
+        completed_at: null,
+        error: null,
+        progress: null
+      });
+
+      // Auto-start queue
+      if (!queueRunning) processQueue();
+
+      res.json({ retried: true, old_id: req.params.id, new_id: newItem.id });
+    } catch (err) {
+      res.status(err.message.includes('not found') ? 404 : 500).json({ error: err.message });
+    }
+  });
+
+  /**
    * POST /clear-completed — Remove all completed/failed items from queue
    */
   router.post('/clear-completed', async (req, res) => {

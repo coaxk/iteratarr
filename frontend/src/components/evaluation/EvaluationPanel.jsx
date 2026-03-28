@@ -542,22 +542,28 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                   <button
                     onClick={async () => {
                       try {
-                        // Reset iteration status, remove failed queue item, re-add and start
-                        await api.updateIteration(iteration.id, { status: 'pending' });
+                        setRenderStatus('checking');
+                        // Find the failed queue item and retry via backend
                         const qs = await api.getIterationQueueStatus(iteration.id);
-                        if (qs.in_queue && qs.id) await api.removeFromQueue(qs.id);
-                        await api.addToQueue({
-                          json_path: iteration.json_path,
-                          clip_name: iteration.json_filename?.replace('.json', '') || `Iteration #${iteration.iteration_number}`,
-                          iteration_id: iteration.id,
-                          seed: iteration.seed_used || null,
-                          source: 'iteration',
-                          priority: 0
-                        });
-                        try { await api.startQueue(); } catch {}
+                        if (qs.in_queue && qs.id && qs.status === 'failed') {
+                          await api.retryQueueItem(qs.id);
+                        } else {
+                          // No failed item found — create fresh
+                          await api.updateIteration(iteration.id, { status: 'pending' });
+                          await api.addToQueue({
+                            json_path: iteration.json_path,
+                            clip_name: iteration.json_filename?.replace('.json', '') || `Iteration #${iteration.iteration_number}`,
+                            iteration_id: iteration.id,
+                            seed: iteration.seed_used || null,
+                            source: 'iteration',
+                            priority: 0
+                          });
+                          try { await api.startQueue(); } catch {}
+                        }
                         setQueueAdded('queued');
                         setRenderStatus(null);
                       } catch (err) {
+                        setRenderStatus('failed');
                         alert(`Retry failed: ${err.message}`);
                       }
                     }}

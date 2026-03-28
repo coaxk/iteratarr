@@ -215,17 +215,11 @@ function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove
           <button
             onClick={async () => {
               try {
-                await onRemove(item.id);
-                await api.addToQueue({
-                  json_path: item.json_path,
-                  clip_name: item.clip_name,
-                  iteration_id: item.iteration_id,
-                  seed: item.seed,
-                  source: item.source,
-                  priority: 0
-                });
+                await api.retryQueueItem(item.id);
                 fetchAll();
-              } catch {}
+              } catch (err) {
+                alert(`Retry failed: ${err.message}`);
+              }
             }}
             className="text-xs font-mono text-score-low hover:text-red-300 underline"
           >

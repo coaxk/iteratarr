@@ -11,7 +11,7 @@ import CopyButton from '../common/CopyButton';
  * Props:
  *   iterationId — the iteration UUID to fetch/extract frames for
  */
-export default function FrameStrip({ iterationId, renderPath: renderPathProp }) {
+export default function FrameStrip({ iterationId, renderPath: renderPathProp, iterationStatus }) {
   const [frames, setFrames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [extracting, setExtracting] = useState(false);
@@ -84,13 +84,24 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp }) 
         } else if (renderPathProp) {
           const extracted = await tryExtract();
           if (!extracted && !cancelled) {
-            // Render not ready yet — poll every 15s, timeout after 10 min
+            // Render not ready yet — poll every 15s
+            // If iteration is queued/rendering, poll indefinitely (queue may take hours)
+            // Otherwise timeout after 10 min
             let polls = 0;
             interval = setInterval(async () => {
               if (cancelled) return;
               polls++;
               setPollCount(polls);
               if (polls >= MAX_POLLS) {
+                // Check if iteration is in queue before giving up
+                try {
+                  const qs = await api.getIterationQueueStatus(iterationId);
+                  if (qs.in_queue && (qs.status === 'queued' || qs.status === 'rendering')) {
+                    // Still in queue — keep polling, reset counter
+                    polls = 0;
+                    return;
+                  }
+                } catch {}
                 clearInterval(interval);
                 setError('Render not detected after 10 minutes. Use Extract Frames manually once the render completes.');
                 return;

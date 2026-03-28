@@ -46,6 +46,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [localTags, setLocalTags] = useState(iteration.tags || []);
   const [renderSubmitted, setRenderSubmitted] = useState(false);
   const [autoScoring, setAutoScoring] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(null);
   const pollCleanupRef = useRef(null);
   const [renderStatus, setRenderStatus] = useState(null); // null | 'rendering' | 'complete' | 'failed'
   const [queueAdded, setQueueAdded] = useState(false);
@@ -109,10 +110,17 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         Promise.all(checks).then(([qs, rs, videoExists]) => {
           if (videoExists) {
             setRenderStatus('complete');
+            setRenderProgress(null);
             api.updateIteration(iteration.id, { status: 'rendered' }).catch(() => {});
           } else if (qs.in_queue) {
             setQueueAdded(qs.status);
-            setRenderStatus(qs.status === 'rendering' ? 'rendering' : null);
+            if (qs.status === 'rendering') {
+              setRenderStatus('rendering');
+              setRenderProgress(qs.progress || null);
+            } else {
+              setRenderStatus(null);
+              setRenderProgress(null);
+            }
           } else {
             const normalize = p => p?.replace(/\\/g, '/');
             const myRenders = rs.renders?.filter(r =>
@@ -121,9 +129,16 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
             ) || [];
             const active = myRenders.find(r => r.status === 'rendering');
             const complete = myRenders.find(r => r.status === 'complete');
-            if (active) setRenderStatus('rendering');
-            else if (complete) setRenderStatus('complete');
-            else setRenderStatus(null);
+            if (active) {
+              setRenderStatus('rendering');
+              setRenderProgress(active.progress || null);
+            } else if (complete) {
+              setRenderStatus('complete');
+              setRenderProgress(null);
+            } else {
+              setRenderStatus(null);
+              setRenderProgress(null);
+            }
           }
         });
       };
@@ -457,9 +472,40 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           }
 
           if (queueState === 'rendering' || renderStatus === 'rendering') {
+            const p = renderProgress;
+            const phaseLabel = p?.phase === 'loading_model' ? 'Loading model...' :
+              p?.phase === 'loading_lora' ? 'Loading LoRA...' :
+              p?.phase === 'task_ready' ? 'Task ready' :
+              p?.phase === 'denoising' ? 'Denoising' :
+              p?.phase === 'denoise_phase' ? `Phase ${p.currentPhase}/${p.totalPhases} — ${p.phaseLabel}` :
+              p?.phase === 'vae_decoding' ? 'VAE Decoding' :
+              p?.phase === 'video_saved' ? 'Video saved' :
+              p?.phase || null;
             return (
-              <div className="mt-2 border border-blue-500/30 bg-blue-500/5 rounded px-3 py-2">
-                <span className="text-xs font-mono text-blue-400 font-bold animate-pulse">Rendering...</span>
+              <div className="mt-2 border border-blue-500/30 bg-blue-500/5 rounded px-3 py-2 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono text-blue-400 font-bold animate-pulse">Rendering...</span>
+                  {phaseLabel && <span className="text-xs font-mono text-blue-400/60">{phaseLabel}</span>}
+                </div>
+                {p?.percent != null && (
+                  <>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div className="bg-blue-400 h-2 rounded-full transition-all duration-500" style={{ width: `${p.percent}%` }} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono text-gray-300">
+                        <span className="text-blue-400 font-bold">{p.percent}%</span>
+                        {p.step && p.totalSteps && <> — Step {p.step}/{p.totalSteps}</>}
+                      </span>
+                      {p.secsPerStep && (
+                        <span className="text-xs font-mono text-gray-400">
+                          <span className="text-green-400 font-bold">{p.secsPerStep.toFixed(1)}s/step</span>
+                          {p.totalSteps && p.step && <> — <span className="text-accent">~{Math.round((p.totalSteps - p.step) * p.secsPerStep)}s left</span></>}
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             );
           }
@@ -632,8 +678,10 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                   ? 'border-blue-400/40 text-blue-400 bg-blue-400/5 animate-pulse'
                   : 'border-purple-400/40 text-purple-400 hover:bg-purple-400/5 hover:border-purple-400/60'
               }`}
+              title="Uses Claude Vision API to auto-score frames (~$0.01-0.03 per score)"
             >
               {autoScoring ? 'Scoring with Vision API...' : 'Auto-Score with Vision API'}
+              {!autoScoring && <span className="block text-[10px] text-purple-400/50 mt-0.5">~$0.02 per score</span>}
             </button>
           </div>
         )}

@@ -690,6 +690,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
             >
               Import Evaluation (Claude / manual JSON)
             </button>
+            <div className="flex-1 flex flex-col">
             <button
               onClick={async () => {
                 if (!visionAvailable) return;
@@ -742,16 +743,22 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
               title={visionAvailable === false ? 'Vision API not configured — set ANTHROPIC_API_KEY to enable' : 'Uses Claude Vision API to auto-score frames (~$0.01-0.03 per score)'}
             >
               {autoScoring ? 'Scoring with Vision API...' : visionAvailable === false ? 'Vision API (not configured)' : 'Auto-Score with Vision API'}
-              {!autoScoring && visionAvailable && <span className="block text-[10px] text-purple-400/50 mt-0.5">{visionUseFrames ? '~$0.05 (individual frames)' : '~$0.02 (contact sheet)'}</span>}
+              {!autoScoring && visionAvailable && (
+                <span className="flex items-center justify-center gap-1 text-[10px] mt-0.5" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={(e) => { e.stopPropagation(); setVisionUseFrames(false); }}
+                    className={`px-1.5 py-0.5 rounded-l ${!visionUseFrames ? 'bg-purple-400/20 text-purple-400' : 'text-purple-400/30 hover:text-purple-400/50'}`}>
+                    Sheet $0.02
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); setVisionUseFrames(true); }}
+                    className={`px-1.5 py-0.5 rounded-r ${visionUseFrames ? 'bg-purple-400/20 text-purple-400' : 'text-purple-400/30 hover:text-purple-400/50'}`}>
+                    Frames $0.05
+                  </button>
+                </span>
+              )}
               {visionAvailable === false && <span className="block text-[10px] text-gray-700 mt-0.5">PRO feature — requires API key</span>}
             </button>
+            </div>
           </div>
-        )}
-        {!isReadOnly && !isEvaluated && !aiScores && visionAvailable && (
-          <label className="flex items-center gap-2 text-xs font-mono text-gray-600 cursor-pointer">
-            <input type="checkbox" checked={visionUseFrames} onChange={(e) => setVisionUseFrames(e.target.checked)} className="rounded" />
-            Use individual frames instead of contact sheet (more detail, higher cost)
-          </label>
         )}
 
         {/* Score sliders */}

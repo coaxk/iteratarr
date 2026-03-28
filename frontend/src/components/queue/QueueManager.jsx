@@ -77,7 +77,7 @@ function CompletedThumbnail({ iterationId, jsonPath }) {
   );
 }
 
-function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove, isActive }) {
+function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove, onRetry, isActive }) {
   const cfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.queued;
   const duration = item.started_at && item.completed_at
     ? Math.round((new Date(item.completed_at) - new Date(item.started_at)) / 1000)
@@ -216,7 +216,7 @@ function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove
             onClick={async () => {
               try {
                 await api.retryQueueItem(item.id);
-                fetchAll();
+                if (onRetry) onRetry();
               } catch (err) {
                 alert(`Retry failed: ${err.message}`);
               }
@@ -482,6 +482,7 @@ export default function QueueManager() {
                 onMoveUp={handleMoveUp}
                 onMoveDown={handleMoveDown}
                 onRemove={handleRemove}
+                onRetry={fetchAll}
                 isActive={false}
               />
             ))}
@@ -515,6 +516,7 @@ export default function QueueManager() {
                 onMoveUp={() => {}}
                 onMoveDown={() => {}}
                 onRemove={handleRemove}
+                onRetry={fetchAll}
                 isActive={false}
               />
             ))}

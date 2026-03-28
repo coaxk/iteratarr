@@ -118,7 +118,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     setComparisonIter(null);
 
     // Single unified status check — polls when rendering
-    if (iteration.status === 'pending') {
+    if (iteration.status === 'pending' || iteration.status === 'failed') {
       setRenderStatus('checking');
       setQueueAdded(false);
 
@@ -451,7 +451,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           <p className="text-xs text-accent font-mono mt-1 break-words">Changed: {iteration.change_from_parent}</p>
         )}
         {/* Render / Queue status for pending iterations */}
-        {iteration.status === 'pending' && iteration.json_path && (() => {
+        {(iteration.status === 'pending' || iteration.status === 'failed') && iteration.json_path && (() => {
           // Queue states: null (not queued), 'queued', 'rendering', 'complete', 'failed'
           const queueState = queueAdded; // queueAdded now holds the queue status string or false
 

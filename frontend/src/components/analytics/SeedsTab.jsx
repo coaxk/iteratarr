@@ -5,6 +5,15 @@ import { useCharacters, useSeedAnalytics, useSeedPersonalityProfileStatus, useVi
 import { api } from '../../api';
 
 function statusForSeed(seed) {
+  const retiredBranches = (seed.abandoned_branch_count || 0) + (seed.superseded_branch_count || 0);
+  if (
+    (seed.branch_count || 0) > 0 &&
+    (seed.active_branch_count || 0) === 0 &&
+    (seed.locked_count || 0) === 0 &&
+    retiredBranches > 0
+  ) {
+    return { label: 'Abandoned', className: 'text-gray-400 bg-gray-500/10' };
+  }
   if (seed.evaluated_count === 0) {
     return { label: 'Untested', className: 'text-gray-500 bg-gray-500/10' };
   }
@@ -136,6 +145,12 @@ const SeedRow = memo(function SeedRow({
       <td className="py-2.5 px-3 text-right text-gray-400">{seed.selected_count}</td>
       <td className="py-2.5 px-3 text-right text-gray-400">{seed.locked_count}</td>
       <td className="py-2.5 px-3 text-right text-gray-400">{seed.screening_rating_avg ?? '—'}</td>
+      <td className="py-2.5 px-3 text-center">
+        <span
+          className={`inline-block w-2.5 h-2.5 rounded-full ${seed.has_profile ? 'bg-green-400' : 'bg-gray-700'}`}
+          title={seed.has_profile ? 'Seed vision profile exists' : 'No seed vision profile yet'}
+        />
+      </td>
       <td className="py-2.5 px-3">
         <div className="bg-gray-800 rounded h-1.5 w-full min-w-28">
           <div className={`rounded h-1.5 ${progressColor}`} style={{ width: `${progressPct}%` }} />
@@ -269,6 +284,23 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     comparedSeedB: seeds.find(seed => seed.seed === compareSeedB) || null
   }), [compareSeedA, compareSeedB, seeds]);
   const canCompare = !!comparedSeedA && !!comparedSeedB && comparedSeedA.seed !== comparedSeedB.seed;
+  const profileScopeLine = useMemo(() => {
+    if (!seedDetail || selectedSeed == null) return null;
+    const sampleCount = seedDetail.personality_profile?.sample_count ?? null;
+    const clipNames = (seedDetail.clips || []).map(clip => clip.clip_name).filter(Boolean);
+    const characters = seedDetail.summary?.character_names || [];
+
+    const clipEvidence = clipNames.length === 1
+      ? clipNames[0]
+      : `${clipNames.length} clips`;
+    const characterEvidence = characters.length === 0
+      ? null
+      : characters.length === 1
+        ? characters[0]
+        : `${characters.slice(0, 2).join(', ')}${characters.length > 2 ? ` +${characters.length - 2} more` : ''}`;
+
+    return `Scope: Seed ${selectedSeed} • Evidence: ${clipEvidence}${sampleCount != null ? ` (${sampleCount} samples)` : ''}${characterEvidence ? ` • Characters: ${characterEvidence}` : ''}`;
+  }, [seedDetail, selectedSeed]);
 
   const handleSetCompareA = (seedValue) => {
     setCompareStatus('');
@@ -499,6 +531,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
             <option value="mixed">Mixed</option>
             <option value="early">Early</option>
             <option value="untested">Untested</option>
+            <option value="abandoned">Abandoned</option>
           </select>
           <select
             value={evidenceFilter}
@@ -586,6 +619,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
               <th className="text-right py-2 px-3">Selected</th>
               <th className="text-right py-2 px-3">Locked</th>
               <th className="text-right py-2 px-3">Screening ★</th>
+              <th className="text-center py-2 px-3">Profile</th>
               <th className="text-left py-2 px-3 min-w-32">Progress</th>
               <th className="text-left py-2 px-3">Characters</th>
             </tr>
@@ -788,11 +822,11 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
             </div>
 
             <div className="border border-gray-700 rounded p-3 bg-surface space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-mono text-gray-500 uppercase tracking-wider">
-                  Vision Personality Profile
-                </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-mono text-gray-500 uppercase tracking-wider">
+                    Seed Vision Personality Profile
+                  </div>
+                  <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleGenerateProfile(false)}
                     disabled={profiling || !visionStatus?.available}
@@ -808,7 +842,13 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
                     Re-run
                   </button>
                 </div>
-              </div>
+                </div>
+              <p className="text-xs font-mono text-gray-600">
+                This profile reflects how this seed behaved in the observed context, not a universal seed truth across all future clips/characters.
+              </p>
+              {profileScopeLine && (
+                <p className="text-xs font-mono text-gray-500">{profileScopeLine}</p>
+              )}
               {!visionStatus?.available && (
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-mono text-amber-400">

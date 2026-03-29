@@ -847,9 +847,11 @@ export function createAnalyticsRoutes(store, config = {}) {
       const iterations = await store.list('iterations');
       const evaluations = await store.list('evaluations');
       const seedScreens = await store.list('seed_screens');
+      const seedProfiles = await store.list('seed_personality_profiles');
 
       const evalById = Object.fromEntries(evaluations.map(e => [e.id, e]));
       const clipById = Object.fromEntries(clips.map(c => [c.id, c]));
+      const profileSeedSet = new Set(seedProfiles.map(profile => Number(profile.seed)));
 
       const itersByBranch = {};
       for (const iter of iterations) {
@@ -881,6 +883,11 @@ export function createAnalyticsRoutes(store, config = {}) {
             best_score: null,
             selected_count: 0,
             locked_count: 0,
+            active_branch_count: 0,
+            abandoned_branch_count: 0,
+            superseded_branch_count: 0,
+            stalled_branch_count: 0,
+            screening_branch_count: 0,
             screening_ratings: [],
             latest_used_at: null,
             clips: new Map()
@@ -893,6 +900,11 @@ export function createAnalyticsRoutes(store, config = {}) {
         if (branch.seed == null || branch.seed === -1 || branch.seed === '-1') continue;
         const entry = ensureSeed(branch.seed);
         entry.branch_count++;
+        if (branch.status === 'active') entry.active_branch_count++;
+        if (branch.status === 'abandoned') entry.abandoned_branch_count++;
+        if (branch.status === 'superseded') entry.superseded_branch_count++;
+        if (branch.status === 'stalled') entry.stalled_branch_count++;
+        if (branch.status === 'screening') entry.screening_branch_count++;
 
         const clip = clipById[branch.clip_id];
         if (clip) {
@@ -1001,6 +1013,12 @@ export function createAnalyticsRoutes(store, config = {}) {
             avg_score: entry.evaluated_count > 0 ? +(entry.total_score / entry.evaluated_count).toFixed(1) : null,
             selected_count: entry.selected_count,
             locked_count: entry.locked_count,
+            active_branch_count: entry.active_branch_count,
+            abandoned_branch_count: entry.abandoned_branch_count,
+            superseded_branch_count: entry.superseded_branch_count,
+            stalled_branch_count: entry.stalled_branch_count,
+            screening_branch_count: entry.screening_branch_count,
+            has_profile: profileSeedSet.has(Number(entry.seed)),
             screening_rating_avg,
             latest_used_at: entry.latest_used_at,
             clips

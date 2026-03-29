@@ -12,6 +12,7 @@ import QueueManager from './components/queue/QueueManager';
 import TemplateLibrary from './components/templates/TemplateLibrary';
 import RenderStatus from './components/render/RenderStatus';
 import GpuStatus from './components/gpu/GpuStatus';
+import CrossClipDashboard from './components/analytics/CrossClipDashboard';
 
 import { useAutoRender } from './hooks/useAutoRender';
 import { useQueueStatus, useClips } from './hooks/useQueries';
@@ -28,6 +29,7 @@ const queryClient = new QueryClient({
 
 const VIEWS = {
   episodes: 'Episode Tracker',
+  analytics: 'Analytics',
   queue: 'Queue Manager',
   characters: 'Character Registry',
   templates: 'Templates',
@@ -235,6 +237,9 @@ function AppContent() {
           )}
           {view === 'episodes' && selectedClip && (
             <ClipDetail clip={selectedClip} onBack={() => guardedNavigate(() => setSelectedClip(null))} onUnsavedScoresChange={setHasUnsavedScores} />
+          )}
+          {view === 'analytics' && (
+            <CrossClipDashboard onBack={() => guardedNavigate(() => setView('episodes'))} />
           )}
           {view === 'queue' && <QueueManager />}
           {view === 'characters' && <CharacterRegistry onNavigateToClip={(clip) => { setSelectedClip(clip); setView('episodes'); }} />}

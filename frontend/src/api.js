@@ -127,6 +127,7 @@ export const api = {
   getBranchAnalytics: (clipId) => request(`/analytics/branches/${clipId}`),
   compareBranches: (clipId, branchId1, branchId2) =>
     request(`/analytics/branches/${clipId}/compare?branches=${branchId1},${branchId2}`),
+  getOverviewAnalytics: () => request('/analytics/overview'),
 
   // GPU Monitoring
   gpuStatus: () => request('/gpu/status'),

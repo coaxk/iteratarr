@@ -205,6 +205,17 @@ export function useBranchComparison(clipId, branchIds, options = {}) {
   });
 }
 
+/** Cross-clip overview analytics — used by CrossClipDashboard */
+export function useOverviewAnalytics(options = {}) {
+  return useQuery({
+    queryKey: ['analytics', 'overview'],
+    queryFn: () => api.getOverviewAnalytics(),
+    staleTime: 60_000,   // 1 min — not real-time data
+    gcTime: 5 * 60_000,
+    ...options
+  });
+}
+
 /** Production queue (legacy locked items) */
 export function useProductionQueue(options = {}) {
   return useQuery({

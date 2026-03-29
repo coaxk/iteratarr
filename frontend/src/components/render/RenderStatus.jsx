@@ -1,50 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
-import { api } from '../../api';
+import { useRenderStatus } from '../../hooks/useQueries';
 
 /**
  * RenderStatus — compact sidebar widget showing Wan2GP connection and render queue.
- *
- * Polls /api/render/status:
- *   - Every 5s when renders are active
- *   - Every 30s when idle
- *
- * States:
- *   - Connected + active renders: job name, queue depth, pulsing amber dot
- *   - Connected + recent complete: "Last render: Xs ago"
- *   - Connected + idle: green dot "Wan2GP: Connected"
- *   - Offline: red dot "Wan2GP: Offline"
+ * Uses TanStack Query — 10s when active, 60s when idle. No manual polling.
  */
 export default function RenderStatus() {
-  const [status, setStatus] = useState(null);
-  const [error, setError] = useState(false);
-  const pollRef = useRef(null);
-
-  const fetchStatus = async () => {
-    try {
-      const data = await api.getRenderStatus();
-      setStatus(data);
-      setError(false);
-    } catch {
-      setStatus(null);
-      setError(true);
-    }
-  };
-
-  useEffect(() => {
-    fetchStatus();
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, []);
-
-  // Adjust poll interval based on active renders
-  useEffect(() => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    const interval = status?.queue?.active > 0 ? 5000 : 30000;
-    pollRef.current = setInterval(fetchStatus, interval);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [status?.queue?.active]);
+  const { data: status, isError } = useRenderStatus();
 
   // Offline state
-  if (error || !status) {
+  if (isError || !status) {
     return (
       <div className="px-3 py-2 border-t border-gray-700">
         <div className="flex items-center gap-2 text-xs font-mono text-gray-500">
@@ -57,7 +21,6 @@ export default function RenderStatus() {
 
   const { available, queue, renders } = status;
 
-  // Not available (API responded but Wan2GP process not detected)
   if (!available) {
     return (
       <div className="px-3 py-2 border-t border-gray-700">
@@ -69,7 +32,6 @@ export default function RenderStatus() {
     );
   }
 
-  // Active renders
   const activeRenders = renders?.filter(r => r.status === 'rendering') || [];
   if (activeRenders.length > 0) {
     const current = activeRenders[0];
@@ -96,10 +58,9 @@ export default function RenderStatus() {
     );
   }
 
-  // Idle — check for last completed render
   const completedRenders = renders?.filter(r => r.status === 'complete') || [];
   if (completedRenders.length > 0) {
-    const last = completedRenders[0]; // Already sorted newest first
+    const last = completedRenders[0];
     const ago = Math.round((Date.now() - new Date(last.completedAt).getTime()) / 1000);
     const agoStr = ago < 60 ? `${ago}s ago`
       : ago < 3600 ? `${Math.round(ago / 60)}m ago`
@@ -118,7 +79,6 @@ export default function RenderStatus() {
     );
   }
 
-  // Connected, no renders
   return (
     <div className="px-3 py-2 border-t border-gray-700">
       <div className="flex items-center gap-2 text-xs font-mono text-score-high">

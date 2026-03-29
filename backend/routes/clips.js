@@ -20,7 +20,7 @@ export function createClipRoutes(store) {
       clip.branch_count = branches.length;
       clip.fork_count = branches.filter(b => b.created_from === 'fork').length;
       const iterations = await store.list('iterations', i => i.clip_id === clip.id);
-      clip.unscored_count = iterations.filter(i => i.status !== 'pending' && !i.evaluation).length;
+      clip.unscored_count = iterations.filter(i => i.status === 'rendered' && !i.evaluation).length;
     }
     res.json(clips);
   });

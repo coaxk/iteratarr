@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import EpisodeTracker from './components/kanban/EpisodeTracker';
 import ClipDetail from './components/clips/ClipDetail';
 import CharacterRegistry from './components/characters/CharacterRegistry';
@@ -13,7 +14,17 @@ import RenderStatus from './components/render/RenderStatus';
 import GpuStatus from './components/gpu/GpuStatus';
 import { useApi } from './hooks/useApi';
 import { useAutoRender } from './hooks/useAutoRender';
+import { useQueueStatus } from './hooks/useQueries';
 import { api } from './api';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
+  }
+});
 
 const VIEWS = {
   episodes: 'Episode Tracker',
@@ -127,19 +138,17 @@ function TelemetryToggle() {
 }
 
 function QueueBadge({ active }) {
-  const [counts, setCounts] = useState(null);
-  useEffect(() => {
-    const poll = () => api.getQueueStatus().then(setCounts).catch(() => {});
-    poll();
-    const id = setInterval(poll, 5000);
-    return () => clearInterval(id);
-  }, []);
+  const { data: counts } = useQueueStatus();
   if (!counts) return null;
   const { queued, rendering, failed } = counts.counts || {};
   const total = (queued || 0) + (rendering || 0);
-  if (failed > 0) return <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-red-500/20 text-red-400">!</span>;
-  if (total === 0) return null;
-  return <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${active ? 'bg-black/20 text-black' : 'bg-accent/20 text-accent'}`}>{total}</span>;
+  if (total === 0 && !failed) return null;
+  return (
+    <span className="flex items-center gap-1">
+      {total > 0 && <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${active ? 'bg-black/20 text-black' : 'bg-accent/20 text-accent'}`}>{total}</span>}
+      {failed > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-red-500/20 text-red-400">!</span>}
+    </span>
+  );
 }
 
 function AutoRenderToggle() {
@@ -159,7 +168,7 @@ function AutoRenderToggle() {
   );
 }
 
-export default function App() {
+function AppContent() {
   const [view, setView] = useState('episodes');
   const [selectedClip, setSelectedClip] = useState(null);
   const [showCreateProject, setShowCreateProject] = useState(false);
@@ -245,5 +254,13 @@ export default function App() {
         />
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
+    </QueryClientProvider>
   );
 }

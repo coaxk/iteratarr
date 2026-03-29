@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
+import { useGpuStatus, useGpuHistory } from '../../hooks/useQueries';
 import { api } from '../../api';
 
 /**
@@ -150,29 +151,10 @@ function ReleaseVramButton() {
 }
 
 export default function GpuStatus() {
-  const [status, setStatus] = useState(null);
-  const [history, setHistory] = useState([]);
+  const { data: status } = useGpuStatus();
+  const { data: history } = useGpuHistory();
   const [expanded, setExpanded] = useState(false);
-  const pollRef = useRef(null);
-
-  const fetchData = async () => {
-    try {
-      const [gpuStatus, gpuHistory] = await Promise.all([
-        api.gpuStatus(),
-        api.gpuHistory()
-      ]);
-      setStatus(gpuStatus);
-      setHistory(gpuHistory);
-    } catch {
-      setStatus({ online: false, error: 'Connection failed' });
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-    pollRef.current = setInterval(fetchData, 5000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, []);
+  // No manual polling — TanStack Query handles it at 10s interval
 
   // Offline / error state
   if (!status || !status.online) {
@@ -186,7 +168,7 @@ export default function GpuStatus() {
     );
   }
 
-  const sparkData = history.map(h => h.gpuUtil);
+  const sparkData = (history || []).map(h => h.gpuUtil);
 
   return (
     <div className="px-3 py-2 border-t border-gray-700 space-y-1.5">

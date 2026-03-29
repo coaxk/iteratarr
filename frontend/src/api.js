@@ -43,6 +43,7 @@ export const api = {
   createCharacter: (data) => request('/characters', { method: 'POST', body: data }),
   getCharacter: (id) => request(`/characters/${id}`),
   updateCharacter: (id, data) => request(`/characters/${id}`, { method: 'PATCH', body: data }),
+  promoteCharacterSeed: (id, data) => request(`/characters/${id}/promote-seed`, { method: 'POST', body: data }),
   deleteCharacter: (id) => request(`/characters/${id}`, { method: 'DELETE' }),
   getCharacterPhotos: (id) => request(`/characters/${id}/photos`),
   uploadCharacterPhotos: (id, photos) => request(`/characters/${id}/photos`, { method: 'POST', body: { photos } }),
@@ -128,6 +129,11 @@ export const api = {
   compareBranches: (clipId, branchId1, branchId2) =>
     request(`/analytics/branches/${clipId}/compare?branches=${branchId1},${branchId2}`),
   getOverviewAnalytics: () => request('/analytics/overview'),
+  getSeedsAnalytics: () => request('/analytics/seeds'),
+  getSeedAnalytics: (seed) => request(`/analytics/seeds/${seed}`),
+  getSeedThumbnails: (clipId) => request(`/analytics/clips/${clipId}/seed-thumbnails`),
+  startSeedPersonalityProfile: (seed, data = {}) => request(`/analytics/seeds/${seed}/personality-profile`, { method: 'POST', body: data }),
+  getSeedPersonalityProfileStatus: (seed) => request(`/analytics/seeds/${seed}/personality-profile/status`),
 
   // GPU Monitoring
   gpuStatus: () => request('/gpu/status'),

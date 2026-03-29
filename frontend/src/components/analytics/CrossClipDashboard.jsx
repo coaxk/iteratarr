@@ -4,9 +4,12 @@ import OverviewTab from './OverviewTab';
 import CharactersTab from './CharactersTab';
 import RopesTab from './RopesTab';
 import StallsTab from './StallsTab';
+import SeedsTab from './SeedsTab';
+import { useSeedsAnalytics } from '../../hooks/useQueries';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
+  { id: 'seeds', label: 'Seeds' },
   { id: 'characters', label: 'Characters' },
   { id: 'ropes', label: 'Ropes' },
   { id: 'stalls', label: 'Stalls' },
@@ -22,6 +25,12 @@ const TABS = [
 export default function CrossClipDashboard({ onBack }) {
   const [activeTab, setActiveTab] = useState('overview');
   const { data, isLoading, isError, refetch } = useOverviewAnalytics();
+  const {
+    data: seedsData,
+    isLoading: seedsLoading,
+    isError: seedsError,
+    refetch: refetchSeeds
+  } = useSeedsAnalytics({ enabled: activeTab === 'seeds' });
 
   if (isLoading) {
     return (
@@ -60,7 +69,10 @@ export default function CrossClipDashboard({ onBack }) {
           <h2 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Analytics</h2>
         </div>
         <button
-          onClick={() => refetch()}
+          onClick={() => {
+            refetch();
+            if (activeTab === 'seeds') refetchSeeds();
+          }}
           className="text-xs font-mono text-gray-600 hover:text-gray-400 transition-colors"
         >
           Refresh
@@ -92,6 +104,14 @@ export default function CrossClipDashboard({ onBack }) {
       {/* Tab content */}
       <div className="flex-1 overflow-auto">
         {activeTab === 'overview' && <OverviewTab data={data} onSwitchToStalls={() => setActiveTab('stalls')} />}
+        {activeTab === 'seeds' && (
+          <SeedsTab
+            data={seedsData}
+            isLoading={seedsLoading}
+            isError={seedsError}
+            onRetry={() => refetchSeeds()}
+          />
+        )}
         {activeTab === 'characters' && <CharactersTab characters={data.characters} />}
         {activeTab === 'ropes' && <RopesTab ropes={data.ropes} />}
         {activeTab === 'stalls' && <StallsTab clips={data.clips} />}

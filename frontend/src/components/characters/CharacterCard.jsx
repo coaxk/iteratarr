@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { api } from '../../api';
 
 function CopyButton({ text }) {
@@ -53,7 +53,7 @@ function ReferencePhotos({ characterId }) {
   const [loading, setLoading] = useState(true);
   const fileRef = useRef(null);
 
-  useState(() => {
+  useEffect(() => {
     api.getCharacterPhotos(characterId).then(data => {
       setPhotos(data.photos || []);
       setLoading(false);
@@ -125,7 +125,52 @@ function CharacterStatus({ character, clipCount }) {
   return <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-blue-400/15 text-blue-400">Screening</span>;
 }
 
-export default function CharacterCard({ character, clipCount = 0, onUpdated, onDeleted, onNavigateToClip }) {
+function SeedStatsBlock({ seedStats }) {
+  if (!seedStats || seedStats.count === 0) {
+    return (
+      <div className="border border-dashed border-gray-700 rounded px-3 py-2">
+        <span className="text-xs font-mono text-gray-600">No seeds tested yet for this character.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-mono text-gray-500">Seeds Tested</span>
+        <span className="text-xs font-mono text-gray-600">
+          {seedStats.count} total · {seedStats.provenCount} proven
+        </span>
+      </div>
+      <div className="space-y-1.5">
+        {seedStats.items.map(seed => (
+          <div key={seed.seed} className="flex items-center justify-between text-xs font-mono bg-surface border border-gray-700/50 rounded px-3 py-1.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-gray-300 font-bold">Seed {seed.seed}</span>
+              {seed.locked_count > 0 && (
+                <span className="px-1.5 py-0.5 rounded bg-green-400/15 text-green-400">Proven</span>
+              )}
+              {seed.locked_count === 0 && seed.selected_count > 0 && (
+                <span className="px-1.5 py-0.5 rounded bg-accent/15 text-accent">Selected</span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="text-gray-500">{seed.evaluated_count} eval</span>
+              <span className={seed.best_score != null ? 'text-accent font-bold' : 'text-gray-600'}>
+                {seed.best_score != null ? `${seed.best_score}/75` : '—'}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+      {seedStats.count > seedStats.items.length && (
+        <span className="text-xs font-mono text-gray-600">Showing top {seedStats.items.length} by best score.</span>
+      )}
+    </div>
+  );
+}
+
+export default function CharacterCard({ character, clipCount = 0, seedStats = null, onUpdated, onDeleted, onNavigateToClip }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState({});
@@ -176,6 +221,11 @@ export default function CharacterCard({ character, clipCount = 0, onUpdated, onD
           <CharacterStatus character={character} clipCount={clipCount} />
         </div>
         <div className="flex items-center gap-3 shrink-0 ml-3">
+          {seedStats?.count > 0 && (
+            <span className="text-xs font-mono text-gray-600">
+              {seedStats.count} seed{seedStats.count !== 1 ? 's' : ''}
+            </span>
+          )}
           {clipCount > 0 && (
             <span className="text-xs font-mono text-gray-600">{clipCount} clip{clipCount !== 1 ? 's' : ''}</span>
           )}
@@ -293,6 +343,9 @@ export default function CharacterCard({ character, clipCount = 0, onUpdated, onD
 
           {/* Proven settings */}
           <ProvenSettings settings={character.proven_settings} />
+
+          {/* Seed evidence */}
+          <SeedStatsBlock seedStats={seedStats} />
 
           {/* Notes */}
           {character.notes && !editing && (

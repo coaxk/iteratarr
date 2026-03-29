@@ -95,6 +95,11 @@ export function createCharacterRoutes(store, config, telemetry = null) {
         locked_identity_block: req.body.locked_identity_block || '',
         locked_negative_block: req.body.locked_negative_block || '',
         proven_settings: req.body.proven_settings || {},
+        proven_seed: req.body.proven_seed ?? null,
+        proven_settings_source_iteration_id: null,
+        proven_settings_updated_at: null,
+        seed_promotion_source_iteration_id: null,
+        seed_promoted_at: null,
         best_iteration_id: null,
         notes: req.body.notes || ''
       });
@@ -131,6 +136,84 @@ export function createCharacterRoutes(store, config, telemetry = null) {
     try {
       const updated = await store.update('characters', req.params.id, req.body);
       res.json(updated);
+    } catch (err) {
+      res.status(err.message.includes('not found') ? 404 : 400).json({ error: err.message });
+    }
+  });
+
+  /**
+   * POST /:id/promote-seed
+   *
+   * Promote a seed to character-level provenance so future workflows can reuse it.
+   * This supports the roots->leaves loop even when promotion is done from screening
+   * or analytics views before/without a lock event.
+   *
+   * Body: {
+   *   seed: number (required),
+   *   source_iteration_id?: string,
+   *   clip_id?: string
+   * }
+   */
+  router.post('/:id/promote-seed', async (req, res) => {
+    try {
+      const character = await store.get('characters', req.params.id);
+      const parsedSeed = Number(req.body.seed);
+      if (!Number.isFinite(parsedSeed)) {
+        return res.status(400).json({ error: 'seed is required and must be a number' });
+      }
+
+      const now = new Date().toISOString();
+      const patch = {
+        proven_seed: parsedSeed,
+        seed_promoted_at: now,
+        seed_promotion_source_iteration_id: req.body.source_iteration_id || null
+      };
+
+      // If source iteration is supplied, verify it belongs to a clip containing this character.
+      if (req.body.source_iteration_id) {
+        const iter = await store.get('iterations', req.body.source_iteration_id);
+        const clip = await store.get('clips', iter.clip_id);
+        const chars = (clip.characters || []).map(v => String(v).toLowerCase());
+        const matchesCharacter = chars.includes(String(character.name).toLowerCase()) ||
+          chars.includes(String(character.trigger_word).toLowerCase());
+        if (!matchesCharacter) {
+          return res.status(400).json({
+            error: 'source_iteration_id does not belong to a clip containing this character'
+          });
+        }
+
+        // Optional settings write-back when iteration JSON is present.
+        if (iter.json_contents && typeof iter.json_contents === 'object') {
+          patch.proven_settings = {
+            ...(character.proven_settings || {}),
+            guidance_scale: iter.json_contents.guidance_scale,
+            guidance2_scale: iter.json_contents.guidance2_scale,
+            loras_multipliers: iter.json_contents.loras_multipliers || '',
+            film_grain_intensity: iter.json_contents.film_grain_intensity,
+            film_grain_saturation: iter.json_contents.film_grain_saturation,
+            flow_shift: iter.json_contents.flow_shift,
+            NAG_scale: iter.json_contents.NAG_scale,
+            num_inference_steps: iter.json_contents.num_inference_steps,
+            seed: iter.json_contents.seed
+          };
+          patch.proven_settings_source_iteration_id = iter.id;
+          patch.proven_settings_updated_at = now;
+        }
+      }
+
+      if (req.body.clip_id) {
+        patch.seed_promotion_clip_id = req.body.clip_id;
+      }
+
+      const updated = await store.update('characters', req.params.id, patch);
+      res.json({
+        promoted: true,
+        character_id: updated.id,
+        proven_seed: updated.proven_seed,
+        seed_promoted_at: updated.seed_promoted_at,
+        seed_promotion_source_iteration_id: updated.seed_promotion_source_iteration_id,
+        character: updated
+      });
     } catch (err) {
       res.status(err.message.includes('not found') ? 404 : 400).json({ error: err.message });
     }

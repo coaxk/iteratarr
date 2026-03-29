@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api';
 import { getAutoRender } from '../../hooks/useAutoRender';
+import { useSeedScreens, useSeedsAnalytics } from '../../hooks/useQueries';
 import SeedCard from './SeedCard';
 
 /**
@@ -87,8 +89,6 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
   const [generateError, setGenerateError] = useState(null);
 
   // Screening results state
-  const [screenRecords, setScreenRecords] = useState([]);
-  const [hasScreening, setHasScreening] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [selectedSeed, setSelectedSeed] = useState(null);
   const [selecting, setSelecting] = useState(false);
@@ -113,54 +113,47 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
 
   // Contact sheets cache — keyed by record ID
   const [contactSheets, setContactSheets] = useState({});
+  const queryClient = useQueryClient();
 
-  // Polling
-  const pollRef = useRef(null);
-
-  // Load existing screening records on mount
-  useEffect(() => {
-    loadScreenRecords();
-  }, [clip.id]);
-
-  // Poll for render completion — 20s when unrendered seeds exist, stops when all done
-  // Note: keeping setInterval here because checkRenders mutates local screenRecords state
-  // Full TanStack migration requires refactoring screenRecords to query-managed state
+  const {
+    data: screenRecords = [],
+    refetch: refetchScreens
+  } = useSeedScreens(clip.id, {
+    refetchInterval: (query) => {
+      const records = query.state.data || [];
+      const hasUnrenderedSeeds = records.some(r => !r.frames || r.frames.length === 0);
+      return hasUnrenderedSeeds ? 20000 : false;
+    },
+    staleTime: 5000
+  });
+  const hasScreening = screenRecords.length > 0;
   const hasUnrendered = hasScreening && screenRecords.some(r => !r.frames || r.frames.length === 0);
+
+  const { data: seedAnalyticsData } = useSeedsAnalytics({
+    enabled: hasScreening,
+    staleTime: 60_000
+  });
+
+  const seedIntelBySeed = Object.fromEntries((seedAnalyticsData?.seeds || []).map(seed => [String(seed.seed), seed]));
+
+  // Keep selected seed in sync with persisted screen selection.
   useEffect(() => {
-    if (!hasUnrendered) {
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-      return;
-    }
-    pollRef.current = setInterval(checkRenders, 20000);
-    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
-  }, [hasUnrendered]);
+    const selected = screenRecords.find(record => record.selected);
+    if (selected) setSelectedSeed(selected.seed);
+  }, [screenRecords]);
 
-  const loadScreenRecords = async () => {
-    try {
-      const records = await api.getSeedScreen(clip.id);
-      if (records.length > 0) {
-        setScreenRecords(records);
-        setHasScreening(true);
-        const selected = records.find(r => r.selected);
-        if (selected) setSelectedSeed(selected.seed);
-      }
-    } catch { /* no screening yet */ }
-  };
-
-  const checkRenders = async () => {
+  const checkRenders = useCallback(async () => {
     // For each record without frames, try to extract them
-    const updated = [...screenRecords];
     let changed = false;
 
-    for (let i = 0; i < updated.length; i++) {
-      const record = updated[i];
+    for (let i = 0; i < screenRecords.length; i++) {
+      const record = screenRecords[i];
       if (record.frames && record.frames.length > 0) continue;
 
       try {
         // Try extracting frames — if the render exists, this will succeed
         const result = await api.extractFrames(record.render_path, record.id, 4);
         if (result.frames && result.frames.length > 0) {
-          updated[i] = { ...record, frames: result.frames };
           // Persist frames to the seed_screen record
           await api.updateSeedScreen(clip.id, record.id, { frames: result.frames });
           changed = true;
@@ -169,9 +162,16 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
     }
 
     if (changed) {
-      setScreenRecords(updated);
+      await refetchScreens();
     }
-  };
+  }, [clip.id, refetchScreens, screenRecords]);
+
+  // Keep extraction work query-driven: when poll refresh returns unrendered items,
+  // attempt frame extraction once, then invalidate/refetch via TanStack Query.
+  useEffect(() => {
+    if (!hasUnrendered) return;
+    checkRenders();
+  }, [checkRenders, hasUnrendered, screenRecords.length]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -200,8 +200,9 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
         count: seedCount
       });
 
-      // Reload screen records from API to get full records
-      await loadScreenRecords();
+      // Refresh query-managed records
+      await queryClient.invalidateQueries({ queryKey: ['seed-screens', clip.id] });
+      await refetchScreens();
 
       // Auto-submit all generated seed renders to Wan2GP if auto-render is enabled
       if (getAutoRender() && result.records?.length > 0) {
@@ -234,6 +235,7 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
     try {
       const iteration = await api.selectSeed(clip.id, { seed });
       setSelectedSeed(seed);
+      await queryClient.invalidateQueries({ queryKey: ['seed-screens', clip.id] });
       if (onSeedSelected) onSeedSelected(iteration);
     } catch (err) {
       setGenerateError(err.message);
@@ -245,16 +247,14 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
   const handleRate = async (screenId, rating) => {
     try {
       await api.updateSeedScreen(clip.id, screenId, { rating });
-      setScreenRecords(prev => prev.map(r =>
-        r.id === screenId ? { ...r, rating } : r
-      ));
+      await queryClient.invalidateQueries({ queryKey: ['seed-screens', clip.id] });
     } catch { /* rating failed silently */ }
   };
 
   const handleDelete = async (screenId) => {
     try {
       await api.deleteSeedScreen(clip.id, screenId);
-      setScreenRecords(prev => prev.filter(r => r.id !== screenId));
+      await queryClient.invalidateQueries({ queryKey: ['seed-screens', clip.id] });
       if (expandedId === screenId) setExpandedId(null);
     } catch (err) {
       setGenerateError(`Delete failed: ${err.message}`);
@@ -349,6 +349,25 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
   const frameSrc = (screenId, filename) => `/api/frames/${screenId}/${filename}`;
 
   const expandedRecord = expandedId ? screenRecords.find(r => r.id === expandedId) : null;
+  const comparisonRows = screenRecords
+    .map(record => {
+      const intel = seedIntelBySeed[String(record.seed)] || null;
+      return {
+        seed: record.seed,
+        rating: record.rating ?? null,
+        selected: !!record.selected || selectedSeed === record.seed,
+        historical_best: intel?.best_score ?? null,
+        historical_evaluated: intel?.evaluated_count ?? 0,
+        historical_locked: intel?.locked_count ?? 0
+      };
+    })
+    .sort((a, b) => {
+      if ((b.rating ?? -1) !== (a.rating ?? -1)) return (b.rating ?? -1) - (a.rating ?? -1);
+      if ((b.historical_best ?? -1) !== (a.historical_best ?? -1)) return (b.historical_best ?? -1) - (a.historical_best ?? -1);
+      if (b.historical_evaluated !== a.historical_evaluated) return b.historical_evaluated - a.historical_evaluated;
+      return 0;
+    });
+  const topRecommendation = comparisonRows[0] || null;
 
   // --- Render ---
 
@@ -513,6 +532,57 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
       {renderStatus && (
         <div className="border border-score-high/50 bg-score-high/10 rounded px-3 py-2">
           <p className="text-xs font-mono text-score-high">{renderStatus}</p>
+        </div>
+      )}
+
+      {/* Seed comparison + recommendation */}
+      {comparisonRows.length > 0 && (
+        <div className="border border-gray-700 rounded p-3 bg-surface-raised space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono text-gray-500 uppercase tracking-wider">Seed Comparison</span>
+            {topRecommendation && (
+              <span className="text-xs font-mono text-accent">
+                Recommended next focus: <span className="font-bold">Seed {topRecommendation.seed}</span>
+              </span>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse font-mono text-xs">
+              <thead>
+                <tr className="border-b border-gray-700 text-gray-500 uppercase tracking-wider">
+                  <th className="text-left py-1.5 pr-3">Seed</th>
+                  <th className="text-right py-1.5 pr-3">Screening ★</th>
+                  <th className="text-right py-1.5 pr-3">Hist Best</th>
+                  <th className="text-right py-1.5 pr-3">Hist Eval</th>
+                  <th className="text-right py-1.5 pr-3">Locked</th>
+                  <th className="text-left py-1.5 pr-1">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {comparisonRows.map(row => (
+                  <tr key={row.seed} className={`border-b border-gray-800 ${row.seed === topRecommendation?.seed ? 'bg-accent/5' : ''}`}>
+                    <td className="py-1.5 pr-3 text-gray-200 font-bold">Seed {row.seed}</td>
+                    <td className="py-1.5 pr-3 text-right text-amber-400">{row.rating ?? '—'}</td>
+                    <td className="py-1.5 pr-3 text-right text-gray-300">{row.historical_best ?? '—'}</td>
+                    <td className="py-1.5 pr-3 text-right text-gray-400">{row.historical_evaluated || '—'}</td>
+                    <td className="py-1.5 pr-3 text-right text-gray-400">{row.historical_locked || '—'}</td>
+                    <td className="py-1.5 pr-1">
+                      {row.selected ? (
+                        <span className="px-1.5 py-0.5 rounded bg-accent/15 text-accent">Selected</span>
+                      ) : row.historical_locked > 0 ? (
+                        <span className="px-1.5 py-0.5 rounded bg-green-400/15 text-green-400">Proven</span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded bg-gray-700 text-gray-500">Candidate</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs font-mono text-gray-600">
+            Recommendation uses current screening rating first, then historical best score and evaluation depth from Seed Intelligence.
+          </p>
         </div>
       )}
 

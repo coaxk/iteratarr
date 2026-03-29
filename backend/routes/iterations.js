@@ -367,42 +367,72 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
       }
 
       // --- Step 8: Update character proven settings from locked iteration ---
-      // When an iteration is locked as production, its generation settings become
-      // the new proven baseline for each character in the clip. This closes the
-      // feedback loop: iterate -> evaluate -> lock -> proven settings auto-update.
+      // Roots->leaves write-back with provenance.
+      // Only replace best_* pointers when score improves; preserve historical best.
       const updatedCharacters = [];
+      const now = new Date().toISOString();
+      const lockedSeed = iteration.json_contents.seed || iteration.seed_used || null;
+      const lockedScore = evaluation.scores.grand_total;
+
+      function buildProvenSettings(jsonContents) {
+        return {
+          guidance_scale: jsonContents.guidance_scale,
+          guidance2_scale: jsonContents.guidance2_scale,
+          loras_multipliers: jsonContents.loras_multipliers || '',
+          film_grain_intensity: jsonContents.film_grain_intensity,
+          film_grain_saturation: jsonContents.film_grain_saturation,
+          flow_shift: jsonContents.flow_shift,
+          NAG_scale: jsonContents.NAG_scale,
+          num_inference_steps: jsonContents.num_inference_steps,
+          seed: jsonContents.seed
+        };
+      }
+
       if (clip.characters && Array.isArray(clip.characters)) {
-        for (const triggerWord of clip.characters) {
-          const matches = await store.list('characters', c => c.trigger_word === triggerWord);
+        for (const clipCharacterValue of clip.characters) {
+          const key = String(clipCharacterValue).toLowerCase();
+          const matches = await store.list('characters', c =>
+            String(c.trigger_word || '').toLowerCase() === key ||
+            String(c.name || '').toLowerCase() === key
+          );
           if (matches.length > 0) {
             const character = matches[0];
-            const provenSettings = {
-              guidance_scale: iteration.json_contents.guidance_scale,
-              guidance2_scale: iteration.json_contents.guidance2_scale,
-              loras_multipliers: iteration.json_contents.loras_multipliers || '',
-              film_grain_intensity: iteration.json_contents.film_grain_intensity,
-              film_grain_saturation: iteration.json_contents.film_grain_saturation,
-              flow_shift: iteration.json_contents.flow_shift,
-              NAG_scale: iteration.json_contents.NAG_scale,
-              num_inference_steps: iteration.json_contents.num_inference_steps,
-              seed: iteration.json_contents.seed
-            };
-
+            const existingBest = Number(character.best_score ?? -1);
+            const isBetter = lockedScore > existingBest;
+            const hasNoBest = !Number.isFinite(existingBest) || existingBest < 0;
             const characterUpdate = {
-              proven_settings: provenSettings,
-              best_iteration_id: iteration.id,
-              best_score: evaluation.scores.grand_total
+              proven_seed: lockedSeed,
+              seed_promoted_at: now,
+              seed_promotion_source_iteration_id: iteration.id,
+              seed_promotion_clip_id: clip.id
             };
 
-            // If the iteration has an alt_prompt, update the character's locked
-            // identity block — the alt_prompt that scored production-ready is the
-            // proven identity description for this character.
-            if (iteration.json_contents.alt_prompt) {
-              characterUpdate.locked_identity_block = iteration.json_contents.alt_prompt;
+            // Only overwrite proven settings on improved (or first) best.
+            if (isBetter || hasNoBest || !character.proven_settings_source_iteration_id) {
+              characterUpdate.proven_settings = buildProvenSettings(iteration.json_contents || {});
+              characterUpdate.proven_settings_source_iteration_id = iteration.id;
+              characterUpdate.proven_settings_updated_at = now;
+
+              // Optional identity write-back from alt prompt when present.
+              if (iteration.json_contents.alt_prompt) {
+                characterUpdate.locked_identity_block = iteration.json_contents.alt_prompt;
+              }
+            }
+
+            if (isBetter || hasNoBest) {
+              characterUpdate.best_iteration_id = iteration.id;
+              characterUpdate.best_score = lockedScore;
             }
 
             await store.update('characters', character.id, characterUpdate);
-            updatedCharacters.push({ id: character.id, name: character.name, trigger_word: triggerWord });
+            updatedCharacters.push({
+              id: character.id,
+              name: character.name,
+              trigger_word: character.trigger_word,
+              best_updated: !!(isBetter || hasNoBest),
+              proven_settings_updated: !!(isBetter || hasNoBest || !character.proven_settings_source_iteration_id),
+              proven_seed: lockedSeed
+            });
           }
         }
       }

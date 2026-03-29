@@ -62,7 +62,7 @@ app.use('/api/branches', createBranchIterationRoutes(store));
 app.use('/api/contactsheet', createContactSheetRoutes(config));
 app.use('/api/queue', createQueueRoutes(store, config));
 app.use('/api/gpu', createGpuRoutes());
-app.use('/api/analytics', createAnalyticsRoutes(store));
+app.use('/api/analytics', createAnalyticsRoutes(store, config));
 app.use('/api/vision', createVisionRoutes(store, config));
 
 // Video file serving — streams MP4 files from allowed directories

@@ -322,4 +322,98 @@ describe('Iterations API', () => {
     const loserBranch = await store.get('branches', b2.id);
     expect(loserBranch.status).toBe('superseded');
   });
+
+  it('POST /api/iterations/:id/lock writes back character seed/settings provenance', async () => {
+    const character = await store.create('characters', {
+      name: 'Mick',
+      trigger_word: 'mckdhn',
+      proven_settings: {},
+      best_iteration_id: null
+    });
+    const scene = await store.create('scenes', { project_id: 'p1', name: 'Scene 01', episode: 1 });
+    const clip = await store.create('clips', {
+      scene_id: scene.id,
+      name: 'C1',
+      status: 'in_progress',
+      characters: [character.trigger_word]
+    });
+    const branch = await store.create('branches', { clip_id: clip.id, seed: 544083690, name: 'b1', status: 'active' });
+    const iter = await request.post('/api/iterations').send({
+      clip_id: clip.id,
+      branch_id: branch.id,
+      json_filename: 'i1.json',
+      json_contents: {
+        ...sampleJson,
+        seed: 544083690,
+        guidance_scale: 6.1,
+        guidance2_scale: 4.2,
+        loras_multipliers: '1.0;0.3 0.3;1.2',
+        alt_prompt: 'mckdhn, fit healthy mid to late fifties'
+      }
+    });
+
+    await request.post(`/api/iterations/${iter.body.id}/evaluate`).send({
+      scores: {
+        identity: { face_match: 5, head_shape: 5, jaw: 5, cheekbones: 5, eyes_brow: 5, skin_texture: 5, hair: 5, frame_consistency: 5 },
+        location: { location_correct: 5, lighting_correct: 5, wardrobe_correct: 5, geometry_correct: 5 },
+        motion: { action_executed: 5, smoothness: 5, camera_movement: 5 }
+      },
+      attribution: { lowest_element: 'none', rope: 'none' }
+    });
+
+    const lockRes = await request.post(`/api/iterations/${iter.body.id}/lock`);
+    expect(lockRes.status).toBe(200);
+    expect(lockRes.body.updated_characters).toHaveLength(1);
+    expect(lockRes.body.updated_characters[0].proven_seed).toBe(544083690);
+
+    const updatedCharacter = await store.get('characters', character.id);
+    expect(updatedCharacter.proven_seed).toBe(544083690);
+    expect(updatedCharacter.seed_promotion_source_iteration_id).toBe(iter.body.id);
+    expect(updatedCharacter.proven_settings_source_iteration_id).toBe(iter.body.id);
+    expect(updatedCharacter.proven_settings_updated_at).toBeTruthy();
+    expect(updatedCharacter.best_iteration_id).toBe(iter.body.id);
+    expect(updatedCharacter.best_score).toBe(75);
+    expect(updatedCharacter.proven_settings.guidance_scale).toBe(6.1);
+  });
+
+  it('POST /api/iterations/:id/lock does not downgrade character best score pointer', async () => {
+    const character = await store.create('characters', {
+      name: 'Mick',
+      trigger_word: 'mckdhn',
+      proven_settings: { guidance_scale: 7.1 },
+      best_iteration_id: 'iter-existing-best',
+      best_score: 75
+    });
+    const scene = await store.create('scenes', { project_id: 'p1', name: 'Scene 01', episode: 1 });
+    const clip = await store.create('clips', {
+      scene_id: scene.id,
+      name: 'C1',
+      status: 'in_progress',
+      characters: [character.trigger_word]
+    });
+    const branch = await store.create('branches', { clip_id: clip.id, seed: 111222333, name: 'b1', status: 'active' });
+    const iter = await request.post('/api/iterations').send({
+      clip_id: clip.id,
+      branch_id: branch.id,
+      json_filename: 'i1.json',
+      json_contents: { ...sampleJson, seed: 111222333, guidance_scale: 6.0 }
+    });
+
+    await request.post(`/api/iterations/${iter.body.id}/evaluate`).send({
+      scores: {
+        identity: { face_match: 4, head_shape: 5, jaw: 4, cheekbones: 5, eyes_brow: 5, skin_texture: 4, hair: 4, frame_consistency: 4 },
+        location: { location_correct: 5, lighting_correct: 5, wardrobe_correct: 5, geometry_correct: 5 },
+        motion: { action_executed: 5, smoothness: 5, camera_movement: 5 }
+      },
+      attribution: { lowest_element: 'none', rope: 'none' }
+    });
+
+    const lockRes = await request.post(`/api/iterations/${iter.body.id}/lock`);
+    expect(lockRes.status).toBe(200);
+
+    const updatedCharacter = await store.get('characters', character.id);
+    expect(updatedCharacter.best_score).toBe(75);
+    expect(updatedCharacter.best_iteration_id).toBe('iter-existing-best');
+    expect(updatedCharacter.proven_seed).toBe(111222333);
+  });
 });

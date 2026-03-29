@@ -216,6 +216,56 @@ export function useOverviewAnalytics(options = {}) {
   });
 }
 
+/** Seed analytics — used by the analytics dashboard Seeds tab */
+export function useSeedsAnalytics(options = {}) {
+  return useQuery({
+    queryKey: ['analytics', 'seeds'],
+    queryFn: () => api.getSeedsAnalytics(),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    ...options
+  });
+}
+
+/** Detailed analytics for a specific seed */
+export function useSeedAnalytics(seed, options = {}) {
+  return useQuery({
+    queryKey: ['analytics', 'seed', seed],
+    queryFn: () => api.getSeedAnalytics(seed),
+    enabled: Number.isFinite(Number(seed)),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    ...options
+  });
+}
+
+/** Batched seed thumbnails for Seed HQ to avoid per-row frame requests */
+export function useSeedThumbnails(clipId, options = {}) {
+  return useQuery({
+    queryKey: ['analytics', 'seed-thumbnails', clipId],
+    queryFn: () => api.getSeedThumbnails(clipId),
+    enabled: !!clipId,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    ...options
+  });
+}
+
+/** Async personality profile job status for a seed */
+export function useSeedPersonalityProfileStatus(seed, options = {}) {
+  return useQuery({
+    queryKey: ['analytics', 'seed-profile-job', seed],
+    queryFn: () => api.getSeedPersonalityProfileStatus(seed),
+    enabled: Number.isFinite(Number(seed)),
+    staleTime: 2_000,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === 'queued' || status === 'running' ? 2000 : false;
+    },
+    ...options
+  });
+}
+
 /** Production queue (legacy locked items) */
 export function useProductionQueue(options = {}) {
   return useQuery({

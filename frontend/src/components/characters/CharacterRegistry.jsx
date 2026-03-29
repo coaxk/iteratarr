@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { useCharacters, useClips, useInvalidateIterations } from '../../hooks/useQueries';
+import { useCharacters, useClips, useSeedsAnalytics } from '../../hooks/useQueries';
 import CharacterCard from './CharacterCard';
 import CreateCharacterModal from '../forms/CreateCharacterModal';
 
 export default function CharacterRegistry({ onNavigateToClip }) {
   const { data: characters, isLoading: loading, error: queryError, refetch } = useCharacters();
   const { data: clips } = useClips();
+  const { data: seedAnalytics } = useSeedsAnalytics();
   const error = queryError?.message || null;
   const [showCreate, setShowCreate] = useState(false);
 
@@ -20,6 +21,47 @@ export default function CharacterRegistry({ onNavigateToClip }) {
     for (const char of (clip.characters || [])) {
       clipCounts[char] = (clipCounts[char] || 0) + 1;
     }
+  }
+
+  // Build per-character seed stats from analytics data.
+  // We match by character name first and also allow trigger-word fallback.
+  const seedsByCharacterKey = {};
+  for (const seed of (seedAnalytics?.seeds || [])) {
+    for (const charName of (seed.character_names || [])) {
+      const key = String(charName).toLowerCase();
+      if (!seedsByCharacterKey[key]) seedsByCharacterKey[key] = [];
+      seedsByCharacterKey[key].push(seed);
+    }
+  }
+
+  function getCharacterSeedStats(character) {
+    const keys = [character.name, character.trigger_word]
+      .filter(Boolean)
+      .map(value => String(value).toLowerCase());
+
+    const merged = [];
+    const seen = new Set();
+    for (const key of keys) {
+      for (const seed of (seedsByCharacterKey[key] || [])) {
+        if (seen.has(seed.seed)) continue;
+        seen.add(seed.seed);
+        merged.push(seed);
+      }
+    }
+
+    merged.sort((a, b) => {
+      if (a.best_score == null && b.best_score == null) return b.evaluated_count - a.evaluated_count;
+      if (a.best_score == null) return 1;
+      if (b.best_score == null) return -1;
+      return b.best_score - a.best_score;
+    });
+
+    const provenCount = merged.filter(seed => (seed.best_score ?? 0) >= 65 || seed.locked_count > 0).length;
+    return {
+      count: merged.length,
+      provenCount,
+      items: merged.slice(0, 6)
+    };
   }
 
   return (
@@ -49,7 +91,15 @@ export default function CharacterRegistry({ onNavigateToClip }) {
       ) : (
         <div className="space-y-2">
           {list.map(character => (
-            <CharacterCard key={character.id} character={character} clipCount={clipCounts[character.name] || 0} onUpdated={refetch} onDeleted={refetch} onNavigateToClip={onNavigateToClip} />
+            <CharacterCard
+              key={character.id}
+              character={character}
+              clipCount={clipCounts[character.name] || 0}
+              seedStats={getCharacterSeedStats(character)}
+              onUpdated={refetch}
+              onDeleted={refetch}
+              onNavigateToClip={onNavigateToClip}
+            />
           ))}
         </div>
       )}

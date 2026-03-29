@@ -1,6 +1,6 @@
-import { useState, useEffect, memo } from 'react';
-import { useClipIterations } from '../../hooks/useQueries';
-import { api } from '../../api';
+import { useState, useMemo, memo } from 'react';
+import { useClipIterations, useSeedThumbnails } from '../../hooks/useQueries';
+import { useSeedAnalytics } from '../../hooks/useQueries';
 import { BRANCH_STATUSES, GRAND_MAX } from '../../constants';
 
 /**
@@ -43,7 +43,7 @@ const ScoreBadge = memo(function ScoreBadge({ score }) {
  * BranchTree — recursive tree renderer for branches.
  * Builds parent→child relationships via source_branch_id and renders with indentation.
  */
-function BranchTree({ branches, allBranches, onEnter, onManage, branchTrends, mostRecentBranchId, allIterations, parentId = null, depth = 0 }) {
+function BranchTree({ branches, allBranches, onEnter, onManage, branchTrends, mostRecentBranchId, parentId = null, depth = 0 }) {
   // Find branches at this level: root branches (no source or source outside this seed) when parentId=null,
   // or children of parentId
   const atThisLevel = parentId === null
@@ -70,29 +70,20 @@ function BranchTree({ branches, allBranches, onEnter, onManage, branchTrends, mo
         onManage={onManage}
         branchTrends={branchTrends}
         mostRecentBranchId={mostRecentBranchId}
-        allIterations={allIterations}
         depth={depth}
       />
     );
   });
 }
 
-const BranchNode = memo(function BranchNode({ branch, children, allBranches, branches, onEnter, onManage, branchTrends, mostRecentBranchId, allIterations, depth }) {
+const BranchNode = memo(function BranchNode({ branch, children, allBranches, branches, onEnter, onManage, branchTrends, mostRecentBranchId, depth }) {
   const [collapsed, setCollapsed] = useState(false);
   const statusInfo = BRANCH_STATUSES[branch.status] || BRANCH_STATUSES.active;
   const isFork = branch.created_from === 'fork';
   const hasChildren = children.length > 0;
   const isMostRecent = branch.id === mostRecentBranchId;
 
-  // Compute trend directly from allIterations
-  const trend = (() => {
-    if (!allIterations) return null;
-    const scored = allIterations
-      .filter(i => i.branch_id === branch.id && i.evaluation?.scores?.grand_total != null)
-      .sort((a, b) => a.iteration_number - b.iteration_number)
-      .map(i => i.evaluation.scores.grand_total);
-    return computeTrend(scored);
-  })();
+  const trend = branchTrends[branch.id] || null;
 
   return (
     <div>
@@ -191,7 +182,6 @@ const BranchNode = memo(function BranchNode({ branch, children, allBranches, bra
           onManage={onManage}
           branchTrends={branchTrends}
           mostRecentBranchId={mostRecentBranchId}
-          allIterations={allIterations}
           parentId={branch.id}
           depth={depth + 1}
         />
@@ -200,42 +190,9 @@ const BranchNode = memo(function BranchNode({ branch, children, allBranches, bra
   );
 });
 
-function SeedGroupThumbnail({ seedScreen, branches, allIterations }) {
-  const [frameSrc, setFrameSrc] = useState(null);
-
-  useEffect(() => {
-    // Try seed screen frames first
-    if (seedScreen?.frames?.length > 0) {
-      setFrameSrc(`/api/frames/${seedScreen.id}/${seedScreen.frames[0]}`);
-      return;
-    }
-    // Try seed screen render_path — extract frames if needed
-    if (seedScreen?.id) {
-      api.listFrames(seedScreen.id).then(data => {
-        if (data.frames?.length > 0) {
-          setFrameSrc(`/api/frames/${seedScreen.id}/${data.frames[0]}`);
-        } else if (seedScreen.render_path) {
-          // Extract frames from the rendered video
-          api.extractFrames(seedScreen.render_path, seedScreen.id, 1).then(r => {
-            if (r.frames?.length > 0) setFrameSrc(`/api/frames/${seedScreen.id}/${r.frames[0]}`);
-          }).catch(() => {});
-        }
-      }).catch(() => {});
-      return;
-    }
-    // Fall back to first branch's first iteration
-    if (branches?.length > 0 && allIterations) {
-      const branchIter = allIterations.find(i => i.branch_id === branches[0].id);
-      if (branchIter) {
-        api.listFrames(branchIter.id).then(data => {
-          if (data.frames?.length > 0) setFrameSrc(`/api/frames/${branchIter.id}/${data.frames[0]}`);
-        }).catch(() => {});
-      }
-    }
-  }, [seedScreen?.id, branches?.length]);
-
-  if (frameSrc) {
-    return <img src={frameSrc} alt="Seed thumbnail" className="h-12 w-auto rounded border border-gray-700 shrink-0" />;
+function SeedGroupThumbnail({ thumbnail }) {
+  if (thumbnail?.url) {
+    return <img src={thumbnail.url} alt="Seed thumbnail" className="h-12 w-auto rounded border border-gray-700 shrink-0" />;
   }
   return (
     <div className="h-12 w-16 rounded border border-gray-700 bg-surface flex items-center justify-center shrink-0">
@@ -244,7 +201,7 @@ function SeedGroupThumbnail({ seedScreen, branches, allIterations }) {
   );
 }
 
-function SeedGroup({ seed, branches, seedScreen, onEnterBranch, onManageBranch, onLaunchBranch, allBranches, branchTrends, mostRecentBranchId, allIterations }) {
+function SeedGroup({ seed, branches, seedScreen, thumbnail, onEnterBranch, onManageBranch, onLaunchBranch, onOpenSeedProfile, allBranches, branchTrends, mostRecentBranchId }) {
   const hasBranches = branches.length > 0;
   const rating = seedScreen?.rating;
 
@@ -256,7 +213,7 @@ function SeedGroup({ seed, branches, seedScreen, onEnterBranch, onManageBranch, 
       {/* Seed header */}
       <div className="flex items-center gap-3 px-4 py-3 bg-surface-raised">
         {/* Thumbnail — auto-extracts from seed screen render or branch iteration */}
-        <SeedGroupThumbnail seedScreen={seedScreen} branches={branches} allIterations={allIterations} />
+        <SeedGroupThumbnail thumbnail={thumbnail} />
 
         {/* Seed number */}
         <div className="flex-1 min-w-0">
@@ -279,6 +236,13 @@ function SeedGroup({ seed, branches, seedScreen, onEnterBranch, onManageBranch, 
 
         {/* Actions */}
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => onOpenSeedProfile(seed)}
+            className="px-2 py-1 text-xs font-mono text-gray-500 hover:text-accent transition-colors"
+            title="Open seed intelligence profile"
+          >
+            Profile
+          </button>
           {!hasBranches && (
             <button
               onClick={() => onLaunchBranch(seed)}
@@ -307,7 +271,6 @@ function SeedGroup({ seed, branches, seedScreen, onEnterBranch, onManageBranch, 
             onManage={onManageBranch}
             branchTrends={branchTrends}
             mostRecentBranchId={mostRecentBranchId}
-            allIterations={allIterations}
           />
         </div>
       )}
@@ -336,55 +299,89 @@ const TREND_DISPLAY = {
 };
 
 export default function SeedHQ({ clip, branches, seedScreens, onEnterBranch, onGenerateSeeds, onRefresh, onManageBranch, onLaunchBranch, onNavigateToAnalytics }) {
+  const [profileSeed, setProfileSeed] = useState(null);
   // Fetch ALL iterations for this clip to compute branch trends
   // Shared with ClipDetail via TanStack Query dedup (same queryKey)
   const { data: allIterations } = useClipIterations(clip.id);
+  const {
+    data: seedProfile,
+    isLoading: seedProfileLoading,
+    isError: seedProfileError,
+    refetch: refetchSeedProfile
+  } = useSeedAnalytics(profileSeed, { enabled: profileSeed != null });
+  const { data: thumbnailsData } = useSeedThumbnails(clip.id);
+  const thumbnailsBySeed = useMemo(() => {
+    const map = {};
+    for (const entry of (thumbnailsData?.seeds || [])) {
+      map[String(entry.seed)] = entry.thumbnail || null;
+    }
+    return map;
+  }, [thumbnailsData]);
 
-  // branchTrends kept as empty object — trends computed directly in BranchNode from allIterations
-  const branchTrends = {};
+  const branchTrends = useMemo(() => {
+    const scoreSeriesByBranch = {};
+    for (const iteration of (allIterations || [])) {
+      const score = iteration?.evaluation?.scores?.grand_total;
+      if (iteration.branch_id == null || score == null) continue;
+      if (!scoreSeriesByBranch[iteration.branch_id]) scoreSeriesByBranch[iteration.branch_id] = [];
+      scoreSeriesByBranch[iteration.branch_id].push({
+        iteration_number: iteration.iteration_number,
+        score
+      });
+    }
+    const trends = {};
+    for (const [branchId, points] of Object.entries(scoreSeriesByBranch)) {
+      const scores = points
+        .sort((a, b) => a.iteration_number - b.iteration_number)
+        .map(point => point.score);
+      trends[branchId] = computeTrend(scores);
+    }
+    return trends;
+  }, [allIterations]);
 
   // Find most recently worked on branch
-  const mostRecentBranchId = branches?.length > 0
-    ? [...branches]
-        .filter(b => b.status === 'active')
-        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0]?.id
-    : null;
+  const mostRecentBranchId = useMemo(() => (
+    branches?.length > 0
+      ? [...branches]
+          .filter(b => b.status === 'active')
+          .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0]?.id
+      : null
+  ), [branches]);
 
-  // Group branches by seed
-  const seedMap = {};
-
-  // Add seed screen records first (these are all seeds, including un-branched)
-  if (seedScreens) {
-    for (const ss of seedScreens) {
-      const seed = ss.seed;
-      if (!seedMap[seed]) seedMap[seed] = { seed, branches: [], seedScreen: ss };
-      else seedMap[seed].seedScreen = ss;
+  const seedMap = useMemo(() => {
+    const map = {};
+    if (seedScreens) {
+      for (const ss of seedScreens) {
+        const seed = ss.seed;
+        if (!map[seed]) map[seed] = { seed, branches: [], seedScreen: ss };
+        else map[seed].seedScreen = ss;
+      }
     }
-  }
-
-  // Add branches (some seeds may not have seed screens — e.g., forked branches)
-  // Filter out legacy seed=-1 migration artifacts
-  if (branches) {
-    for (const branch of branches) {
-      const seed = branch.seed;
-      if (seed === -1 || seed === '-1') continue; // Skip legacy migration entries
-      if (!seedMap[seed]) seedMap[seed] = { seed, branches: [], seedScreen: null };
-      seedMap[seed].branches.push(branch);
+    if (branches) {
+      for (const branch of branches) {
+        const seed = branch.seed;
+        if (seed === -1 || seed === '-1') continue;
+        if (!map[seed]) map[seed] = { seed, branches: [], seedScreen: null };
+        map[seed].branches.push(branch);
+      }
     }
-  }
+    return map;
+  }, [branches, seedScreens]);
 
-  // Sort: seeds with highest best_score first, then by branch count, then seed number
-  const seedGroups = Object.values(seedMap).sort((a, b) => {
-    const aScore = a.branches.reduce((max, br) => Math.max(max, br.best_score || 0), 0);
-    const bScore = b.branches.reduce((max, br) => Math.max(max, br.best_score || 0), 0);
-    if (bScore !== aScore) return bScore - aScore;
-    if (b.branches.length !== a.branches.length) return b.branches.length - a.branches.length;
-    return 0;
-  });
+  const seedGroups = useMemo(() => (
+    Object.values(seedMap).sort((a, b) => {
+      const aScore = a.branches.reduce((max, br) => Math.max(max, br.best_score || 0), 0);
+      const bScore = b.branches.reduce((max, br) => Math.max(max, br.best_score || 0), 0);
+      if (bScore !== aScore) return bScore - aScore;
+      if (b.branches.length !== a.branches.length) return b.branches.length - a.branches.length;
+      return 0;
+    })
+  ), [seedMap]);
 
   const totalBranches = branches?.length || 0;
   const totalSeeds = Object.keys(seedMap).length;
   const activeBranches = (branches || []).filter(b => b.status === 'active').length;
+  const clipProfile = seedProfile?.clips?.find(c => c.clip_id === clip.id) || null;
 
   return (
     <div className="space-y-3">
@@ -429,6 +426,116 @@ export default function SeedHQ({ clip, branches, seedScreens, onEnterBranch, onG
         </div>
       )}
 
+      {/* Seed profile panel */}
+      {profileSeed != null && (
+        <div className="border border-gray-700 rounded-lg p-3 bg-surface-raised space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono text-gray-500 uppercase tracking-wider">
+              Seed Profile: {profileSeed}
+            </span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => refetchSeedProfile()}
+                className="text-xs font-mono text-gray-600 hover:text-gray-300 transition-colors"
+              >
+                Refresh
+              </button>
+              <button
+                onClick={() => setProfileSeed(null)}
+                className="text-xs font-mono text-gray-600 hover:text-gray-300 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+
+          {seedProfileLoading && (
+            <p className="text-xs font-mono text-gray-500">Loading seed intelligence...</p>
+          )}
+
+          {seedProfileError && (
+            <p className="text-xs font-mono text-red-400">Failed to load seed profile.</p>
+          )}
+
+          {!seedProfileLoading && !seedProfileError && seedProfile && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+                <div className="border border-gray-700 rounded px-2 py-1.5 font-mono">
+                  <div className="text-[10px] text-gray-500 uppercase">Best</div>
+                  <div className="text-sm text-accent font-bold">{seedProfile.summary?.best_score ?? '—'}</div>
+                </div>
+                <div className="border border-gray-700 rounded px-2 py-1.5 font-mono">
+                  <div className="text-[10px] text-gray-500 uppercase">Avg</div>
+                  <div className="text-sm text-gray-300 font-bold">{seedProfile.summary?.avg_score ?? '—'}</div>
+                </div>
+                <div className="border border-gray-700 rounded px-2 py-1.5 font-mono">
+                  <div className="text-[10px] text-gray-500 uppercase">Eval</div>
+                  <div className="text-sm text-gray-300 font-bold">{seedProfile.summary?.evaluated_count ?? 0}</div>
+                </div>
+                <div className="border border-gray-700 rounded px-2 py-1.5 font-mono">
+                  <div className="text-[10px] text-gray-500 uppercase">Branches</div>
+                  <div className="text-sm text-gray-300 font-bold">{seedProfile.summary?.branch_count ?? 0}</div>
+                </div>
+                <div className="border border-gray-700 rounded px-2 py-1.5 font-mono">
+                  <div className="text-[10px] text-gray-500 uppercase">Locked</div>
+                  <div className="text-sm text-green-400 font-bold">{seedProfile.summary?.locked_count ?? 0}</div>
+                </div>
+              </div>
+
+              <div className="border border-gray-700 rounded p-2 bg-surface">
+                <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1">This Clip Context</div>
+                {clipProfile ? (
+                  <div className="text-xs font-mono text-gray-300">
+                    {clipProfile.iteration_count} iterations, {clipProfile.evaluated_count} evaluated, best {clipProfile.best_score ?? '—'}
+                  </div>
+                ) : (
+                  <div className="text-xs font-mono text-gray-600">No historical evidence for this seed on this clip yet.</div>
+                )}
+              </div>
+
+              <div className="border border-gray-700 rounded p-2 bg-surface">
+                <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1">Recommendation</div>
+                <p className="text-xs font-mono text-gray-300">
+                  {seedProfile.insights?.recommendation || 'No recommendation yet.'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                <div className="border border-gray-700 rounded p-2 bg-surface">
+                  <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1">Trait Signals</div>
+                  {(seedProfile.insights?.trait_signals || []).length === 0 ? (
+                    <p className="text-xs font-mono text-gray-600">No strong trait signals yet.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {seedProfile.insights.trait_signals.slice(0, 3).map(signal => (
+                        <div key={signal.key} className="flex items-center justify-between text-xs font-mono border border-gray-800 rounded px-2 py-1">
+                          <span className="text-gray-300">{signal.label}</span>
+                          <span className="text-amber-400">{signal.prevalence}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="border border-gray-700 rounded p-2 bg-surface">
+                  <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1">Stability</div>
+                  <div className="space-y-1 text-xs font-mono">
+                    <div className="flex items-center justify-between border border-gray-800 rounded px-2 py-1">
+                      <span className="text-gray-400">Grand stddev</span>
+                      <span className="text-gray-300">{seedProfile.insights?.stability?.grand_stddev ?? '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between border border-gray-800 rounded px-2 py-1">
+                      <span className="text-gray-400">Identity stddev</span>
+                      <span className="text-gray-300">{seedProfile.insights?.stability?.identity_stddev ?? '—'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Seed tree */}
       {seedGroups.map(group => (
         <SeedGroup
@@ -436,13 +543,14 @@ export default function SeedHQ({ clip, branches, seedScreens, onEnterBranch, onG
           seed={group.seed}
           branches={group.branches}
           seedScreen={group.seedScreen}
+          thumbnail={thumbnailsBySeed[String(group.seed)]}
           onEnterBranch={onEnterBranch}
           onManageBranch={onManageBranch}
           onLaunchBranch={onLaunchBranch}
+          onOpenSeedProfile={setProfileSeed}
           allBranches={branches}
           branchTrends={branchTrends}
           mostRecentBranchId={mostRecentBranchId}
-          allIterations={allIterations}
         />
       ))}
     </div>

@@ -29,7 +29,7 @@ export function createTestApp(dataDir, config = {}) {
   app.use('/api/clips', createBranchRoutes(store, config));
   app.use('/api/branches', createBranchIterationRoutes(store));
   app.use('/api/telemetry', createTelemetryRoutes(telemetry, config));
-  app.use('/api/analytics', createAnalyticsRoutes(store));
+  app.use('/api/analytics', createAnalyticsRoutes(store, config));
 
   return { app, store, telemetry };
 }

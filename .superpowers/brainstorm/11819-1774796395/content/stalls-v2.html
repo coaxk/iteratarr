@@ -1,0 +1,74 @@
+<h2>Stalls tab — updated logic</h2>
+<p class="subtitle">Locked clips celebrated, abandoned branches excluded from stall checks.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Tab: Stalls</div>
+  <div class="mockup-body">
+    <div style="font-family:monospace;font-size:12px;color:#888;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px">Clips that may need intervention</div>
+
+    <!-- Stalling clips -->
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+
+      <div style="background:#1a1a1a;border:1px solid #dc2626;border-radius:6px;padding:14px 16px;font-family:monospace">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div>
+            <span style="color:#e5e5e5;font-size:14px">Clip 1e — Mick Balcony</span>
+            <span style="margin-left:10px;background:#dc2626;color:#fff;font-size:11px;padding:2px 8px;border-radius:3px">PLATEAU</span>
+          </div>
+          <span style="color:#888;font-size:12px">mckdhn</span>
+        </div>
+        <div style="color:#888;font-size:13px">Best score <span style="color:#d97706">61</span> — unchanged for <span style="color:#dc2626">4 iterations</span> across active branches</div>
+        <div style="color:#555;font-size:12px;margin-top:4px">2 abandoned branches excluded · Last active change: Rope 1 prompt position</div>
+      </div>
+
+      <div style="background:#1a1a1a;border:1px solid #dc2626;border-radius:6px;padding:14px 16px;font-family:monospace">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div>
+            <span style="color:#e5e5e5;font-size:14px">Mick — 3 new seed lines</span>
+            <span style="margin-left:10px;background:#7c3aed;color:#fff;font-size:11px;padding:2px 8px;border-radius:3px">NO EVALS</span>
+          </div>
+          <span style="color:#888;font-size:12px">mckdhn</span>
+        </div>
+        <div style="color:#888;font-size:13px">Active branches have <span style="color:#dc2626">12 iterations</span> with no evaluations</div>
+        <div style="color:#555;font-size:12px;margin-top:4px">Renders may be failing or evaluations not being submitted</div>
+      </div>
+
+    </div>
+
+    <!-- Divider -->
+    <div style="border-top:1px solid #2a2a2a;margin-bottom:16px"></div>
+
+    <!-- Locked — celebrated -->
+    <div style="font-family:monospace;font-size:12px;color:#888;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">Locked ✓</div>
+    <div style="background:#1a1a1a;border:1px solid #22c55e;border-radius:6px;padding:12px 16px;font-family:monospace;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="color:#e5e5e5;font-size:14px">Clip 2a — Belinda Intro</span>
+          <span style="margin-left:10px;background:#22c55e;color:#000;font-size:11px;padding:2px 8px;border-radius:3px;font-weight:bold">LOCKED</span>
+        </div>
+        <span style="color:#22c55e;font-family:monospace;font-size:15px">68<span style="font-size:12px;color:#555">/75</span></span>
+      </div>
+      <div style="color:#555;font-size:12px;margin-top:4px">Locked at iter_12 · not flagged for stall detection</div>
+    </div>
+
+    <!-- Divider -->
+    <div style="border-top:1px solid #2a2a2a;margin-bottom:16px"></div>
+
+    <!-- Healthy / progressing -->
+    <div style="font-family:monospace;font-size:12px;color:#888;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">Progressing normally</div>
+    <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:12px 16px;font-family:monospace;color:#555;font-size:13px">
+      Jack Doohan — Baseline &nbsp;·&nbsp; Toby Price — Baseline &nbsp;·&nbsp; Matty — Baseline &nbsp;·&nbsp; + 1 more
+    </div>
+
+    <!-- Logic note -->
+    <div style="margin-top:16px;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:12px 16px;font-family:monospace;font-size:12px;color:#555">
+      <span style="color:#888">Stall rules:</span>
+      &nbsp;Plateau = best score unchanged for 4+ iters on <span style="color:#e5e5e5">active</span> branches
+      &nbsp;·&nbsp; No evals = active branches with 3+ iters and zero evaluations
+      &nbsp;·&nbsp; Abandoned branches and locked clips are always excluded
+    </div>
+
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">Does this handle it correctly? "Good" locks the full design.</p>

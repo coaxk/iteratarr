@@ -1,0 +1,152 @@
+<h2>Cross-Clip Analytics — Overview tab mockup</h2>
+<p class="subtitle">Does this feel right for the landing tab? Scroll to see all sections.</p>
+
+<div class="mockup">
+  <div class="mockup-header">◆ Analytics &nbsp;&nbsp; <span style="font-size:11px;color:#555">← back to clips</span></div>
+  <div class="mockup-body" style="padding:0">
+
+    <!-- Tab bar -->
+    <div style="display:flex;gap:0;border-bottom:1px solid #333;background:#1a1a1a">
+      <div style="padding:10px 18px;font-family:monospace;font-size:12px;color:#d97706;border-bottom:2px solid #d97706">Overview</div>
+      <div style="padding:10px 18px;font-family:monospace;font-size:12px;color:#555">Characters</div>
+      <div style="padding:10px 18px;font-family:monospace;font-size:12px;color:#555">Ropes</div>
+      <div style="padding:10px 18px;font-family:monospace;font-size:12px;color:#555">Stalls</div>
+    </div>
+
+    <div style="padding:16px;display:flex;flex-direction:column;gap:16px">
+
+      <!-- Summary pills -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="background:#262626;border:1px solid #333;border-radius:6px;padding:10px 16px;font-family:monospace;font-size:12px">
+          <div style="color:#555;font-size:10px;margin-bottom:4px">CLIPS</div>
+          <div style="color:#e5e5e5;font-size:18px">9</div>
+        </div>
+        <div style="background:#262626;border:1px solid #333;border-radius:6px;padding:10px 16px;font-family:monospace;font-size:12px">
+          <div style="color:#555;font-size:10px;margin-bottom:4px">ITERATIONS</div>
+          <div style="color:#e5e5e5;font-size:18px">100</div>
+        </div>
+        <div style="background:#262626;border:1px solid #333;border-radius:6px;padding:10px 16px;font-family:monospace;font-size:12px">
+          <div style="color:#555;font-size:10px;margin-bottom:4px">EVALUATED</div>
+          <div style="color:#e5e5e5;font-size:18px">64</div>
+        </div>
+        <div style="background:#262626;border:1px solid #333;border-radius:6px;padding:10px 16px;font-family:monospace;font-size:12px">
+          <div style="color:#555;font-size:10px;margin-bottom:4px">LOCKED</div>
+          <div style="color:#22c55e;font-size:18px">0</div>
+        </div>
+        <div style="background:#262626;border:1px solid #dc2626;border-radius:6px;padding:10px 16px;font-family:monospace;font-size:12px">
+          <div style="color:#dc2626;font-size:10px;margin-bottom:4px">STALLING</div>
+          <div style="color:#dc2626;font-size:18px">2</div>
+        </div>
+      </div>
+
+      <!-- Clips table -->
+      <div>
+        <div style="font-family:monospace;font-size:11px;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">All Clips</div>
+        <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:12px">
+          <thead>
+            <tr style="border-bottom:1px solid #333;color:#555;font-size:10px;text-transform:uppercase">
+              <th style="text-align:left;padding:6px 8px">Clip</th>
+              <th style="text-align:left;padding:6px 8px">Character</th>
+              <th style="text-align:left;padding:6px 8px">Status</th>
+              <th style="text-align:right;padding:6px 8px">Best</th>
+              <th style="text-align:right;padding:6px 8px">Iters</th>
+              <th style="text-align:left;padding:6px 8px;width:120px">Progress</th>
+              <th style="text-align:left;padding:6px 8px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid #222">
+              <td style="padding:7px 8px;color:#e5e5e5">Clip 1e - Mick Balcony</td>
+              <td style="padding:7px 8px;color:#8b5cf6">mckdhn</td>
+              <td style="padding:7px 8px"><span style="color:#d97706">in_progress</span></td>
+              <td style="padding:7px 8px;text-align:right;color:#d97706">61<span style="color:#555">/75</span></td>
+              <td style="padding:7px 8px;text-align:right;color:#888">18</td>
+              <td style="padding:7px 8px">
+                <div style="background:#333;border-radius:3px;height:6px;width:100%">
+                  <div style="background:#d97706;border-radius:3px;height:6px;width:81%"></div>
+                </div>
+              </td>
+              <td style="padding:7px 8px"><span style="color:#dc2626;font-size:10px">⚠ plateau</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid #222">
+              <td style="padding:7px 8px;color:#e5e5e5">Mick - Baseline</td>
+              <td style="padding:7px 8px;color:#8b5cf6">mckdhn</td>
+              <td style="padding:7px 8px"><span style="color:#3b82f6">evaluating</span></td>
+              <td style="padding:7px 8px;text-align:right;color:#3b82f6">—</td>
+              <td style="padding:7px 8px;text-align:right;color:#888">12</td>
+              <td style="padding:7px 8px">
+                <div style="background:#333;border-radius:3px;height:6px;width:100%">
+                  <div style="background:#3b82f6;border-radius:3px;height:6px;width:0%"></div>
+                </div>
+              </td>
+              <td style="padding:7px 8px"><span style="color:#dc2626;font-size:10px">⚠ no evals</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid #222">
+              <td style="padding:7px 8px;color:#e5e5e5">Jack Doohan - Baseline</td>
+              <td style="padding:7px 8px;color:#ec4899">Jack Doohan</td>
+              <td style="padding:7px 8px"><span style="color:#d97706">in_progress</span></td>
+              <td style="padding:7px 8px;text-align:right;color:#22c55e">58<span style="color:#555">/75</span></td>
+              <td style="padding:7px 8px;text-align:right;color:#888">8</td>
+              <td style="padding:7px 8px">
+                <div style="background:#333;border-radius:3px;height:6px;width:100%">
+                  <div style="background:#22c55e;border-radius:3px;height:6px;width:77%"></div>
+                </div>
+              </td>
+              <td style="padding:7px 8px"></td>
+            </tr>
+            <tr style="border-bottom:1px solid #222;opacity:0.5">
+              <td style="padding:7px 8px;color:#888">Belinda - Baseline</td>
+              <td style="padding:7px 8px;color:#888">Belinda</td>
+              <td style="padding:7px 8px"><span style="color:#d97706">in_progress</span></td>
+              <td style="padding:7px 8px;text-align:right;color:#555">—</td>
+              <td style="padding:7px 8px;text-align:right;color:#555">0</td>
+              <td style="padding:7px 8px">
+                <div style="background:#333;border-radius:3px;height:6px;width:100%"></div>
+              </td>
+              <td style="padding:7px 8px"></td>
+            </tr>
+            <tr style="color:#555;font-size:11px">
+              <td colspan="7" style="padding:6px 8px">+ 5 more clips…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Score histogram -->
+      <div>
+        <div style="font-family:monospace;font-size:11px;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Score Distribution — all evaluated iterations</div>
+        <div style="display:flex;align-items:flex-end;gap:4px;height:80px;padding:0 4px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+            <span style="font-family:monospace;font-size:9px;color:#555">3</span>
+            <div style="background:#3b82f6;width:100%;height:20px;border-radius:2px 2px 0 0"></div>
+            <span style="font-family:monospace;font-size:9px;color:#555">0–15</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+            <span style="font-family:monospace;font-size:9px;color:#555">7</span>
+            <div style="background:#3b82f6;width:100%;height:35px;border-radius:2px 2px 0 0"></div>
+            <span style="font-family:monospace;font-size:9px;color:#555">15–30</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+            <span style="font-family:monospace;font-size:9px;color:#555">14</span>
+            <div style="background:#d97706;width:100%;height:56px;border-radius:2px 2px 0 0"></div>
+            <span style="font-family:monospace;font-size:9px;color:#555">30–45</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+            <span style="font-family:monospace;font-size:9px;color:#555">24</span>
+            <div style="background:#d97706;width:100%;height:70px;border-radius:2px 2px 0 0"></div>
+            <span style="font-family:monospace;font-size:9px;color:#555">45–60</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+            <span style="font-family:monospace;font-size:9px;color:#555">16</span>
+            <div style="background:#22c55e;width:100%;height:50px;border-radius:2px 2px 0 0"></div>
+            <span style="font-family:monospace;font-size:9px;color:#555">60–75</span>
+          </div>
+        </div>
+        <div style="font-family:monospace;font-size:10px;color:#555;margin-top:6px">median 52 · mean 49 · high 61 · lock threshold <span style="color:#22c55e">65</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">Does this Overview tab look right? Reply yes or let me know what to change.</p>

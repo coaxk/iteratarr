@@ -1,0 +1,64 @@
+<h2>Dashboard panel layout</h2>
+<p class="subtitle">The panel slides in from the right (or takes center stage). Which layout feels right for the content?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Wide right drawer (~60% viewport width)</h3>
+      <p>Slides in from the right. App remains visible behind it. Tabs inside: Overview · By Character · Rope Analysis · Stall Detector. Scrollable per-tab.</p>
+      <div style="margin-top:12px;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:12px;font-size:11px;font-family:monospace;color:#888">
+        <div style="display:flex;gap:8px;border-bottom:1px solid #333;padding-bottom:8px;margin-bottom:8px">
+          <span style="color:#d97706">Overview</span>
+          <span>By Character</span>
+          <span>Rope Analysis</span>
+          <span>Stall Detector</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="background:#262626;border-radius:4px;padding:8px">Clip status table</div>
+          <div style="background:#262626;border-radius:4px;padding:8px">Score histogram</div>
+          <div style="background:#262626;border-radius:4px;padding:8px;grid-column:span 2">Score trend (all clips)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Centered modal (~85% viewport)</h3>
+      <p>Full-attention overlay. Everything on one scrollable page — no tabs. Sections stack vertically: clips table → score distribution → character breakdown → rope effectiveness.</p>
+      <div style="margin-top:12px;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:12px;font-size:11px;font-family:monospace;color:#888">
+        <div style="color:#d97706;margin-bottom:8px;font-size:12px">◆ Cross-Clip Analytics</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="background:#262626;border-radius:4px;padding:8px">All Clips — status + best score table</div>
+          <div style="background:#262626;border-radius:4px;padding:8px">Score distribution histogram</div>
+          <div style="background:#262626;border-radius:4px;padding:8px">Per-character performance</div>
+          <div style="background:#262626;border-radius:4px;padding:8px">Cross-clip rope effectiveness</div>
+          <div style="background:#262626;border-radius:4px;padding:8px">Stall detection alerts</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Full-screen takeover</h3>
+      <p>Replaces the app view entirely (like the existing Kanban). Feels like a proper analytics page. Uses the same tab structure as Option A but with full width for charts.</p>
+      <div style="margin-top:12px;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:12px;font-size:11px;font-family:monospace;color:#888">
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid #333;padding-bottom:8px;margin-bottom:8px">
+          <span style="color:#d97706">◆ Analytics</span>
+          <span style="color:#555">← back to clips</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;font-size:10px">
+          <span style="color:#d97706;border-bottom:1px solid #d97706">Overview</span>
+          <span>Characters</span>
+          <span>Ropes</span>
+          <span>Stalls</span>
+        </div>
+        <div style="background:#262626;border-radius:4px;padding:8px;height:60px;display:flex;align-items:center;justify-content:center;color:#555">full-width chart area</div>
+      </div>
+    </div>
+  </div>
+</div>

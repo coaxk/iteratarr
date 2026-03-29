@@ -1030,15 +1030,18 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
                   </div>
                   {(seedDetail.personality_profile.trait_signals || []).length > 0 && (
                     <div className="space-y-1">
-                      {(seedDetail.personality_profile.trait_signals || []).map(signal => (
-                        <div key={signal.key} className="flex items-center justify-between text-xs font-mono border border-gray-800 rounded px-2 py-1.5">
-                          <span className="text-gray-300">{signal.label}</span>
-                          <span className="text-amber-400">{signal.prevalence}%</span>
-                          <span className="text-gray-500">{signal.count}/{seedDetail.personality_profile.sample_count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                   {(seedDetail.personality_profile.trait_signals || []).map(signal => (
+                      <div key={signal.key} className="flex items-center justify-between text-xs font-mono border border-gray-800 rounded px-2 py-1.5">
+                        <span className="text-gray-300">{signal.label}</span>
+                        <span className="text-amber-400">
+                          {signal.prevalence}%
+                          {seedDetail.personality_profile.sample_count < 5 ? ' (early)' : ''}
+                        </span>
+                        <span className="text-gray-500">{signal.count}/{seedDetail.personality_profile.sample_count}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 </div>
               )}
             </div>

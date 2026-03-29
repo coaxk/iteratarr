@@ -44,6 +44,18 @@ export function createAnalyticsRoutes(store, config = {}) {
     return +Math.sqrt(variance).toFixed(2);
   }
 
+  function traitConfidence({ count, prevalence, sampleSize }) {
+    // Small samples are directional only; avoid marking "high confidence"
+    // until we have enough observations.
+    if (sampleSize < 5) {
+      if (count >= 2 || prevalence >= 50) return 'medium';
+      return 'low';
+    }
+    if (count >= 4 || prevalence >= 60) return 'high';
+    if (count >= 2 || prevalence >= 35) return 'medium';
+    return 'low';
+  }
+
   async function getLatestSeedPersonalityProfile(seed) {
     const profiles = await store.list('seed_personality_profiles', profile => Number(profile.seed) === Number(seed));
     return profiles.sort((a, b) => (b.analyzed_at || '').localeCompare(a.analyzed_at || ''))[0] || null;
@@ -149,15 +161,13 @@ export function createAnalyticsRoutes(store, config = {}) {
 
     const grandScores = scoredSamples.map(sample => sample.score).filter(score => score != null);
     const frameConsistencyScores = scoredSamples.map(sample => sample.frame_consistency).filter(score => score != null);
-    const traitSignals = TRAIT_DEFINITIONS
-      .map(def => {
-        const count = traitCounts[def.key] || 0;
-        const prevalence = scoredSamples.length > 0 ? +((count / scoredSamples.length) * 100).toFixed(0) : 0;
-        let confidence = 'low';
-        if (count >= 4 || prevalence >= 60) confidence = 'high';
-        else if (count >= 2 || prevalence >= 35) confidence = 'medium';
-        return { key: def.key, label: def.label, count, prevalence, confidence };
-      })
+      const traitSignals = TRAIT_DEFINITIONS
+        .map(def => {
+          const count = traitCounts[def.key] || 0;
+          const prevalence = scoredSamples.length > 0 ? +((count / scoredSamples.length) * 100).toFixed(0) : 0;
+          const confidence = traitConfidence({ count, prevalence, sampleSize: scoredSamples.length });
+          return { key: def.key, label: def.label, count, prevalence, confidence };
+        })
       .filter(signal => signal.count > 0)
       .sort((a, b) => b.prevalence - a.prevalence);
 
@@ -1319,16 +1329,14 @@ export function createAnalyticsRoutes(store, config = {}) {
         motion: dimensionTotals.motion.count > 0 ? +(dimensionTotals.motion.sum / dimensionTotals.motion.count).toFixed(1) : null
       };
 
-      const traitSignals = TRAIT_DEFINITIONS
-        .map(def => {
-          const count = traitCounts[def.key] || 0;
-          const prevalence = evaluatedCount > 0 ? +((count / evaluatedCount) * 100).toFixed(0) : 0;
-          let confidence = 'low';
-          if (count >= 4 || prevalence >= 60) confidence = 'high';
-          else if (count >= 2 || prevalence >= 35) confidence = 'medium';
-          return {
-            key: def.key,
-            label: def.label,
+        const traitSignals = TRAIT_DEFINITIONS
+          .map(def => {
+            const count = traitCounts[def.key] || 0;
+            const prevalence = evaluatedCount > 0 ? +((count / evaluatedCount) * 100).toFixed(0) : 0;
+            const confidence = traitConfidence({ count, prevalence, sampleSize: evaluatedCount });
+            return {
+              key: def.key,
+              label: def.label,
             count,
             prevalence,
             confidence

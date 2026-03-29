@@ -122,21 +122,23 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
     loadScreenRecords();
   }, [clip.id]);
 
-  // Poll for render completion every 10s when we have unrendered screens
+  // Poll for render completion — 15s when unrendered seeds exist, stops when all done
   useEffect(() => {
     if (!hasScreening) return;
 
     const hasUnrendered = screenRecords.some(r => !r.frames || r.frames.length === 0);
     if (!hasUnrendered) {
       if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = null;
       return;
     }
 
+    if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(() => {
       checkRenders();
-    }, 10000);
+    }, 15000);
 
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
   }, [hasScreening, screenRecords]);
 
   const loadScreenRecords = async () => {

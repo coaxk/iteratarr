@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import FileBrowserModal from '../forms/FileBrowserModal';
 import FrameStrip from './FrameStrip';
 import { api } from '../../api';
@@ -8,61 +9,28 @@ import { api } from '../../api';
  * When path is set but file doesn't exist yet, polls every 30s until it appears.
  */
 function VideoPanel({ label, path, side, onBrowse, iterationId }) {
-  const [loaded, setLoaded] = useState(false);
-  const [waiting, setWaiting] = useState(false);
-  const [pollCount, setPollCount] = useState(0);
-
   const videoSrc = path ? `/api/video?path=${encodeURIComponent(path)}` : null;
 
-  // Check if file exists at path by hitting the video endpoint with HEAD-like request
-  const checkExists = async () => {
-    if (!path) return false;
-    try {
+  // Check if video file exists — polls only until found, then stops
+  const { data: loaded } = useQuery({
+    queryKey: ['video-exists', path],
+    queryFn: async () => {
+      if (!path) return false;
       const res = await fetch(`/api/video?path=${encodeURIComponent(path)}`, { method: 'HEAD' });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  };
-
-  // On mount and path change — check immediately, only poll if not found
-  useEffect(() => {
-    if (!path) return;
-    setLoaded(false);
-    setWaiting(false);
-    setPollCount(0);
-
-    let cancelled = false;
-    let interval = null;
-
-    checkExists().then(exists => {
-      if (cancelled) return;
-      if (exists) {
-        setLoaded(true);
-      } else {
-        // File doesn't exist yet — start polling
-        setWaiting(true);
-        interval = setInterval(async () => {
-          if (cancelled) return;
-          setPollCount(c => c + 1);
-          const found = await checkExists();
-          if (found && !cancelled) {
-            setLoaded(true);
-            setWaiting(false);
-            clearInterval(interval);
-            // Record render completion for telemetry
-            if (iterationId) {
-              api.renderComplete(iterationId, new Date().toISOString()).catch(() => {});
-            }
-          }
-        }, 10000);
+      if (res.ok) {
+        // Record render completion
+        if (iterationId) api.renderComplete(iterationId, new Date().toISOString()).catch(() => {});
+        return true;
       }
-    });
+      return false;
+    },
+    enabled: !!path,
+    refetchInterval: (query) => query.state.data === true ? false : 15000, // stop polling once found
+    staleTime: 5000,
+  });
 
-    return () => { cancelled = true; if (interval) clearInterval(interval); };
-  }, [path]);
-
-  const src = videoSrc ? `${videoSrc}&_t=${pollCount}` : null;
+  const waiting = path && loaded === false;
+  const src = videoSrc ? `${videoSrc}&_t=${Date.now()}` : null;
 
   return (
     <div className="flex-1 min-w-0">
@@ -95,7 +63,7 @@ function VideoPanel({ label, path, side, onBrowse, iterationId }) {
                   <span className="text-xs font-mono text-accent animate-pulse">Waiting for render to complete...</span>
                   <span className="text-xs font-mono text-gray-700 break-all px-2 text-center">{path.split(/[/\\]/).pop()}</span>
                   <span className="text-xs font-mono text-gray-600">Checking every 10s — will auto-load when ready</span>
-                  {pollCount > 0 && <span className="text-xs font-mono text-gray-700">checked {pollCount}x</span>}
+                  <span className="text-xs font-mono text-gray-700">checking every 15s</span>
                 </>
               ) : (
                 <>

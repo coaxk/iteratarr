@@ -84,7 +84,7 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
         } else if (renderPathProp) {
           const extracted = await tryExtract();
           if (!extracted && !cancelled) {
-            // Render not ready yet — poll every 15s
+            // Render not ready yet — poll every 20s
             // If iteration is queued/rendering, poll indefinitely (queue may take hours)
             // Otherwise timeout after 10 min
             let polls = 0;
@@ -108,7 +108,7 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
               }
               const done = await tryExtract();
               if (done) clearInterval(interval);
-            }, 15000);
+            }, 20000); // 20s — frames extraction polling
           }
         }
       })

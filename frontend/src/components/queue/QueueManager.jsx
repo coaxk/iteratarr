@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useQueueList, useQueueStatus, useInvalidateQueue } from '../../hooks/useQueries';
 import { api } from '../../api';
 
 /**
@@ -245,39 +247,13 @@ function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove
 }
 
 export default function QueueManager() {
-  const [items, setItems] = useState([]);
-  const [status, setStatus] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { data: items = [], isLoading: loading, error: queryError } = useQueueList();
+  const { data: status } = useQueueStatus();
+  const invalidateQueue = useInvalidateQueue();
   const [actionMsg, setActionMsg] = useState(null);
-  const pollRef = useRef(null);
+  const error = queryError?.message || null;
 
-  const fetchAll = useCallback(async () => {
-    try {
-      const [queueItems, queueStatus] = await Promise.all([
-        api.listQueue(),
-        api.getQueueStatus()
-      ]);
-      setItems(queueItems);
-      setStatus(queueStatus);
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Initial load
-  useEffect(() => { fetchAll(); }, [fetchAll]);
-
-  // Polling — 3s when rendering, 15s when idle
-  useEffect(() => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    const interval = status?.running ? 3000 : 15000;
-    pollRef.current = setInterval(fetchAll, interval);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [status?.running, fetchAll]);
+  const fetchAll = invalidateQueue; // backwards compat for child components
 
   const showAction = (msg) => {
     setActionMsg(msg);

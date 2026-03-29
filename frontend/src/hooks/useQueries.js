@@ -139,13 +139,24 @@ export function useTemplates(options = {}) {
   });
 }
 
-/** Iterations for a clip — optionally filtered by branch */
+/** Iterations for a clip — optionally filtered by branch. Lightweight (no json_contents). */
 export function useClipIterations(clipId, branchId, options = {}) {
   return useQuery({
     queryKey: ['iterations', clipId, branchId || 'all'],
     queryFn: () => api.getClipIterations(clipId, branchId),
     enabled: !!clipId,
     staleTime: 10000,
+    ...options
+  });
+}
+
+/** Single iteration with full data (includes json_contents) */
+export function useIteration(iterationId, options = {}) {
+  return useQuery({
+    queryKey: ['iteration', iterationId],
+    queryFn: () => api.getIteration(iterationId),
+    enabled: !!iterationId,
+    staleTime: 30000,
     ...options
   });
 }

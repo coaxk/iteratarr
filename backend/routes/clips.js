@@ -14,15 +14,15 @@ export function createClipRoutes(store) {
       const sceneIds = new Set(scenes.map(s => s.id));
       clips = clips.filter(c => sceneIds.has(c.scene_id));
     }
-    // Enrich with branch + fork counts + unscored count
+    // Batch load branches + iterations once (avoids N+1 queries per clip)
+    const allBranches = await store.list('branches');
+    const allIterations = await store.list('iterations');
     for (const clip of clips) {
-      const branches = await store.list('branches', b => b.clip_id === clip.id);
-      clip.branch_count = branches.length;
-      clip.fork_count = branches.filter(b => b.created_from === 'fork').length;
-      const iterations = await store.list('iterations', i => i.clip_id === clip.id);
-      // Only count iterations that are part of an iteration chain (not seed screens)
-      clip.unscored_count = iterations.filter(i =>
-        i.status === 'rendered' && !i.evaluation && (i.parent_iteration_id || i.iteration_number > 1)
+      const clipBranches = allBranches.filter(b => b.clip_id === clip.id);
+      clip.branch_count = clipBranches.length;
+      clip.fork_count = clipBranches.filter(b => b.created_from === 'fork').length;
+      clip.unscored_count = allIterations.filter(i =>
+        i.clip_id === clip.id && i.status === 'rendered' && !i.evaluation && (i.parent_iteration_id || i.iteration_number > 1)
       ).length;
     }
     res.json(clips);
@@ -100,7 +100,7 @@ export function createClipRoutes(store) {
   });
 
   router.get('/:id/iterations', async (req, res) => {
-    const { branch_id } = req.query;
+    const { branch_id, full } = req.query;
     let iterations = await store.list('iterations', i => i.clip_id === req.params.id);
     if (branch_id) {
       iterations = iterations.filter(i => i.branch_id === branch_id);
@@ -112,6 +112,11 @@ export function createClipRoutes(store) {
         try {
           iter.evaluation = await store.get('evaluations', iter.evaluation_id);
         } catch { /* evaluation may have been deleted */ }
+      }
+      // Strip heavy json_contents from list view (2-5KB per iteration)
+      // Frontend fetches full data for selected iteration via GET /iterations/:id
+      if (!full) {
+        delete iter.json_contents;
       }
     }
     res.json(iterations);

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useClipBranches, useClipIterations, useSeedScreens, useInvalidateIterations } from '../../hooks/useQueries';
+import { useClipBranches, useClipIterations, useSeedScreens, useIteration, useInvalidateIterations } from '../../hooks/useQueries';
 import { api } from '../../api';
 import { CLIP_STATUSES, SCORE_LOCK_THRESHOLD, GRAND_MAX, ROPES, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS } from '../../constants';
 import IterationLineage from './IterationLineage';
@@ -22,6 +22,8 @@ export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parent
   // Iterations — filtered by branch when one is selected
   const { data: iterations, isLoading: loading, refetch } = useClipIterations(clip.id, selectedBranchId);
   const [selectedIteration, setSelectedIteration] = useState(null);
+  // Fetch full iteration data (with json_contents) for the selected iteration
+  const { data: fullSelectedIteration } = useIteration(selectedIteration?.id);
   const [liveScore, setLiveScore] = useState(null);
   // Seed HQ navigation: null = HQ overview, branchId = drill into branch
   const [drillBranchId, setDrillBranchId] = useState(null);
@@ -456,9 +458,9 @@ export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parent
       </div>}
 
       {/* Evaluation panel for the selected iteration */}
-      {drillBranchId && selectedIteration && (
+      {drillBranchId && selectedIteration && fullSelectedIteration && (
         <EvaluationPanel
-          iteration={selectedIteration}
+          iteration={fullSelectedIteration}
           childIteration={childIteration}
           parentIteration={parentIteration}
           ancestorChain={ancestorChain}

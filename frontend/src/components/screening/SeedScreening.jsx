@@ -122,24 +122,18 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
     loadScreenRecords();
   }, [clip.id]);
 
-  // Poll for render completion — 15s when unrendered seeds exist, stops when all done
+  // Poll for render completion — 20s when unrendered seeds exist, stops when all done
+  // Note: keeping setInterval here because checkRenders mutates local screenRecords state
+  // Full TanStack migration requires refactoring screenRecords to query-managed state
+  const hasUnrendered = hasScreening && screenRecords.some(r => !r.frames || r.frames.length === 0);
   useEffect(() => {
-    if (!hasScreening) return;
-
-    const hasUnrendered = screenRecords.some(r => !r.frames || r.frames.length === 0);
     if (!hasUnrendered) {
-      if (pollRef.current) clearInterval(pollRef.current);
-      pollRef.current = null;
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       return;
     }
-
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => {
-      checkRenders();
-    }, 15000);
-
+    pollRef.current = setInterval(checkRenders, 20000);
     return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
-  }, [hasScreening, screenRecords]);
+  }, [hasUnrendered]);
 
   const loadScreenRecords = async () => {
     try {

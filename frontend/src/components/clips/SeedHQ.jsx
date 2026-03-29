@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useClipIterations } from '../../hooks/useQueries';
 import { api } from '../../api';
 import { BRANCH_STATUSES, GRAND_MAX } from '../../constants';
@@ -16,7 +16,7 @@ import { BRANCH_STATUSES, GRAND_MAX } from '../../constants';
  *   onRefresh() — trigger data refetch
  */
 
-function TrendPill({ trend }) {
+const TrendPill = memo(function TrendPill({ trend }) {
   if (!trend) return null;
   const config = {
     rising:    { style: 'bg-green-400/15 text-green-400 border-green-400/30', label: '↗ Rising', tip: 'Scores trending up — momentum is building' },
@@ -27,9 +27,9 @@ function TrendPill({ trend }) {
   const c = config[trend];
   if (!c) return null;
   return <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border shrink-0 cursor-help ${c.style}`} title={c.tip}>{c.label}</span>;
-}
+});
 
-function ScoreBadge({ score }) {
+const ScoreBadge = memo(function ScoreBadge({ score }) {
   if (score == null) return null;
   const pct = score / GRAND_MAX;
   const color = pct >= 0.85 ? 'text-green-400 bg-green-400/10' :
@@ -37,7 +37,7 @@ function ScoreBadge({ score }) {
                 pct >= 0.5  ? 'text-yellow-400 bg-yellow-400/10' :
                               'text-gray-400 bg-gray-400/10';
   return <span className={`px-1.5 py-0.5 rounded text-xs font-mono font-bold ${color}`}>{score}/{GRAND_MAX}</span>;
-}
+});
 
 /**
  * BranchTree — recursive tree renderer for branches.
@@ -77,7 +77,7 @@ function BranchTree({ branches, allBranches, onEnter, onManage, branchTrends, mo
   });
 }
 
-function BranchNode({ branch, children, allBranches, branches, onEnter, onManage, branchTrends, mostRecentBranchId, allIterations, depth }) {
+const BranchNode = memo(function BranchNode({ branch, children, allBranches, branches, onEnter, onManage, branchTrends, mostRecentBranchId, allIterations, depth }) {
   const [collapsed, setCollapsed] = useState(false);
   const statusInfo = BRANCH_STATUSES[branch.status] || BRANCH_STATUSES.active;
   const isFork = branch.created_from === 'fork';
@@ -198,7 +198,7 @@ function BranchNode({ branch, children, allBranches, branches, onEnter, onManage
       )}
     </div>
   );
-}
+});
 
 function SeedGroupThumbnail({ seedScreen, branches, allIterations }) {
   const [frameSrc, setFrameSrc] = useState(null);

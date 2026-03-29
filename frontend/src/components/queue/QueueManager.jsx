@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useQueueList, useQueueStatus, useInvalidateQueue } from '../../hooks/useQueries';
 import { api } from '../../api';
@@ -79,7 +79,7 @@ function CompletedThumbnail({ iterationId, jsonPath }) {
   );
 }
 
-function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove, onRetry, isActive }) {
+const QueueItemRow = memo(function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove, onRetry, isActive }) {
   const cfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.queued;
   const duration = item.started_at && item.completed_at
     ? Math.round((new Date(item.completed_at) - new Date(item.started_at)) / 1000)
@@ -244,7 +244,7 @@ function QueueItemRow({ item, index, totalQueued, onMoveUp, onMoveDown, onRemove
       </div>
     </div>
   );
-}
+});
 
 export default function QueueManager() {
   const { data: items = [], isLoading: loading, error: queryError } = useQueueList();

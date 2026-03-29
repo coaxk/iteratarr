@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api';
 import FileBrowserModal from '../forms/FileBrowserModal';
 import CopyButton from '../common/CopyButton';
@@ -12,20 +13,13 @@ import CopyButton from '../common/CopyButton';
  *   iterationId — the iteration UUID to fetch/extract frames for
  */
 export default function FrameStrip({ iterationId, renderPath: renderPathProp, iterationStatus }) {
-  const [frames, setFrames] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [extracting, setExtracting] = useState(false);
-  const [error, setError] = useState(null);
-  const [videoPath, setVideoPath] = useState('');
-  const [frameCount, setFrameCount] = useState(4);
   const [expandedFrame, setExpandedFrame] = useState(null);
   const [showBrowser, setShowBrowser] = useState(false);
-  const [framesDir, setFramesDir] = useState(null);
   const [outputDir, setOutputDir] = useState(null);
-  const [pollCount, setPollCount] = useState(0);
   const [csExported, setCsExported] = useState(null);
   const thumbsRef = useRef(null);
-  const MAX_POLLS = 40; // 40 * 15s = 10 minutes
+  const queryClient = useQueryClient();
 
   // Attach wheel listener with passive: false so preventDefault works
   useEffect(() => {
@@ -45,97 +39,54 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
     api.getConfigPaths().then(p => setOutputDir(p.wan2gp_output_dir)).catch(() => {});
   }, []);
 
-  const tryExtract = async () => {
-    if (!renderPathProp || !iterationId) return false;
-    try {
-      const result = await api.extractFrames(renderPathProp, iterationId, frameCount);
-      if (result.frames?.length > 0) {
-        setFrames(result.frames);
-        if (result.frames_dir) setFramesDir(result.frames_dir);
-        setVideoPath(renderPathProp);
-        return true;
+  // TanStack Query for frames — polls until frames found, then stops
+  const { data: frameData, isLoading: loading, error: frameError } = useQuery({
+    queryKey: ['frames', iterationId],
+    queryFn: async () => {
+      const data = await api.listFrames(iterationId);
+      if (data.frames?.length > 0) return data;
+      // No frames yet — try extracting if render path exists
+      if (renderPathProp) {
+        try {
+          const result = await api.extractFrames(renderPathProp, iterationId, 4);
+          if (result.frames?.length > 0) {
+            return { frames: result.frames, frames_dir: result.frames_dir, contact_sheet: null };
+          }
+        } catch { /* render not ready yet */ }
       }
-    } catch {
-      // File doesn't exist yet — that's fine
-    }
-    return false;
-  };
+      return { frames: [], frames_dir: null, contact_sheet: null };
+    },
+    enabled: !!iterationId,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return data?.frames?.length > 0 ? false : 20000; // stop polling once frames found
+    },
+    staleTime: 10000,
+  });
 
+  const frames = frameData?.frames || [];
+  const framesDir = frameData?.frames_dir || null;
+  const error = frameError?.message || null;
+
+  // Load contact sheet from frame data
   useEffect(() => {
-    if (!iterationId) return;
-    setLoading(true);
-    setError(null);
-    setFrames([]);
-    setExpandedFrame(null);
-
-    let cancelled = false;
-    let interval = null;
-
-    api.listFrames(iterationId)
-      .then(async (data) => {
-        if (cancelled) return;
-        if (data.frames?.length > 0) {
-          setFrames(data.frames);
-          if (data.frames_dir) setFramesDir(data.frames_dir);
-          // Load existing contact sheet from disk if available
-          if (data.contact_sheet) {
-            setCsExported(data.contact_sheet);
-          }
-        } else if (renderPathProp) {
-          const extracted = await tryExtract();
-          if (!extracted && !cancelled) {
-            // Render not ready yet — poll every 20s
-            // If iteration is queued/rendering, poll indefinitely (queue may take hours)
-            // Otherwise timeout after 10 min
-            let polls = 0;
-            interval = setInterval(async () => {
-              if (cancelled) return;
-              polls++;
-              setPollCount(polls);
-              if (polls >= MAX_POLLS) {
-                // Check if iteration is in queue before giving up
-                try {
-                  const qs = await api.getIterationQueueStatus(iterationId);
-                  if (qs.in_queue && (qs.status === 'queued' || qs.status === 'rendering')) {
-                    // Still in queue — keep polling, reset counter
-                    polls = 0;
-                    return;
-                  }
-                } catch {}
-                clearInterval(interval);
-                setError('Render not detected after 10 minutes. Use Extract Frames manually once the render completes.');
-                return;
-              }
-              const done = await tryExtract();
-              if (done) clearInterval(interval);
-            }, 20000); // 20s — frames extraction polling
-          }
-        }
-      })
-      .catch(err => { if (!cancelled) setError(err.message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-
-    return () => { cancelled = true; if (interval) clearInterval(interval); };
-  }, [iterationId, renderPathProp]);
+    if (frameData?.contact_sheet) setCsExported(frameData.contact_sheet);
+  }, [frameData?.contact_sheet]);
 
   const handleExtract = async (path) => {
-    const target = path || videoPath.trim();
-    if (!target) return;
+    if (!path) return;
     setExtracting(true);
-    setError(null);
     try {
-      const result = await api.extractFrames(target, iterationId, frameCount);
-      setFrames(result.frames || []);
-      if (result.frames_dir) setFramesDir(result.frames_dir);
+      await api.extractFrames(path, iterationId, 4);
+      queryClient.invalidateQueries({ queryKey: ['frames', iterationId] });
     } catch (err) {
-      setError(err.message);
+      alert(`Extract failed: ${err.message}`);
     } finally {
       setExtracting(false);
     }
   };
 
   const handleBrowseSelect = (filePath) => {
-    setVideoPath(filePath);
     setShowBrowser(false);
     handleExtract(filePath);
   };
@@ -161,9 +112,10 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
             <span className="text-xs font-mono text-gray-600">{frames.length} frames</span>
             <button
               onClick={async () => {
-                // Delete old frames from server, then browse for new render
+                // Delete old frames from server, invalidate query, then browse
                 try { await fetch(`/api/frames/${iterationId}`, { method: 'DELETE' }); } catch {}
-                setFrames([]); setFramesDir(null); setShowBrowser(true);
+                queryClient.invalidateQueries({ queryKey: ['frames', iterationId] });
+                setShowBrowser(true);
               }}
               className="text-xs font-mono text-gray-600 hover:text-accent"
             >
@@ -315,21 +267,13 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
         </div>
       )}
 
-      {/* Selected path display */}
-      {videoPath && (
-        <div className="flex items-center gap-2 px-2 py-1.5 bg-surface border border-gray-600 rounded">
-          <span className="text-xs font-mono text-gray-400 truncate flex-1">{videoPath}</span>
-          {extracting && <span className="text-xs font-mono text-accent">Extracting...</span>}
-        </div>
-      )}
-
       {/* Browse for render / polling status */}
       {frames.length === 0 && !extracting && (
         <div className="space-y-2">
-          {pollCount > 0 && !error && (
+          {renderPathProp && !error && (
             <div className="flex items-center gap-2 text-xs font-mono text-gray-500">
               <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              Waiting for render... checked {pollCount} time{pollCount !== 1 ? 's' : ''} ({Math.round(pollCount * 15 / 60)}m)
+              Waiting for render... checking every 20s
             </div>
           )}
           <button

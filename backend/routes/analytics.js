@@ -547,7 +547,11 @@ export function createAnalyticsRoutes(store) {
 
       // Score distribution stats
       const sortedScores = [...allScores].sort((a, b) => a - b);
-      const median = sortedScores.length > 0 ? sortedScores[Math.floor(sortedScores.length / 2)] : null;
+      const median = sortedScores.length > 0
+        ? sortedScores.length % 2 === 1
+          ? sortedScores[Math.floor(sortedScores.length / 2)]
+          : +((sortedScores[sortedScores.length / 2 - 1] + sortedScores[sortedScores.length / 2]) / 2).toFixed(1)
+        : null;
       const mean = sortedScores.length > 0 ? +(sortedScores.reduce((s, v) => s + v, 0) / sortedScores.length).toFixed(1) : null;
       const high = sortedScores.length > 0 ? sortedScores[sortedScores.length - 1] : null;
 

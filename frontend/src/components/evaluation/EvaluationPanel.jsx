@@ -704,9 +704,11 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                   setAutoScoring(false);
                 }
               }}
-              disabled={autoScoring || visionAvailable === false}
+              disabled={autoScoring || visionAvailable !== true}
               className={`flex-1 py-2.5 border border-dashed rounded text-sm font-mono transition-colors ${
-                visionAvailable === false
+                visionAvailable === null
+                  ? 'border-gray-600 text-gray-500 cursor-wait'
+                  : visionAvailable === false
                   ? 'border-gray-700 text-gray-600 cursor-not-allowed'
                   : autoScoring
                     ? 'border-blue-400/40 text-blue-400 bg-blue-400/5 animate-pulse'
@@ -714,7 +716,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
               }`}
               title={visionAvailable === false ? 'Vision API not configured — set ANTHROPIC_API_KEY to enable' : 'Uses Claude Vision API to auto-score frames (~$0.01-0.03 per score)'}
             >
-              {autoScoring ? 'Scoring with Vision API...' : visionAvailable === false ? 'Vision API (not configured)' : 'Auto-Score with Vision API'}
+              {autoScoring ? 'Scoring with Vision API...' : visionAvailable === null ? 'Connecting...' : visionAvailable === false ? 'Vision API (not configured)' : 'Auto-Score with Vision API'}
               {!autoScoring && visionAvailable && (
                 <span className="flex items-center justify-center gap-1 text-[10px] mt-0.5" onClick={(e) => e.stopPropagation()}>
                   <button onClick={(e) => { e.stopPropagation(); setVisionUseFrames(false); }}

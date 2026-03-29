@@ -153,7 +153,7 @@ const QueueItemRow = memo(function QueueItemRow({ item, index, totalQueued, onMo
         </div>
 
         {/* Thumbnail preview for completed renders */}
-        {item.status === 'complete' && item.iteration_id && (
+        {item.status === 'complete' && (item.iteration_id || item.json_path) && (
           <CompletedThumbnail iterationId={item.iteration_id} jsonPath={item.json_path} />
         )}
 

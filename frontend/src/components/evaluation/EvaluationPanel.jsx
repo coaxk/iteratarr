@@ -367,7 +367,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
       <div>
         <div className="flex items-center gap-2">
           {(() => {
-            const sorted = allIterations.sort((a, b) => a.iteration_number - b.iteration_number);
+            const sorted = [...allIterations].sort((a, b) => a.iteration_number - b.iteration_number);
             const idx = sorted.findIndex(i => i.id === iteration.id);
             const prev = idx > 0 ? sorted[idx - 1] : null;
             const next = idx < sorted.length - 1 ? sorted[idx + 1] : null;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api';
 import FileBrowserModal from '../forms/FileBrowserModal';
@@ -22,8 +22,14 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
   const queryClient = useQueryClient();
 
   // Attach wheel listener with passive: false so preventDefault works
-  useEffect(() => {
-    const el = thumbsRef.current;
+  // Uses callback ref to handle element availability after frames load
+  const wheelHandlerRef = useRef(null);
+  const setThumbsRef = useCallback((el) => {
+    // Clean up old listener
+    if (wheelHandlerRef.current?.el) {
+      wheelHandlerRef.current.el.removeEventListener('wheel', wheelHandlerRef.current.handler);
+    }
+    thumbsRef.current = el;
     if (!el) return;
     const handler = (e) => {
       e.preventDefault();
@@ -31,8 +37,8 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
       el.scrollBy({ left: (e.deltaY > 0 ? 1 : -1) * 120, behavior: 'smooth' });
     };
     el.addEventListener('wheel', handler, { passive: false });
-    return () => el.removeEventListener('wheel', handler);
-  });
+    wheelHandlerRef.current = { el, handler };
+  }, []);
 
   // Fetch Wan2GP output dir for browse starting point
   useEffect(() => {
@@ -140,7 +146,7 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
         return (
           <div className="flex items-center gap-1">
             <button onClick={() => scrollBy(-1)} className="shrink-0 text-gray-600 hover:text-accent text-xs font-mono px-1">←</button>
-            <div ref={thumbsRef} className="flex gap-1 overflow-hidden flex-1 min-w-0">
+            <div ref={setThumbsRef} className="flex gap-1 overflow-hidden flex-1 min-w-0">
               {frames.map((filename, idx) => (
                 <button
                   key={filename}

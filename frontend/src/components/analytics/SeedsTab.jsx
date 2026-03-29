@@ -255,14 +255,10 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     return true;
   }), [characterFilter, evidenceFilter, searchTerm, seeds, statusFilter]);
 
-  const comparedSeedA = useMemo(
-    () => seeds.find(seed => seed.seed === compareSeedA) || null,
-    [compareSeedA, seeds]
-  );
-  const comparedSeedB = useMemo(
-    () => seeds.find(seed => seed.seed === compareSeedB) || null,
-    [compareSeedB, seeds]
-  );
+  const { comparedSeedA, comparedSeedB } = useMemo(() => ({
+    comparedSeedA: seeds.find(seed => seed.seed === compareSeedA) || null,
+    comparedSeedB: seeds.find(seed => seed.seed === compareSeedB) || null
+  }), [compareSeedA, compareSeedB, seeds]);
   const canCompare = !!comparedSeedA && !!comparedSeedB && comparedSeedA.seed !== comparedSeedB.seed;
 
   function deltaText(a, b) {

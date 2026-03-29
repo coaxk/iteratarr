@@ -17,6 +17,25 @@ export function createAnalyticsRoutes(store, config = {}) {
   const framesRoot = join(config.iteratarr_data_dir || '.', 'frames');
   const seedPersonalityJobs = new Map();
   const scoreLockThreshold = Number(config.score_lock_threshold) || 65;
+  const ROPE_LABELS = {
+    rope_1_prompt_position: 'Rope 1 — Prompt Position',
+    rope_2_attention_weighting: 'Rope 2 — Attention Weighting',
+    rope_3_lora_multipliers: 'Rope 3 — LoRA Multipliers',
+    rope_4a_cfg_high: 'Rope 4a — CFG High Noise',
+    rope_4b_cfg_low: 'Rope 4b — CFG Low Noise',
+    rope_5_steps_skipping: 'Rope 5 — Steps Skipping',
+    rope_6_alt_prompt: 'Rope 6 — Alt Prompt',
+    bonus_flow_shift: 'Bonus — flow_shift',
+    bonus_nag_scale: 'Bonus — NAG_scale',
+    bonus_sample_solver: 'Bonus — sample_solver',
+    multiple: 'Multiple ropes',
+  };
+  const TRAIT_DEFINITIONS = [
+    { key: 'age_regression', label: 'Age regression tendency', keywords: ['younger', 'age', 'youth', 'teen', 'child'] },
+    { key: 'body_drift', label: 'Body-type drift tendency', keywords: ['body', 'weight', 'heavier', 'lean', 'muscle', 'build'] },
+    { key: 'accessory_generation', label: 'Accessory generation tendency', keywords: ['accessory', 'hat', 'glasses', 'jewelry', 'necklace', 'earring'] },
+    { key: 'identity_drift', label: 'Identity drift tendency', keywords: ['identity', 'off-model', 'off model', 'drift', 'face mismatch'] }
+  ];
 
   function stddev(values) {
     if (!values || values.length < 2) return null;
@@ -77,13 +96,7 @@ export function createAnalyticsRoutes(store, config = {}) {
     }
 
     const scoredSamples = [];
-    const traitDefinitions = [
-      { key: 'age_regression', label: 'Age regression tendency', keywords: ['younger', 'age', 'youth', 'teen', 'child'] },
-      { key: 'body_drift', label: 'Body-type drift tendency', keywords: ['body', 'weight', 'heavier', 'lean', 'muscle', 'build'] },
-      { key: 'accessory_generation', label: 'Accessory generation tendency', keywords: ['accessory', 'hat', 'glasses', 'jewelry', 'necklace', 'earring'] },
-      { key: 'identity_drift', label: 'Identity drift tendency', keywords: ['identity', 'off-model', 'off model', 'drift', 'face mismatch'] }
-    ];
-    const traitCounts = Object.fromEntries(traitDefinitions.map(def => [def.key, 0]));
+    const traitCounts = Object.fromEntries(TRAIT_DEFINITIONS.map(def => [def.key, 0]));
 
     const sortedSamples = samples
       .sort((a, b) => (b.iteration_number || 0) - (a.iteration_number || 0))
@@ -110,7 +123,7 @@ export function createAnalyticsRoutes(store, config = {}) {
       };
       const result = await scoreFrames(framePaths, context);
       const notesBlob = `${result.qualitative_notes || ''} ${result.attribution?.lowest_element || ''}`.toLowerCase();
-      for (const traitDef of traitDefinitions) {
+      for (const traitDef of TRAIT_DEFINITIONS) {
         if (traitDef.keywords.some(keyword => notesBlob.includes(keyword))) {
           traitCounts[traitDef.key] += 1;
         }
@@ -136,7 +149,7 @@ export function createAnalyticsRoutes(store, config = {}) {
 
     const grandScores = scoredSamples.map(sample => sample.score).filter(score => score != null);
     const frameConsistencyScores = scoredSamples.map(sample => sample.frame_consistency).filter(score => score != null);
-    const traitSignals = traitDefinitions
+    const traitSignals = TRAIT_DEFINITIONS
       .map(def => {
         const count = traitCounts[def.key] || 0;
         const prevalence = scoredSamples.length > 0 ? +((count / scoredSamples.length) * 100).toFixed(0) : 0;
@@ -686,20 +699,6 @@ export function createAnalyticsRoutes(store, config = {}) {
         }
       }
 
-      const ROPE_LABELS = {
-        rope_1_prompt_position: 'Rope 1 — Prompt Position',
-        rope_2_attention_weighting: 'Rope 2 — Attention Weighting',
-        rope_3_lora_multipliers: 'Rope 3 — LoRA Multipliers',
-        rope_4a_cfg_high: 'Rope 4a — CFG High Noise',
-        rope_4b_cfg_low: 'Rope 4b — CFG Low Noise',
-        rope_5_steps_skipping: 'Rope 5 — Steps Skipping',
-        rope_6_alt_prompt: 'Rope 6 — Alt Prompt',
-        bonus_flow_shift: 'Bonus — flow_shift',
-        bonus_nag_scale: 'Bonus — NAG_scale',
-        bonus_sample_solver: 'Bonus — sample_solver',
-        multiple: 'Multiple ropes',
-      };
-
       const ropes = Object.values(ropeImpacts)
         .map(r => ({
           rope: r.rope,
@@ -745,7 +744,7 @@ export function createAnalyticsRoutes(store, config = {}) {
         }
       });
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -826,7 +825,7 @@ export function createAnalyticsRoutes(store, config = {}) {
 
       res.json({ clip_id: clipId, seeds });
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -1029,7 +1028,7 @@ export function createAnalyticsRoutes(store, config = {}) {
         seeds
       });
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -1133,13 +1132,7 @@ export function createAnalyticsRoutes(store, config = {}) {
         location: { sum: 0, count: 0 },
         motion: { sum: 0, count: 0 }
       };
-      const traitDefinitions = [
-        { key: 'age_regression', label: 'Age regression tendency', keywords: ['younger', 'age', 'youth', 'teen', 'child'] },
-        { key: 'body_drift', label: 'Body-type drift tendency', keywords: ['body', 'weight', 'heavier', 'lean', 'muscle', 'build'] },
-        { key: 'accessory_generation', label: 'Accessory generation tendency', keywords: ['accessory', 'hat', 'glasses', 'jewelry', 'necklace', 'earring'] },
-        { key: 'identity_drift', label: 'Identity drift tendency', keywords: ['identity', 'off-model', 'off model', 'drift', 'face mismatch'] }
-      ];
-      const traitCounts = Object.fromEntries(traitDefinitions.map(def => [def.key, 0]));
+      const traitCounts = Object.fromEntries(TRAIT_DEFINITIONS.map(def => [def.key, 0]));
 
       const branchesDetail = activeBranches.map(branch => {
         const branchIters = (itersByBranch[branch.id] || []).sort((a, b) => a.iteration_number - b.iteration_number);
@@ -1196,7 +1189,7 @@ export function createAnalyticsRoutes(store, config = {}) {
               evalRecord?.attribution?.lowest_element || '',
               evalRecord?.attribution?.next_change_description || ''
             ].join(' ').toLowerCase();
-            for (const traitDef of traitDefinitions) {
+            for (const traitDef of TRAIT_DEFINITIONS) {
               if (traitDef.keywords.some(keyword => noteBlob.includes(keyword))) {
                 traitCounts[traitDef.key] += 1;
               }
@@ -1267,20 +1260,6 @@ export function createAnalyticsRoutes(store, config = {}) {
         }
       }
 
-      const ROPE_LABELS = {
-        rope_1_prompt_position: 'Rope 1 - Prompt Position',
-        rope_2_attention_weighting: 'Rope 2 - Attention Weighting',
-        rope_3_lora_multipliers: 'Rope 3 - LoRA Multipliers',
-        rope_4a_cfg_high: 'Rope 4a - CFG High Noise',
-        rope_4b_cfg_low: 'Rope 4b - CFG Low Noise',
-        rope_5_steps_skipping: 'Rope 5 - Steps Skipping',
-        rope_6_alt_prompt: 'Rope 6 - Alt Prompt',
-        bonus_flow_shift: 'Bonus - flow_shift',
-        bonus_nag_scale: 'Bonus - NAG_scale',
-        bonus_sample_solver: 'Bonus - sample_solver',
-        multiple: 'Multiple ropes'
-      };
-
       const ropeEffectiveness = Object.values(ropeImpacts)
         .map(item => ({
           rope: item.rope,
@@ -1322,7 +1301,7 @@ export function createAnalyticsRoutes(store, config = {}) {
         motion: dimensionTotals.motion.count > 0 ? +(dimensionTotals.motion.sum / dimensionTotals.motion.count).toFixed(1) : null
       };
 
-      const traitSignals = traitDefinitions
+      const traitSignals = TRAIT_DEFINITIONS
         .map(def => {
           const count = traitCounts[def.key] || 0;
           const prevalence = evaluatedCount > 0 ? +((count / evaluatedCount) * 100).toFixed(0) : 0;
@@ -1397,7 +1376,7 @@ export function createAnalyticsRoutes(store, config = {}) {
         }
       });
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -1426,7 +1405,7 @@ export function createAnalyticsRoutes(store, config = {}) {
         status: job?.status || (profile ? 'completed' : 'idle')
       });
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -1510,7 +1489,7 @@ export function createAnalyticsRoutes(store, config = {}) {
         job
       });
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      res.status(500).json({ error: err.message });
     }
   });
 

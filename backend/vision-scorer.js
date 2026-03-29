@@ -72,7 +72,14 @@ You MUST respond with ONLY a valid JSON object in this exact format, no other te
  * Get the API key from environment
  */
 function getApiKey() {
-  return process.env.ANTHROPIC_API_KEY || config.anthropic_api_key || null;
+  return (
+    process.env.ANTHROPIC_API_KEY ||
+    process.env.ANTHROPIC_KEY ||
+    config.anthropic_api_key ||
+    config.anthropic_key ||
+    config.api_keys?.anthropic ||
+    null
+  );
 }
 
 /**

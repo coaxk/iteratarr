@@ -18,7 +18,9 @@ const defaults = {
   project_base_dir: 'C:/Projects/kebbin-shop',
   wan2gp_lora_dir: 'C:/pinokio/api/wan2gp.git/app/loras/wan',
   wan2gp_output_dir: 'C:/pinokio/api/wan2gp.git/app/outputs',
-  anthropic_api_key: null
+  anthropic_api_key: null,
+  anthropic_key: null,
+  api_keys: {}
 };
 
 let userConfig = {};

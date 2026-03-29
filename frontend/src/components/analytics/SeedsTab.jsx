@@ -159,6 +159,8 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
   const [promotionTargetId, setPromotionTargetId] = useState('');
   const [promotionStatus, setPromotionStatus] = useState('');
   const [promoting, setPromoting] = useState(false);
+  const [newCharacterName, setNewCharacterName] = useState('');
+  const [newCharacterTrigger, setNewCharacterTrigger] = useState('');
   const [profiling, setProfiling] = useState(false);
   const [profilingStatus, setProfilingStatus] = useState('');
   const [profileRunToken, setProfileRunToken] = useState(0);
@@ -207,15 +209,6 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     () => [...new Set(seeds.flatMap(seed => seed.character_names || []))].sort(),
     [seeds]
   );
-  const characterMap = useMemo(
-    () => Object.fromEntries(
-      characters.flatMap(char => [
-        [String(char.name || '').toLowerCase(), char],
-        [String(char.trigger_word || '').toLowerCase(), char]
-      ])
-    ),
-    [characters]
-  );
   const promotionCandidates = useMemo(() => {
     const suggestedNameSet = new Set((seedDetail?.summary?.character_names || []).map(name => String(name).toLowerCase()));
     const all = [...characters];
@@ -239,9 +232,10 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
 
   useEffect(() => {
     if (promotionCandidates.length === 0) {
-      setPromotionTargetId('');
+      setPromotionTargetId('__new__');
       return;
     }
+    if (promotionTargetId === '__new__') return;
     if (!promotionCandidates.some(candidate => candidate.id === promotionTargetId)) {
       setPromotionTargetId(promotionCandidates[0].id);
     }
@@ -314,8 +308,37 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     setPromoting(true);
     setPromotionStatus('');
     try {
-      const result = await api.promoteCharacterSeed(promotionTargetId, { seed: selectedSeed });
+      let targetCharacterId = promotionTargetId;
+      let createdCharacter = null;
+
+      if (promotionTargetId === '__new__') {
+        const name = newCharacterName.trim();
+        const trigger = newCharacterTrigger.trim();
+        if (!name || !trigger) {
+          setPromotionStatus('Promotion failed: New character name and trigger word are required.');
+          setPromoting(false);
+          return;
+        }
+        createdCharacter = await api.createCharacter({
+          name,
+          trigger_word: trigger,
+          lora_files: [],
+          lora_dir: '',
+          locked_identity_block: '',
+          locked_negative_block: '',
+          proven_settings: {},
+          notes: ''
+        });
+        targetCharacterId = createdCharacter.id;
+      }
+
+      const result = await api.promoteCharacterSeed(targetCharacterId, { seed: selectedSeed });
+      await queryClient.invalidateQueries({ queryKey: ['characters'] });
       setPromotionStatus(`Promoted seed ${selectedSeed} for ${result.character?.name || 'character'}.`);
+      if (createdCharacter) {
+        setNewCharacterName('');
+        setNewCharacterTrigger('');
+      }
     } catch (err) {
       setPromotionStatus(`Promotion failed: ${err.message}`);
     } finally {
@@ -394,6 +417,8 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     setProfilingStatus('');
     setCompareStatus('');
     setVisionStatusNote('');
+    setNewCharacterName('');
+    setNewCharacterTrigger('');
     setProfiling(false);
     setProfileRunToken(0);
   }, [selectedSeed]);
@@ -665,17 +690,14 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
               <p className="text-xs font-mono text-gray-600 mb-2">
                 Use this only when a seed is proven for the character identity baseline and should carry forward as a character-level default.
               </p>
-              {promotionCandidates.length === 0 ? (
-                <p className="text-sm font-mono text-gray-600">
-                  No matching character record found for this seed’s character names yet.
-                </p>
-              ) : (
+              <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <select
                     value={promotionTargetId}
                     onChange={(e) => setPromotionTargetId(e.target.value)}
                     className="bg-surface-overlay border border-gray-700 rounded px-2 py-1.5 text-xs font-mono text-gray-300"
                   >
+                    <option value="__new__">Create New Character</option>
                     {promotionCandidates.map(candidate => (
                       <option key={candidate.id} value={candidate.id}>
                         {candidate.suggested ? 'Suggested - ' : ''}{candidate.name} ({candidate.trigger_word})
@@ -684,13 +706,29 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
                   </select>
                   <button
                     onClick={handlePromoteSeed}
-                    disabled={!promotionTargetId || promoting}
+                    disabled={!promotionTargetId || promoting || (promotionTargetId === '__new__' && (!newCharacterName.trim() || !newCharacterTrigger.trim()))}
                     className="px-3 py-1.5 text-xs font-mono font-bold rounded bg-accent text-black hover:bg-accent/90 disabled:opacity-50"
                   >
-                    {promoting ? 'Promoting...' : 'Promote'}
+                    {promoting ? 'Promoting...' : promotionTargetId === '__new__' ? 'Create + Promote' : 'Promote'}
                   </button>
                 </div>
-              )}
+                {promotionTargetId === '__new__' && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                    <input
+                      value={newCharacterName}
+                      onChange={(e) => setNewCharacterName(e.target.value)}
+                      placeholder="New character name"
+                      className="bg-surface-overlay border border-gray-700 rounded px-2 py-1.5 text-xs font-mono text-gray-300 placeholder:text-gray-600"
+                    />
+                    <input
+                      value={newCharacterTrigger}
+                      onChange={(e) => setNewCharacterTrigger(e.target.value)}
+                      placeholder="Trigger word (e.g. mckdhn)"
+                      className="bg-surface-overlay border border-gray-700 rounded px-2 py-1.5 text-xs font-mono text-gray-300 placeholder:text-gray-600"
+                    />
+                  </div>
+                )}
+              </div>
               {promotionStatus && (
                 <p className={`mt-2 text-xs font-mono ${promotionStatus.startsWith('Promotion failed') ? 'text-red-400' : 'text-green-400'}`}>
                   {promotionStatus}

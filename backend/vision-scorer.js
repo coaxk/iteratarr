@@ -10,6 +10,7 @@
 
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
+import config from './config.js';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
@@ -71,7 +72,7 @@ You MUST respond with ONLY a valid JSON object in this exact format, no other te
  * Get the API key from environment
  */
 function getApiKey() {
-  return process.env.ANTHROPIC_API_KEY || null;
+  return process.env.ANTHROPIC_API_KEY || config.anthropic_api_key || null;
 }
 
 /**

@@ -17,7 +17,8 @@ const defaults = {
   port: 3847,
   project_base_dir: 'C:/Projects/kebbin-shop',
   wan2gp_lora_dir: 'C:/pinokio/api/wan2gp.git/app/loras/wan',
-  wan2gp_output_dir: 'C:/pinokio/api/wan2gp.git/app/outputs'
+  wan2gp_output_dir: 'C:/pinokio/api/wan2gp.git/app/outputs',
+  anthropic_api_key: null
 };
 
 let userConfig = {};

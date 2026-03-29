@@ -163,10 +163,15 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
   const [profilingStatus, setProfilingStatus] = useState('');
   const [profileRunToken, setProfileRunToken] = useState(0);
   const [compareStatus, setCompareStatus] = useState('');
+  const [visionStatusNote, setVisionStatusNote] = useState('');
   const seeds = data?.seeds || [];
   const summary = data?.summary || null;
   const { data: characters = [] } = useCharacters();
-  const { data: visionStatus, refetch: refetchVisionStatus } = useVisionStatus({ refetchOnMount: 'always' });
+  const {
+    data: visionStatus,
+    isFetching: visionStatusFetching,
+    refetch: refetchVisionStatus
+  } = useVisionStatus({ refetchOnMount: 'always' });
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -211,12 +216,21 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     ),
     [characters]
   );
-  const promotionCandidates = useMemo(
-    () => (seedDetail?.summary?.character_names || [])
-      .map(name => characterMap[String(name).toLowerCase()])
-      .filter(Boolean),
-    [characterMap, seedDetail?.summary?.character_names]
-  );
+  const promotionCandidates = useMemo(() => {
+    const suggestedNameSet = new Set((seedDetail?.summary?.character_names || []).map(name => String(name).toLowerCase()));
+    const all = [...characters];
+    all.sort((left, right) => {
+      const leftSuggested = suggestedNameSet.has(String(left.name || '').toLowerCase()) || suggestedNameSet.has(String(left.trigger_word || '').toLowerCase());
+      const rightSuggested = suggestedNameSet.has(String(right.name || '').toLowerCase()) || suggestedNameSet.has(String(right.trigger_word || '').toLowerCase());
+      if (leftSuggested && !rightSuggested) return -1;
+      if (!leftSuggested && rightSuggested) return 1;
+      return String(left.name || '').localeCompare(String(right.name || ''));
+    });
+    return all.map(character => ({
+      ...character,
+      suggested: suggestedNameSet.has(String(character.name || '').toLowerCase()) || suggestedNameSet.has(String(character.trigger_word || '').toLowerCase())
+    }));
+  }, [characters, seedDetail?.summary?.character_names]);
 
   const promotionCandidateIds = useMemo(
     () => promotionCandidates.map(candidate => candidate.id).join(','),
@@ -313,6 +327,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     if (selectedSeed == null) return;
     setProfiling(true);
     setProfilingStatus('');
+    setVisionStatusNote('');
     try {
       const result = await api.startSeedPersonalityProfile(selectedSeed, { force, max_samples: 6 });
       if (result.cached) {
@@ -328,6 +343,21 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     } catch (err) {
       setProfiling(false);
       setProfilingStatus(`Profile failed: ${err.message}`);
+    }
+  };
+
+  const handleRecheckVision = async () => {
+    setVisionStatusNote('');
+    const result = await refetchVisionStatus();
+    const status = result.data;
+    if (!status) {
+      setVisionStatusNote('Vision status check failed.');
+      return;
+    }
+    if (status.available) {
+      setVisionStatusNote('Vision API is available.');
+    } else {
+      setVisionStatusNote(`Vision still unavailable: ${status.reason || 'configure ANTHROPIC_API_KEY'}.`);
     }
   };
 
@@ -363,6 +393,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     setPromotionStatus('');
     setProfilingStatus('');
     setCompareStatus('');
+    setVisionStatusNote('');
     setProfiling(false);
     setProfileRunToken(0);
   }, [selectedSeed]);
@@ -647,7 +678,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
                   >
                     {promotionCandidates.map(candidate => (
                       <option key={candidate.id} value={candidate.id}>
-                        {candidate.name} ({candidate.trigger_word})
+                        {candidate.suggested ? 'Suggested - ' : ''}{candidate.name} ({candidate.trigger_word})
                       </option>
                     ))}
                   </select>
@@ -746,12 +777,18 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
                     Vision API unavailable: {visionStatus?.reason || 'configure ANTHROPIC_API_KEY'}.
                   </p>
                   <button
-                    onClick={() => refetchVisionStatus()}
-                    className="px-2 py-1 rounded text-xs font-mono border border-gray-700 text-gray-400 hover:text-gray-200"
+                    onClick={handleRecheckVision}
+                    disabled={visionStatusFetching}
+                    className="px-2 py-1 rounded text-xs font-mono border border-gray-700 text-gray-400 hover:text-gray-200 disabled:opacity-60"
                   >
-                    Recheck
+                    {visionStatusFetching ? 'Rechecking...' : 'Recheck'}
                   </button>
                 </div>
+              )}
+              {visionStatusNote && (
+                <p className={`text-xs font-mono ${visionStatusNote.includes('available') ? 'text-green-400' : 'text-amber-400'}`}>
+                  {visionStatusNote}
+                </p>
               )}
               {profilingStatus && (
                 <p className={`text-xs font-mono ${profilingStatus.startsWith('Profile failed') ? 'text-red-400' : 'text-green-400'}`}>

@@ -181,7 +181,12 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
   const [profileRunToken, setProfileRunToken] = useState(0);
   const [compareStatus, setCompareStatus] = useState('');
   const [visionStatusNote, setVisionStatusNote] = useState('');
-  const seeds = data?.seeds || [];
+  const [profileSeedFlags, setProfileSeedFlags] = useState({});
+  const rawSeeds = data?.seeds || [];
+  const seeds = useMemo(
+    () => rawSeeds.map(seed => ({ ...seed, has_profile: !!seed.has_profile || !!profileSeedFlags[String(seed.seed)] })),
+    [profileSeedFlags, rawSeeds]
+  );
   const summary = data?.summary || null;
   const { data: characters = [] } = useCharacters();
   const {
@@ -386,6 +391,19 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     try {
       const result = await api.startSeedPersonalityProfile(selectedSeed, { force, max_samples: 6 });
       if (result.cached) {
+        setProfileSeedFlags(prev => ({ ...prev, [String(selectedSeed)]: true }));
+        queryClient.setQueryData(['analytics', 'seeds'], prev => {
+          if (!prev?.seeds) return prev;
+          return {
+            ...prev,
+            seeds: prev.seeds.map(seed => (
+              Number(seed.seed) === Number(selectedSeed)
+                ? { ...seed, has_profile: true }
+                : seed
+            ))
+          };
+        });
+        await queryClient.invalidateQueries({ queryKey: ['analytics', 'seeds'] });
         await queryClient.invalidateQueries({ queryKey: ['analytics', 'seed', selectedSeed] });
         setProfiling(false);
         const sampleCount = result.profile?.sample_count ?? 0;
@@ -421,6 +439,19 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     if (profileJobStatus.status === 'running' || profileJobStatus.status === 'queued') return;
 
     if (profileJobStatus.status === 'completed') {
+      setProfileSeedFlags(prev => ({ ...prev, [String(selectedSeed)]: true }));
+      queryClient.setQueryData(['analytics', 'seeds'], prev => {
+        if (!prev?.seeds) return prev;
+        return {
+          ...prev,
+          seeds: prev.seeds.map(seed => (
+            Number(seed.seed) === Number(selectedSeed)
+              ? { ...seed, has_profile: true }
+              : seed
+          ))
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: ['analytics', 'seeds'] });
       queryClient.invalidateQueries({ queryKey: ['analytics', 'seed', selectedSeed] });
       setProfilingStatus('Profile generated and synced.');
     } else if (profileJobStatus.status === 'failed') {
@@ -428,6 +459,11 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     }
     setProfiling(false);
   }, [profileJobStatus, profiling, queryClient, selectedSeed]);
+
+  useEffect(() => {
+    if (!seedDetail?.personality_profile || selectedSeed == null) return;
+    setProfileSeedFlags(prev => ({ ...prev, [String(selectedSeed)]: true }));
+  }, [seedDetail?.personality_profile, selectedSeed]);
 
   useEffect(() => {
     if (!profiling || !profileJobError) return;

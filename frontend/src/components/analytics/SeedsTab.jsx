@@ -4,6 +4,8 @@ import { SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constants';
 import { useCharacters, useSeedAnalytics, useSeedPersonalityProfileStatus, useVisionStatus } from '../../hooks/useQueries';
 import { api } from '../../api';
 
+const PROFILE_FLAGS_STORAGE_KEY = 'iteratarr.seedProfileFlags.v1';
+
 function statusForSeed(seed) {
   const retiredBranches = (seed.abandoned_branch_count || 0) + (seed.superseded_branch_count || 0);
   if (
@@ -181,7 +183,15 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
   const [profileRunToken, setProfileRunToken] = useState(0);
   const [compareStatus, setCompareStatus] = useState('');
   const [visionStatusNote, setVisionStatusNote] = useState('');
-  const [profileSeedFlags, setProfileSeedFlags] = useState({});
+  const [profileSeedFlags, setProfileSeedFlags] = useState(() => {
+    try {
+      const raw = localStorage.getItem(PROFILE_FLAGS_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [sortConfig, setSortConfig] = useState({ key: 'best_score', direction: 'desc' });
   const rawSeeds = data?.seeds || [];
   const seeds = useMemo(
     () => rawSeeds.map(seed => ({ ...seed, has_profile: !!seed.has_profile || !!profileSeedFlags[String(seed.seed)] })),
@@ -195,6 +205,17 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     refetch: refetchVisionStatus
   } = useVisionStatus({ refetchOnMount: 'always' });
   const queryClient = useQueryClient();
+  const setProfileFlag = (seedValue) => {
+    const key = String(seedValue);
+    setProfileSeedFlags(prev => {
+      if (prev[key]) return prev;
+      const next = { ...prev, [key]: true };
+      try {
+        localStorage.setItem(PROFILE_FLAGS_STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (seeds.length === 0) {
@@ -208,6 +229,12 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     if (compareSeedA != null && !seeds.some(seed => seed.seed === compareSeedA)) setCompareSeedA(null);
     if (compareSeedB != null && !seeds.some(seed => seed.seed === compareSeedB)) setCompareSeedB(null);
   }, [compareSeedA, compareSeedB, seeds, selectedSeed]);
+
+  useEffect(() => {
+    const profiledSeeds = seeds.filter(seed => seed.has_profile);
+    if (profiledSeeds.length === 0) return;
+    for (const seed of profiledSeeds) setProfileFlag(seed.seed);
+  }, [seeds]);
 
   const {
     data: seedDetail,
@@ -283,6 +310,44 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
 
     return true;
   }), [characterFilter, evidenceFilter, searchTerm, seeds, statusFilter]);
+
+  const sortedFilteredSeeds = useMemo(() => {
+    const direction = sortConfig.direction === 'asc' ? 1 : -1;
+    const valueFor = (seed, key) => {
+      switch (key) {
+        case 'status': return statusForSeed(seed).label;
+        case 'characters': return (seed.character_names || []).join(', ');
+        case 'progress': return seed.best_score ?? -1;
+        case 'has_profile': return seed.has_profile ? 1 : 0;
+        default: return seed[key];
+      }
+    };
+
+    return [...filteredSeeds].sort((a, b) => {
+      const left = valueFor(a, sortConfig.key);
+      const right = valueFor(b, sortConfig.key);
+      const leftNull = left == null;
+      const rightNull = right == null;
+      if (leftNull && rightNull) return 0;
+      if (leftNull) return 1;
+      if (rightNull) return -1;
+      if (typeof left === 'number' && typeof right === 'number') return (left - right) * direction;
+      return String(left).localeCompare(String(right)) * direction;
+    });
+  }, [filteredSeeds, sortConfig.direction, sortConfig.key]);
+
+  const toggleSort = (key) => {
+    setSortConfig(prev => (
+      prev.key === key
+        ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: key === 'seed' ? 'asc' : 'desc' }
+    ));
+  };
+
+  const sortIndicator = (key) => {
+    if (sortConfig.key !== key) return '';
+    return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
+  };
 
   const { comparedSeedA, comparedSeedB } = useMemo(() => ({
     comparedSeedA: seeds.find(seed => seed.seed === compareSeedA) || null,
@@ -391,7 +456,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     try {
       const result = await api.startSeedPersonalityProfile(selectedSeed, { force, max_samples: 6 });
       if (result.cached) {
-        setProfileSeedFlags(prev => ({ ...prev, [String(selectedSeed)]: true }));
+        setProfileFlag(selectedSeed);
         queryClient.setQueryData(['analytics', 'seeds'], prev => {
           if (!prev?.seeds) return prev;
           return {
@@ -439,7 +504,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     if (profileJobStatus.status === 'running' || profileJobStatus.status === 'queued') return;
 
     if (profileJobStatus.status === 'completed') {
-      setProfileSeedFlags(prev => ({ ...prev, [String(selectedSeed)]: true }));
+      setProfileFlag(selectedSeed);
       queryClient.setQueryData(['analytics', 'seeds'], prev => {
         if (!prev?.seeds) return prev;
         return {
@@ -462,7 +527,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
 
   useEffect(() => {
     if (!seedDetail?.personality_profile || selectedSeed == null) return;
-    setProfileSeedFlags(prev => ({ ...prev, [String(selectedSeed)]: true }));
+    setProfileFlag(selectedSeed);
   }, [seedDetail?.personality_profile, selectedSeed]);
 
   useEffect(() => {
@@ -645,23 +710,49 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
           <thead>
             <tr className="border-b border-gray-700 text-gray-500 text-xs uppercase tracking-wider">
               <th className="text-left py-2 px-3">Compare</th>
-              <th className="text-left py-2 px-3">Seed</th>
-              <th className="text-left py-2 px-3">Status</th>
-              <th className="text-right py-2 px-3">Clips</th>
-              <th className="text-right py-2 px-3">Branches</th>
-              <th className="text-right py-2 px-3">Evaluated</th>
-              <th className="text-right py-2 px-3">Best</th>
-              <th className="text-right py-2 px-3">Avg</th>
-              <th className="text-right py-2 px-3">Selected</th>
-              <th className="text-right py-2 px-3">Locked</th>
-              <th className="text-right py-2 px-3">Screening ★</th>
-              <th className="text-center py-2 px-3">Profile</th>
-              <th className="text-left py-2 px-3 min-w-32">Progress</th>
-              <th className="text-left py-2 px-3">Characters</th>
+              <th className="text-left py-2 px-3">
+                <button onClick={() => toggleSort('seed')} className="hover:text-gray-300">Seed{sortIndicator('seed')}</button>
+              </th>
+              <th className="text-left py-2 px-3">
+                <button onClick={() => toggleSort('status')} className="hover:text-gray-300">Status{sortIndicator('status')}</button>
+              </th>
+              <th className="text-right py-2 px-3">
+                <button onClick={() => toggleSort('clip_count')} className="hover:text-gray-300">Clips{sortIndicator('clip_count')}</button>
+              </th>
+              <th className="text-right py-2 px-3">
+                <button onClick={() => toggleSort('branch_count')} className="hover:text-gray-300">Branches{sortIndicator('branch_count')}</button>
+              </th>
+              <th className="text-right py-2 px-3">
+                <button onClick={() => toggleSort('evaluated_count')} className="hover:text-gray-300">Evaluated{sortIndicator('evaluated_count')}</button>
+              </th>
+              <th className="text-right py-2 px-3">
+                <button onClick={() => toggleSort('best_score')} className="hover:text-gray-300">Best{sortIndicator('best_score')}</button>
+              </th>
+              <th className="text-right py-2 px-3">
+                <button onClick={() => toggleSort('avg_score')} className="hover:text-gray-300">Avg{sortIndicator('avg_score')}</button>
+              </th>
+              <th className="text-right py-2 px-3">
+                <button onClick={() => toggleSort('selected_count')} className="hover:text-gray-300">Selected{sortIndicator('selected_count')}</button>
+              </th>
+              <th className="text-right py-2 px-3">
+                <button onClick={() => toggleSort('locked_count')} className="hover:text-gray-300">Locked{sortIndicator('locked_count')}</button>
+              </th>
+              <th className="text-right py-2 px-3">
+                <button onClick={() => toggleSort('screening_rating_avg')} className="hover:text-gray-300">Screening ★{sortIndicator('screening_rating_avg')}</button>
+              </th>
+              <th className="text-center py-2 px-3">
+                <button onClick={() => toggleSort('has_profile')} className="hover:text-gray-300">Profile{sortIndicator('has_profile')}</button>
+              </th>
+              <th className="text-left py-2 px-3 min-w-32">
+                <button onClick={() => toggleSort('progress')} className="hover:text-gray-300">Progress{sortIndicator('progress')}</button>
+              </th>
+              <th className="text-left py-2 px-3">
+                <button onClick={() => toggleSort('characters')} className="hover:text-gray-300">Characters{sortIndicator('characters')}</button>
+              </th>
             </tr>
           </thead>
           <tbody>
-            {filteredSeeds.map(seed => (
+            {sortedFilteredSeeds.map(seed => (
               <SeedRow
                 key={seed.seed}
                 seed={seed}
@@ -675,7 +766,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
             ))}
           </tbody>
         </table>
-        {filteredSeeds.length === 0 && (
+        {sortedFilteredSeeds.length === 0 && (
           <div className="py-6 text-center text-sm font-mono text-gray-600">
             No seeds match the current filters.
           </div>

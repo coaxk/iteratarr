@@ -20,7 +20,10 @@ export function createClipRoutes(store) {
       clip.branch_count = branches.length;
       clip.fork_count = branches.filter(b => b.created_from === 'fork').length;
       const iterations = await store.list('iterations', i => i.clip_id === clip.id);
-      clip.unscored_count = iterations.filter(i => i.status === 'rendered' && !i.evaluation).length;
+      // Only count iterations that are part of an iteration chain (not seed screens)
+      clip.unscored_count = iterations.filter(i =>
+        i.status === 'rendered' && !i.evaluation && (i.parent_iteration_id || i.iteration_number > 1)
+      ).length;
     }
     res.json(clips);
   });

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import EpisodeTracker from './components/kanban/EpisodeTracker';
 import ClipDetail from './components/clips/ClipDetail';
 import CharacterRegistry from './components/characters/CharacterRegistry';
@@ -12,9 +12,9 @@ import QueueManager from './components/queue/QueueManager';
 import TemplateLibrary from './components/templates/TemplateLibrary';
 import RenderStatus from './components/render/RenderStatus';
 import GpuStatus from './components/gpu/GpuStatus';
-import { useApi } from './hooks/useApi';
+
 import { useAutoRender } from './hooks/useAutoRender';
-import { useQueueStatus } from './hooks/useQueries';
+import { useQueueStatus, useClips } from './hooks/useQueries';
 import { api } from './api';
 
 const queryClient = new QueryClient({
@@ -35,12 +35,14 @@ const VIEWS = {
 };
 
 function TrendsView() {
-  const { data: clips, loading: clipsLoading } = useApi(() => api.listClips(), []);
+  const { data: clips, isLoading: clipsLoading } = useClips();
   const [selectedClipId, setSelectedClipId] = useState(null);
-  const { data: iterations, loading: itersLoading } = useApi(
-    () => selectedClipId ? api.getClipIterations(selectedClipId) : Promise.resolve([]),
-    [selectedClipId]
-  );
+  const { data: iterations, isLoading: itersLoading } = useQuery({
+    queryKey: ['iterations', selectedClipId],
+    queryFn: () => api.getClipIterations(selectedClipId),
+    enabled: !!selectedClipId,
+    staleTime: 15000,
+  });
 
   return (
     <div className="space-y-4">

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useApi } from '../../hooks/useApi';
+import { useBranchAnalytics } from '../../hooks/useQueries';
 import { api } from '../../api';
 import { GRAND_MAX, SCORE_LOCK_THRESHOLD, ROPES } from '../../constants';
 import CrossBranchComparison from './CrossBranchComparison';
@@ -104,7 +104,8 @@ function ScoreBar({ value, max = GRAND_MAX, showLabel = true }) {
 }
 
 export default function BranchAnalytics({ clip, onClose, onFork }) {
-  const { data, loading, error } = useApi(() => api.getBranchAnalytics(clip.id), [clip.id]);
+  const { data, isLoading: loading, error: queryError } = useBranchAnalytics(clip.id);
+  const error = queryError?.message || null;
   const [compareMode, setCompareMode] = useState(false);
   const [selectedBranches, setSelectedBranches] = useState([]);
   const [activeSection, setActiveSection] = useState('leaderboard');

@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { api } from '../../api';
-import { useApi } from '../../hooks/useApi';
+import { useCharacters } from '../../hooks/useQueries';
 
 export default function CreateClipModal({ onCreated, onClose }) {
-  // Load characters from registry for selection
-  const { data: characters, loading: charsLoading } = useApi(() => api.listCharacters(), []);
+  const { data: characters, isLoading: charsLoading } = useCharacters();
 
   const [name, setName] = useState('');
   const [scene, setScene] = useState('');

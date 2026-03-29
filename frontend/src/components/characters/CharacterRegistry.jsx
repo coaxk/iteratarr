@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useApi } from '../../hooks/useApi';
-import { api } from '../../api';
+import { useCharacters, useClips, useInvalidateIterations } from '../../hooks/useQueries';
 import CharacterCard from './CharacterCard';
 import CreateCharacterModal from '../forms/CreateCharacterModal';
 
 export default function CharacterRegistry({ onNavigateToClip }) {
-  const { data: characters, loading, error, refetch } = useApi(() => api.listCharacters(), []);
-  const { data: clips } = useApi(() => api.listClips(), []);
+  const { data: characters, isLoading: loading, error: queryError, refetch } = useCharacters();
+  const { data: clips } = useClips();
+  const error = queryError?.message || null;
   const [showCreate, setShowCreate] = useState(false);
 
   if (loading) return <p className="text-gray-500 font-mono text-sm">Loading characters...</p>;

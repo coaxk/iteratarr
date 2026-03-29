@@ -129,6 +129,71 @@ export function useCharacters(options = {}) {
   });
 }
 
+/** Templates list */
+export function useTemplates(options = {}) {
+  return useQuery({
+    queryKey: ['templates'],
+    queryFn: api.listTemplates,
+    staleTime: 30000,
+    ...options
+  });
+}
+
+/** Iterations for a clip — optionally filtered by branch */
+export function useClipIterations(clipId, branchId, options = {}) {
+  return useQuery({
+    queryKey: ['iterations', clipId, branchId || 'all'],
+    queryFn: () => api.getClipIterations(clipId, branchId),
+    enabled: !!clipId,
+    staleTime: 10000,
+    ...options
+  });
+}
+
+/** Branches for a clip */
+export function useClipBranches(clipId, options = {}) {
+  return useQuery({
+    queryKey: ['branches', clipId],
+    queryFn: () => api.listBranches(clipId),
+    enabled: !!clipId,
+    staleTime: 10000,
+    ...options
+  });
+}
+
+/** Seed screen records for a clip */
+export function useSeedScreens(clipId, options = {}) {
+  return useQuery({
+    queryKey: ['seed-screens', clipId],
+    queryFn: () => api.getSeedScreen(clipId),
+    enabled: !!clipId,
+    staleTime: 15000,
+    ...options
+  });
+}
+
+/** Branch analytics */
+export function useBranchAnalytics(clipId, options = {}) {
+  return useQuery({
+    queryKey: ['analytics', 'branches', clipId],
+    queryFn: () => api.getBranchAnalytics(clipId),
+    enabled: !!clipId,
+    staleTime: 30000,
+    ...options
+  });
+}
+
+/** Cross-branch comparison */
+export function useBranchComparison(clipId, branchIds, options = {}) {
+  return useQuery({
+    queryKey: ['analytics', 'compare', clipId, branchIds],
+    queryFn: () => api.compareBranches(clipId, branchIds),
+    enabled: !!clipId && branchIds?.length === 2,
+    staleTime: 30000,
+    ...options
+  });
+}
+
 /** Production queue (legacy locked items) */
 export function useProductionQueue(options = {}) {
   return useQuery({

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useApi } from '../../hooks/useApi';
+import { useBranchComparison } from '../../hooks/useQueries';
 import { api } from '../../api';
 import { GRAND_MAX, SCORE_LOCK_THRESHOLD, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, ROPES } from '../../constants';
 
@@ -80,10 +80,8 @@ function SubtotalRow({ label, leftVal, rightVal, max }) {
 }
 
 export default function CrossBranchComparison({ clipId, branchId1, branchId2, onClose, onFork }) {
-  const { data, loading, error } = useApi(
-    () => api.compareBranches(clipId, branchId1, branchId2),
-    [clipId, branchId1, branchId2]
-  );
+  const { data, isLoading: loading, error: queryError } = useBranchComparison(clipId, [branchId1, branchId2]);
+  const error = queryError?.message || null;
   const [forking, setForking] = useState(false);
   const [forkSeed, setForkSeed] = useState('');
   const [forkSource, setForkSource] = useState(null); // 'left' | 'right'

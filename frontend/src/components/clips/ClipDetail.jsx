@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useApi } from '../../hooks/useApi';
+import { useClipBranches, useClipIterations, useSeedScreens, useInvalidateIterations } from '../../hooks/useQueries';
 import { api } from '../../api';
 import { CLIP_STATUSES, SCORE_LOCK_THRESHOLD, GRAND_MAX, ROPES, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS } from '../../constants';
 import IterationLineage from './IterationLineage';
@@ -17,19 +17,16 @@ import BranchAnalytics from '../analytics/BranchAnalytics';
 export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parentUnsavedCallback }) {
   // Branch state
   const [selectedBranchId, setSelectedBranchId] = useState(null);
-  const { data: branches, refetch: refetchBranches } = useApi(() => api.listBranches(clip.id), [clip.id]);
+  const { data: branches, refetch: refetchBranches } = useClipBranches(clip.id);
 
   // Iterations — filtered by branch when one is selected
-  const { data: iterations, loading, refetch } = useApi(
-    () => api.getClipIterations(clip.id, selectedBranchId),
-    [clip.id, selectedBranchId]
-  );
+  const { data: iterations, isLoading: loading, refetch } = useClipIterations(clip.id, selectedBranchId);
   const [selectedIteration, setSelectedIteration] = useState(null);
   const [liveScore, setLiveScore] = useState(null);
   // Seed HQ navigation: null = HQ overview, branchId = drill into branch
   const [drillBranchId, setDrillBranchId] = useState(null);
   const [showSeedGen, setShowSeedGen] = useState(false);
-  const { data: seedScreens, refetch: refetchSeeds } = useApi(() => api.getSeedScreen(clip.id), [clip.id]);
+  const { data: seedScreens, refetch: refetchSeeds } = useSeedScreens(clip.id);
   const [viewMode, setViewMode] = useState('lineage'); // 'lineage' | 'table'
   const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
   const [showComparison, setShowComparison] = useState(false);

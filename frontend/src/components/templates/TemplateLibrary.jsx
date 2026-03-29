@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useApi } from '../../hooks/useApi';
+import { useCharacters, useTemplates } from '../../hooks/useQueries';
 import { api } from '../../api';
 
 /**
@@ -291,7 +291,7 @@ function ViewTemplateModal({ template, onClose }) {
 }
 
 function GenerateModal({ template, onClose, onGenerated }) {
-  const { data: characters, loading: charsLoading } = useApi(() => api.listCharacters(), []);
+  const { data: characters, isLoading: charsLoading } = useCharacters();
   const [characterId, setCharacterId] = useState('');
   const [location, setLocation] = useState('');
   const [action, setAction] = useState('');
@@ -414,7 +414,8 @@ function GenerateModal({ template, onClose, onGenerated }) {
 // --- Main Component ---
 
 export default function TemplateLibrary() {
-  const { data: templates, loading, error, refetch } = useApi(() => api.listTemplates(), []);
+  const { data: templates, isLoading: loading, error: queryError, refetch } = useTemplates();
+  const error = queryError?.message || null;
   const [showCreate, setShowCreate] = useState(false);
   const [viewTemplate, setViewTemplate] = useState(null);
   const [generateTemplate, setGenerateTemplate] = useState(null);

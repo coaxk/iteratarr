@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useApi } from '../../hooks/useApi';
+import { useClipIterations } from '../../hooks/useQueries';
 import { api } from '../../api';
 import { BRANCH_STATUSES, GRAND_MAX } from '../../constants';
 
@@ -337,7 +337,8 @@ const TREND_DISPLAY = {
 
 export default function SeedHQ({ clip, branches, seedScreens, onEnterBranch, onGenerateSeeds, onRefresh, onManageBranch, onLaunchBranch }) {
   // Fetch ALL iterations for this clip to compute branch trends
-  const { data: allIterations } = useApi(() => api.getClipIterations(clip.id), [clip.id]);
+  // Shared with ClipDetail via TanStack Query dedup (same queryKey)
+  const { data: allIterations } = useClipIterations(clip.id);
 
   // branchTrends kept as empty object — trends computed directly in BranchNode from allIterations
   const branchTrends = {};

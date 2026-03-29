@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { useApi } from '../../hooks/useApi';
+import { useClips, useInvalidateIterations } from '../../hooks/useQueries';
 import { api } from '../../api';
 import { CLIP_STATUSES } from '../../constants';
 import ClipCard from './ClipCard';
@@ -9,7 +9,8 @@ import CreateClipModal from '../forms/CreateClipModal';
 const COLUMNS = ['not_started', 'screening', 'in_progress', 'evaluating', 'locked', 'in_queue'];
 
 export default function EpisodeTracker({ onSelectClip }) {
-  const { data: clips, loading, error, refetch } = useApi(() => api.listClips(), []);
+  const { data: clips, isLoading: loading, error: queryError, refetch } = useClips();
+  const error = queryError?.message || null;
   const [showCreateClip, setShowCreateClip] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showArchive, setShowArchive] = useState(false);

@@ -16,6 +16,7 @@ export function createAnalyticsRoutes(store, config = {}) {
   const router = Router();
   const framesRoot = join(config.iteratarr_data_dir || '.', 'frames');
   const seedPersonalityJobs = new Map();
+  const scoreLockThreshold = Number(config.score_lock_threshold) || 65;
 
   function stddev(values) {
     if (!values || values.length < 2) return null;
@@ -1022,7 +1023,7 @@ export function createAnalyticsRoutes(store, config = {}) {
         summary: {
           seed_count: seeds.length,
           evaluated_seed_count: seeds.filter(seed => seed.evaluated_count > 0).length,
-          proven_seed_count: seeds.filter(seed => (seed.best_score ?? 0) >= 65 || seed.locked_count > 0).length,
+          proven_seed_count: seeds.filter(seed => (seed.best_score ?? 0) >= scoreLockThreshold || seed.locked_count > 0).length,
           selected_seed_count: seeds.filter(seed => seed.selected_count > 0).length
         },
         seeds
@@ -1051,8 +1052,14 @@ export function createAnalyticsRoutes(store, config = {}) {
 
       const clips = await store.list('clips');
       const branches = await store.list('branches', b => Number(b.seed) === seed);
-      const iterations = await store.list('iterations');
-      const evaluations = await store.list('evaluations');
+      const activeBranchIds = new Set(
+        branches
+          .filter(branch => branch.seed !== -1 && branch.seed !== '-1')
+          .map(branch => branch.id)
+      );
+      const iterations = await store.list('iterations', iteration => iteration.branch_id && activeBranchIds.has(iteration.branch_id));
+      const evaluationIds = new Set(iterations.filter(iter => iter.evaluation_id).map(iter => iter.evaluation_id));
+      const evaluations = await store.list('evaluations', evaluation => evaluationIds.has(evaluation.id));
       const seedScreens = await store.list('seed_screens', s => Number(s.seed) === seed);
 
       const activeBranches = branches.filter(b => b.seed !== -1 && b.seed !== '-1');
@@ -1062,11 +1069,7 @@ export function createAnalyticsRoutes(store, config = {}) {
 
       const evalById = Object.fromEntries(evaluations.map(e => [e.id, e]));
       const clipById = Object.fromEntries(clips.map(c => [c.id, c]));
-      const branchIds = new Set(activeBranches.map(b => b.id));
-
-      const branchIterations = iterations
-        .filter(i => i.branch_id && branchIds.has(i.branch_id))
-        .sort((a, b) => a.iteration_number - b.iteration_number);
+      const branchIterations = [...iterations].sort((a, b) => a.iteration_number - b.iteration_number);
 
       const itersByBranch = {};
       for (const iter of branchIterations) {
@@ -1348,7 +1351,7 @@ export function createAnalyticsRoutes(store, config = {}) {
       let recommendation = 'Keep collecting evidence on this seed before committing more iteration budget.';
       if (evaluatedCount === 0) {
         recommendation = 'Run at least one evaluated branch to establish a reliable baseline for this seed.';
-      } else if ((bestScore ?? 0) >= 65) {
+      } else if ((bestScore ?? 0) >= scoreLockThreshold) {
         recommendation = 'This seed is already producing lock-level outcomes; prioritize rollout on similar clips.';
       } else if (topRope && topRope.avg_delta > 0) {
         recommendation = `Best observed lever so far is ${topRope.label} (${topRope.avg_delta > 0 ? '+' : ''}${topRope.avg_delta} avg delta).`;

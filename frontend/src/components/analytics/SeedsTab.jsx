@@ -189,6 +189,8 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
   } = useSeedAnalytics(selectedSeed, { enabled: selectedSeed != null && !isLoading && !isError });
   const {
     data: profileJobStatus,
+    isError: profileJobError,
+    error: profileJobErrorValue,
     refetch: refetchProfileJobStatus
   } = useSeedPersonalityProfileStatus(selectedSeed, {
     enabled: selectedSeed != null && profileRunToken > 0,
@@ -215,6 +217,11 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     [characterMap, seedDetail?.summary?.character_names]
   );
 
+  const promotionCandidateIds = useMemo(
+    () => promotionCandidates.map(candidate => candidate.id).join(','),
+    [promotionCandidates]
+  );
+
   useEffect(() => {
     if (promotionCandidates.length === 0) {
       setPromotionTargetId('');
@@ -223,7 +230,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     if (!promotionCandidates.some(candidate => candidate.id === promotionTargetId)) {
       setPromotionTargetId(promotionCandidates[0].id);
     }
-  }, [promotionCandidates.map(candidate => candidate.id).join(','), promotionTargetId]);
+  }, [promotionCandidateIds, promotionCandidates, promotionTargetId]);
   const filteredSeeds = useMemo(() => seeds.filter(seed => {
     if (searchTerm.trim()) {
       const search = searchTerm.trim().toLowerCase();
@@ -313,6 +320,21 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     }
     setProfiling(false);
   }, [profileJobStatus, profiling, queryClient, selectedSeed]);
+
+  useEffect(() => {
+    if (!profiling || !profileJobError) return;
+    setProfiling(false);
+    setProfilingStatus(`Profile job status unavailable. ${profileJobErrorValue?.message || 'The backend may have restarted; re-run profile.'}`);
+  }, [profileJobError, profileJobErrorValue, profiling]);
+
+  useEffect(() => {
+    if (!profiling) return undefined;
+    const timeout = setTimeout(() => {
+      setProfiling(false);
+      setProfilingStatus('Profile timed out waiting for job status. Re-run profile to continue.');
+    }, 3 * 60_000);
+    return () => clearTimeout(timeout);
+  }, [profiling, profileRunToken]);
 
   useEffect(() => {
     setPromotionStatus('');

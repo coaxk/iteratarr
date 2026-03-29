@@ -335,7 +335,7 @@ const TREND_DISPLAY = {
   fresh:     { icon: '\u2022', color: 'text-blue-400', label: 'Fresh' },
 };
 
-export default function SeedHQ({ clip, branches, seedScreens, onEnterBranch, onGenerateSeeds, onRefresh, onManageBranch, onLaunchBranch }) {
+export default function SeedHQ({ clip, branches, seedScreens, onEnterBranch, onGenerateSeeds, onRefresh, onManageBranch, onLaunchBranch, onNavigateToAnalytics }) {
   // Fetch ALL iterations for this clip to compute branch trends
   // Shared with ClipDetail via TanStack Query dedup (same queryKey)
   const { data: allIterations } = useClipIterations(clip.id);
@@ -396,12 +396,23 @@ export default function SeedHQ({ clip, branches, seedScreens, onEnterBranch, onG
             {totalSeeds} seed{totalSeeds !== 1 ? 's' : ''} &middot; {totalBranches} branch{totalBranches !== 1 ? 'es' : ''} &middot; {activeBranches} active
           </span>
         </div>
-        <button
-          onClick={onGenerateSeeds}
-          className="px-3 py-1.5 text-xs font-mono font-bold bg-accent text-black rounded hover:bg-accent/90 transition-colors"
-        >
-          + Generate Seeds
-        </button>
+        <div className="flex items-center gap-2">
+          {onNavigateToAnalytics && (
+            <button
+              onClick={onNavigateToAnalytics}
+              className="px-3 py-1.5 text-xs font-mono text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-500 rounded transition-colors"
+              title="Open cross-clip analytics dashboard"
+            >
+              Analytics
+            </button>
+          )}
+          <button
+            onClick={onGenerateSeeds}
+            className="px-3 py-1.5 text-xs font-mono font-bold bg-accent text-black rounded hover:bg-accent/90 transition-colors"
+          >
+            + Generate Seeds
+          </button>
+        </div>
       </div>
 
       {/* Empty state */}

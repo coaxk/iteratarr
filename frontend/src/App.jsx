@@ -236,7 +236,12 @@ function AppContent() {
             <EpisodeTracker onSelectClip={(clip) => setSelectedClip(clip)} />
           )}
           {view === 'episodes' && selectedClip && (
-            <ClipDetail clip={selectedClip} onBack={() => guardedNavigate(() => setSelectedClip(null))} onUnsavedScoresChange={setHasUnsavedScores} />
+            <ClipDetail
+              clip={selectedClip}
+              onBack={() => guardedNavigate(() => setSelectedClip(null))}
+              onUnsavedScoresChange={setHasUnsavedScores}
+              onNavigateToAnalytics={() => guardedNavigate(() => { setSelectedClip(null); setView('analytics'); })}
+            />
           )}
           {view === 'analytics' && (
             <CrossClipDashboard onBack={() => guardedNavigate(() => setView('episodes'))} />

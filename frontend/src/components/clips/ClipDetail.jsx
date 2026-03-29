@@ -14,7 +14,7 @@ import BranchPillBar from './BranchPillBar';
 import BranchManageMenu from './BranchManageMenu';
 import BranchAnalytics from '../analytics/BranchAnalytics';
 
-export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parentUnsavedCallback }) {
+export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parentUnsavedCallback, onNavigateToAnalytics }) {
   // Branch state
   const [selectedBranchId, setSelectedBranchId] = useState(null);
   const { data: branches, refetch: refetchBranches } = useClipBranches(clip.id);
@@ -321,6 +321,7 @@ export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parent
               alert(`Launch failed: ${err.message}`);
             }
           }}
+          onNavigateToAnalytics={onNavigateToAnalytics}
         />
       )}
 

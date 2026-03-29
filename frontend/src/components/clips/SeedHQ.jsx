@@ -411,6 +411,9 @@ export default function SeedHQ({ clip, branches, seedScreens, onEnterBranch, onG
           </button>
         </div>
       </div>
+      <p className="text-[11px] font-mono text-gray-600">
+        Branch trend pills (`Rising/Plateau/Declining/Fresh`) appear on each branch row once scored iterations exist.
+      </p>
 
       {/* Empty state */}
       {seedGroups.length === 0 && (

@@ -162,10 +162,11 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
   const [profiling, setProfiling] = useState(false);
   const [profilingStatus, setProfilingStatus] = useState('');
   const [profileRunToken, setProfileRunToken] = useState(0);
+  const [compareStatus, setCompareStatus] = useState('');
   const seeds = data?.seeds || [];
   const summary = data?.summary || null;
   const { data: characters = [] } = useCharacters();
-  const { data: visionStatus } = useVisionStatus();
+  const { data: visionStatus, refetch: refetchVisionStatus } = useVisionStatus({ refetchOnMount: 'always' });
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -261,6 +262,32 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
   }), [compareSeedA, compareSeedB, seeds]);
   const canCompare = !!comparedSeedA && !!comparedSeedB && comparedSeedA.seed !== comparedSeedB.seed;
 
+  const handleSetCompareA = (seedValue) => {
+    setCompareStatus('');
+    if (compareSeedA === seedValue) {
+      setCompareSeedA(null);
+      return;
+    }
+    if (compareSeedB === seedValue) {
+      setCompareStatus('A/B must be different seeds. Clear B first or pick another seed.');
+      return;
+    }
+    setCompareSeedA(seedValue);
+  };
+
+  const handleSetCompareB = (seedValue) => {
+    setCompareStatus('');
+    if (compareSeedB === seedValue) {
+      setCompareSeedB(null);
+      return;
+    }
+    if (compareSeedA === seedValue) {
+      setCompareStatus('A/B must be different seeds. Clear A first or pick another seed.');
+      return;
+    }
+    setCompareSeedB(seedValue);
+  };
+
   function deltaText(a, b) {
     if (a == null || b == null) return '—';
     const delta = b - a;
@@ -335,6 +362,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
   useEffect(() => {
     setPromotionStatus('');
     setProfilingStatus('');
+    setCompareStatus('');
     setProfiling(false);
     setProfileRunToken(0);
   }, [selectedSeed]);
@@ -482,6 +510,9 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
             </p>
           </div>
         )}
+        {compareStatus && (
+          <p className="mt-2 text-xs font-mono text-amber-400">{compareStatus}</p>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -512,8 +543,8 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
                 onSelect={setSelectedSeed}
                 compareSeedA={compareSeedA}
                 compareSeedB={compareSeedB}
-                onSetCompareA={setCompareSeedA}
-                onSetCompareB={setCompareSeedB}
+                onSetCompareA={handleSetCompareA}
+                onSetCompareB={handleSetCompareB}
               />
             ))}
           </tbody>
@@ -600,6 +631,9 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
               <div className="text-xs font-mono text-gray-500 uppercase tracking-wider mb-2">
                 Promote Seed To Character
               </div>
+              <p className="text-xs font-mono text-gray-600 mb-2">
+                Use this only when a seed is proven for the character identity baseline and should carry forward as a character-level default.
+              </p>
               {promotionCandidates.length === 0 ? (
                 <p className="text-sm font-mono text-gray-600">
                   No matching character record found for this seed’s character names yet.
@@ -707,9 +741,17 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
                 </div>
               </div>
               {!visionStatus?.available && (
-                <p className="text-xs font-mono text-amber-400">
-                  Vision API unavailable: {visionStatus?.reason || 'configure ANTHROPIC_API_KEY'}.
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-mono text-amber-400">
+                    Vision API unavailable: {visionStatus?.reason || 'configure ANTHROPIC_API_KEY'}.
+                  </p>
+                  <button
+                    onClick={() => refetchVisionStatus()}
+                    className="px-2 py-1 rounded text-xs font-mono border border-gray-700 text-gray-400 hover:text-gray-200"
+                  >
+                    Recheck
+                  </button>
+                </div>
               )}
               {profilingStatus && (
                 <p className={`text-xs font-mono ${profilingStatus.startsWith('Profile failed') ? 'text-red-400' : 'text-green-400'}`}>

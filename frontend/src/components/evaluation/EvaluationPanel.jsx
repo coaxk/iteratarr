@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { useIterationQueueStatus, useRenderStatus, useVisionStatus } from '../../hooks/useQueries';
 import ScoreGroup from './ScoreGroup';
 import ScoreRing from './ScoreRing';
 import AttributionPanel from './AttributionPanel';
@@ -47,21 +48,23 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [renderSubmitted, setRenderSubmitted] = useState(false);
   const [autoScoring, setAutoScoring] = useState(false);
   const [visionUseFrames, setVisionUseFrames] = useState(false);
-  const [visionAvailable, setVisionAvailable] = useState(null); // null=checking, true/false
   const [renderProgress, setRenderProgress] = useState(null);
-  const pollCleanupRef = useRef(null);
-
-  const [renderStatus, setRenderStatus] = useState(null); // null | 'rendering' | 'complete' | 'failed'
+  const [renderStatus, setRenderStatus] = useState(null);
   const [queueAdded, setQueueAdded] = useState(false);
 
   const isEvaluated = !!iteration.evaluation;
   const hasChild = !!childIteration;
   const isReadOnly = isEvaluated && hasChild;
 
-  // Check Vision API availability once
-  useEffect(() => {
-    api.visionStatus().then(s => setVisionAvailable(s.available)).catch(() => setVisionAvailable(false));
-  }, []);
+  // Shared queries — TanStack Query deduplicates with other components
+  const { data: visionData } = useVisionStatus();
+  const visionAvailable = visionData?.available ?? null;
+
+  const isPending = iteration.status === 'pending' || iteration.status === 'failed';
+  const { data: iterQueueStatus } = useIterationQueueStatus(isPending ? iteration.id : null, {
+    refetchInterval: isPending && (queueAdded || renderStatus === 'rendering') ? 10000 : false
+  });
+  const { data: renderStatusData } = useRenderStatus();
 
   // Signal unsaved scores to parent + warn before navigating away
   useEffect(() => {
@@ -80,9 +83,6 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   }, [aiScores, isEvaluated]);
 
   useEffect(() => {
-    // Clean up any previous render status polling
-    if (pollCleanupRef.current) { pollCleanupRef.current(); pollCleanupRef.current = null; }
-
     if (iteration.evaluation) {
       const ev = iteration.evaluation;
       if (ev.scores?.identity) setIdentity(ev.scores.identity);
@@ -117,64 +117,34 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     setComparisonVideoPath(null);
     setComparisonIter(null);
 
-    // Single unified status check — polls when rendering
-    if (iteration.status === 'pending' || iteration.status === 'failed') {
-      setRenderStatus('checking');
-      setQueueAdded(false);
-
-      const runCheck = () => {
-        const checks = [
-          api.getIterationQueueStatus(iteration.id).catch(() => ({ in_queue: false })),
-          api.getRenderStatus().catch(() => ({ renders: [] })),
-          iteration.render_path
-            ? fetch(`/api/video?path=${encodeURIComponent(iteration.render_path)}`, { method: 'HEAD' }).then(r => r.ok).catch(() => false)
-            : Promise.resolve(false)
-        ];
-
-        Promise.all(checks).then(([qs, rs, videoExists]) => {
-          if (videoExists) {
-            setRenderStatus('complete');
-            setRenderProgress(null);
-            api.updateIteration(iteration.id, { status: 'rendered' }).catch(() => {});
-          } else if (qs.in_queue) {
-            setQueueAdded(qs.status);
-            if (qs.status === 'rendering') {
-              setRenderStatus('rendering');
-              setRenderProgress(qs.progress || null);
-            } else {
-              setRenderStatus(null);
-              setRenderProgress(null);
-            }
-          } else {
-            const normalize = p => p?.replace(/\\/g, '/');
-            const myRenders = rs.renders?.filter(r =>
-              r.json_path && iteration.json_path &&
-              normalize(r.json_path) === normalize(iteration.json_path)
-            ) || [];
-            const active = myRenders.find(r => r.status === 'rendering');
-            const complete = myRenders.find(r => r.status === 'complete');
-            if (active) {
-              setRenderStatus('rendering');
-              setRenderProgress(active.progress || null);
-            } else if (complete) {
-              setRenderStatus('complete');
-              setRenderProgress(null);
-            } else {
-              setRenderStatus(null);
-              setRenderProgress(null);
-            }
-          }
-        });
-      };
-
-      runCheck();
-      // Poll every 10s to detect render completion
-      const pollId = setInterval(runCheck, 10000);
-      pollCleanupRef.current = () => clearInterval(pollId);
-    } else {
-      setRenderStatus(null);
+    // One-time HEAD check for existing video
+    if (isPending && iteration.render_path) {
+      fetch(`/api/video?path=${encodeURIComponent(iteration.render_path)}`, { method: 'HEAD' })
+        .then(r => { if (r.ok) { setRenderStatus('complete'); api.updateIteration(iteration.id, { status: 'rendered' }).catch(() => {}); } })
+        .catch(() => {});
     }
   }, [iteration.id]);
+
+  // Sync render/queue status from TanStack Query data
+  useEffect(() => {
+    if (!isPending || renderStatus === 'complete') return;
+    if (iterQueueStatus?.in_queue) {
+      setQueueAdded(iterQueueStatus.status);
+      if (iterQueueStatus.status === 'rendering') {
+        setRenderStatus('rendering');
+        setRenderProgress(iterQueueStatus.progress || null);
+      }
+    } else if (renderStatusData?.renders) {
+      const normalize = p => p?.replace(/\\/g, '/');
+      const myRenders = renderStatusData.renders.filter(r =>
+        r.json_path && iteration.json_path && normalize(r.json_path) === normalize(iteration.json_path)
+      );
+      const active = myRenders.find(r => r.status === 'rendering');
+      const complete = myRenders.find(r => r.status === 'complete');
+      if (active) { setRenderStatus('rendering'); setRenderProgress(active.progress || null); }
+      else if (complete) { setRenderStatus('complete'); setRenderProgress(null); }
+    }
+  }, [iterQueueStatus, renderStatusData]);
 
   const grandTotal =
     IDENTITY_FIELDS.reduce((s, f) => s + (identity[f.key] || 1), 0) +

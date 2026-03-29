@@ -35,7 +35,7 @@ const LockedCard = memo(function LockedCard({ clip }) {
         <span className="bg-green-600 text-black text-xs px-2 py-0.5 rounded font-bold">LOCKED</span>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-gray-500 text-xs">{clip.characters.join(', ')}</span>
+        <span className="text-gray-500 text-xs">{clip.characters.length > 0 ? clip.characters.join(', ') : 'no character'}</span>
         <span className="text-green-400 font-bold text-sm">
           {clip.best_score}<span className="text-gray-600 font-normal">/{GRAND_MAX}</span>
         </span>

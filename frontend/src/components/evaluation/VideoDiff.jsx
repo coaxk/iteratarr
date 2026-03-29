@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import FileBrowserModal from '../forms/FileBrowserModal';
 import FrameStrip from './FrameStrip';

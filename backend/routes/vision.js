@@ -205,7 +205,8 @@ export function createVisionRoutes(store, config) {
       console.log(`[Vision] Scoring iter#${iteration.iteration_number} (${iteration_id.substring(0, 8)}) via ${method}`);
       const result = await scoreFrames(framePaths, context);
       result.method = method;
-      console.log(`[Vision] Score: ${result.grand_total}/75 (${method})`);
+      const cacheLabel = result.cache_hit ? ' [cache hit]' : result.tokens_used?.cache_write > 0 ? ' [cache write]' : '';
+      console.log(`[Vision] Score: ${result.grand_total}/75 (${method})${cacheLabel}`);
 
       res.json(result);
     } catch (err) {
@@ -268,6 +269,8 @@ export function createVisionRoutes(store, config) {
 
         console.log(`[Vision] Batch scoring ${id.substring(0, 8)}`);
         const result = await scoreFrames(framePaths, context);
+        const cacheLabel = result.cache_hit ? ' [cache hit]' : result.tokens_used?.cache_write > 0 ? ' [cache write]' : '';
+        console.log(`[Vision] Score: ${result.grand_total}/75${cacheLabel}`);
         results.push({ iteration_id: id, ...result });
       } catch (err) {
         results.push({ iteration_id: id, error: err.message });

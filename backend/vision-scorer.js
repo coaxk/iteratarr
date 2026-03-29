@@ -148,18 +148,20 @@ export async function scoreFrames(framePaths, context = {}) {
     userPrompt += `\nChange from previous iteration: ${context.changeFromParent}`;
   }
 
-  // Call Claude API
+  // Call Claude API — system prompt uses prompt caching so repeated evaluations
+  // in the same session only pay rubric tokens once (cache TTL: 5 minutes).
   const response = await fetch(ANTHROPIC_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'prompt-caching-2024-07-31'
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
-      system: SCORING_RUBRIC,
+      system: [{ type: 'text', text: SCORING_RUBRIC, cache_control: { type: 'ephemeral' } }],
       messages: [{
         role: 'user',
         content: [
@@ -218,6 +220,7 @@ export async function scoreFrames(framePaths, context = {}) {
       Object.values(parsed.scores.location).reduce((s, v) => s + v, 0) +
       Object.values(parsed.scores.motion).reduce((s, v) => s + v, 0);
 
+    const usage = result.usage || {};
     return {
       scores: parsed.scores,
       attribution: parsed.attribution || {},
@@ -225,7 +228,14 @@ export async function scoreFrames(framePaths, context = {}) {
       scoring_source: 'vision_api',
       grand_total: grandTotal,
       model_used: 'claude-sonnet-4-20250514',
-      scored_at: new Date().toISOString()
+      scored_at: new Date().toISOString(),
+      cache_hit: (usage.cache_read_input_tokens || 0) > 0,
+      tokens_used: {
+        input: usage.input_tokens || 0,
+        output: usage.output_tokens || 0,
+        cache_read: usage.cache_read_input_tokens || 0,
+        cache_write: usage.cache_creation_input_tokens || 0
+      }
     };
   } catch (parseErr) {
     throw new Error(`Failed to parse Claude response: ${parseErr.message}. Raw: ${text.substring(0, 200)}`);

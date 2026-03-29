@@ -62,6 +62,7 @@ Six controllable levers (called ropes) drive every prompt engineering decision:
 - **Production lock** — 7-step workflow: LOCKED folder, 81-frame JSON, DaVinci sidecar, queue
 - **Structured file layout** — episode/scene/clip hierarchy with auto-naming
 - **Wan2GP integration** — output_filename auto-set, render path auto-detected
+- **Cross-clip analytics dashboard** — overview pills, per-character performance, rope effectiveness bars, stalling/locked/healthy clip sections; shortcut in Seed HQ header
 - **Telemetry foundation** — opt-in, anonymized, off by default
 
 ## Stack

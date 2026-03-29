@@ -225,7 +225,9 @@ export function createQueueRoutes(store, config) {
       const failed = items.find(i => i.iteration_id === req.params.iterationId && i.status === 'failed');
       const result = match || completed || failed;
       if (result) {
-        res.json({ in_queue: true, ...result, progress: match?.id === activeItem?.id ? activeProgress : null });
+        const queuedItems = items.filter(i => i.status === 'queued').sort((a, b) => (a.priority || 0) - (b.priority || 0));
+        const position = match?.status === 'queued' ? queuedItems.findIndex(i => i.id === match.id) + 1 : null;
+        res.json({ in_queue: true, ...result, position, progress: match?.id === activeItem?.id ? activeProgress : null });
       } else {
         res.json({ in_queue: false });
       }

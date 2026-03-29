@@ -62,7 +62,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
 
   const isPending = iteration.status === 'pending' || iteration.status === 'failed';
   const { data: iterQueueStatus } = useIterationQueueStatus(isPending ? iteration.id : null, {
-    refetchInterval: isPending && (queueAdded || renderStatus === 'rendering') ? 10000 : false
+    refetchInterval: isPending ? (renderStatus === 'rendering' || queueAdded === 'rendering' ? 10000 : queueAdded === 'queued' ? 30000 : false) : false
   });
   const { data: renderStatusData } = useRenderStatus();
 
@@ -444,10 +444,13 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           }
 
           if (queueState === 'queued') {
+            const queuePosition = iterQueueStatus?.position;
             return (
               <div className="mt-2 border border-accent/30 bg-accent/5 rounded px-3 py-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-accent font-bold">In queue — waiting to render</span>
+                  <span className="text-xs font-mono text-accent font-bold">
+                    In queue{queuePosition != null ? ` — position ${queuePosition}` : ' — waiting to render'}
+                  </span>
                   <button
                     onClick={async () => {
                       try {

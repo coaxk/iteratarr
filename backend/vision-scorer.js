@@ -171,7 +171,7 @@ export async function scoreFrames(framePaths, context = {}) {
       'anthropic-beta': 'prompt-caching-2024-07-31'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: [{ type: 'text', text: SCORING_RUBRIC, cache_control: { type: 'ephemeral' } }],
       messages: [{
@@ -189,8 +189,8 @@ export async function scoreFrames(framePaths, context = {}) {
   if (!response.ok) {
     const errText = await response.text();
     let humanMessage;
-    if (response.status === 529 || response.status === 503) {
-      humanMessage = 'Claude API is overloaded — try again in a moment';
+    if (response.status === 529 || response.status === 503 || response.status === 502) {
+      humanMessage = 'Claude API is temporarily unavailable (gateway error) — try again in a moment';
     } else if (response.status === 429) {
       humanMessage = 'Claude API rate limit hit — try again in a moment';
     } else if (response.status === 401) {
@@ -254,7 +254,7 @@ export async function scoreFrames(framePaths, context = {}) {
       qualitative_notes: parsed.qualitative_notes || '',
       scoring_source: 'vision_api',
       grand_total: grandTotal,
-      model_used: 'claude-sonnet-4-20250514',
+      model_used: 'claude-sonnet-4-6',
       scored_at: new Date().toISOString(),
       cache_hit: (usage.cache_read_input_tokens || 0) > 0,
       tokens_used: {
@@ -286,19 +286,19 @@ export async function checkVisionApi() {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 10,
         messages: [{ role: 'user', content: 'ping' }]
       })
     });
 
     if (response.ok || response.status === 200) {
-      return { available: true, model: 'claude-sonnet-4-20250514' };
+      return { available: true, model: 'claude-sonnet-4-6' };
     }
     if (response.status === 401) {
       return { available: false, reason: 'Invalid API key' };
     }
-    return { available: true, model: 'claude-sonnet-4-20250514' };
+    return { available: true, model: 'claude-sonnet-4-6' };
   } catch (err) {
     return { available: false, reason: err.message };
   }

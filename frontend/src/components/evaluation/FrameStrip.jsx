@@ -12,8 +12,10 @@ import CopyButton from '../common/CopyButton';
  * Props:
  *   iterationId — the iteration UUID to fetch/extract frames for
  */
-export default function FrameStrip({ iterationId, renderPath: renderPathProp, iterationStatus }) {
+export default function FrameStrip({ iterationId, renderPath: renderPathProp, iteration }) {
   const [extracting, setExtracting] = useState(false);
+  const [lazyExtracting, setLazyExtracting] = useState(false);
+  const [lazyExtractError, setLazyExtractError] = useState(null);
   const [expandedFrame, setExpandedFrame] = useState(null);
   const [showBrowser, setShowBrowser] = useState(false);
   const [outputDir, setOutputDir] = useState(null);
@@ -24,6 +26,7 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
   // Attach wheel listener with passive: false so preventDefault works
   // Uses callback ref to handle element availability after frames load
   const wheelHandlerRef = useRef(null);
+  const lazyRequestedRef = useRef(false);
   const setThumbsRef = useCallback((el) => {
     // Clean up old listener
     if (wheelHandlerRef.current?.el) {
@@ -48,24 +51,12 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
   // TanStack Query for frames — polls until frames found, then stops
   const { data: frameData, isLoading: loading, error: frameError } = useQuery({
     queryKey: ['frames', iterationId],
-    queryFn: async () => {
-      const data = await api.listFrames(iterationId);
-      if (data.frames?.length > 0) return data;
-      // No frames yet — try extracting if render path exists
-      if (renderPathProp) {
-        try {
-          const result = await api.extractFrames(renderPathProp, iterationId, 4);
-          if (result.frames?.length > 0) {
-            return { frames: result.frames, frames_dir: result.frames_dir, contact_sheet: null };
-          }
-        } catch { /* render not ready yet */ }
-      }
-      return { frames: [], frames_dir: null, contact_sheet: null };
-    },
+    queryFn: async () => api.listFrames(iterationId),
     enabled: !!iterationId,
     refetchInterval: (query) => {
       const data = query.state.data;
-      return data?.frames?.length > 0 ? false : 20000; // stop polling once frames found
+      if (data?.frames?.length > 0) return false; // stop polling once any preview frames exist
+      return renderPathProp ? 20000 : false;
     },
     staleTime: 10000,
   });
@@ -79,11 +70,37 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
     if (frameData?.contact_sheet) setCsExported(frameData.contact_sheet);
   }, [frameData?.contact_sheet]);
 
+  useEffect(() => {
+    lazyRequestedRef.current = false;
+    setLazyExtracting(false);
+    setLazyExtractError(null);
+  }, [iterationId]);
+
+  // Lazy full extraction: queue writes frames_extracted=false after initial 6 thumbnails.
+  // On first open we expand to full 32-frame set and persist that status.
+  useEffect(() => {
+    if (!iterationId || !renderPathProp || !iteration) return;
+    if (iteration.frames_extracted !== false) return;
+    if (lazyRequestedRef.current) return;
+
+    lazyRequestedRef.current = true;
+    setLazyExtracting(true);
+    setLazyExtractError(null);
+
+    api.extractFrames(iterationId, renderPathProp, 32)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['frames', iterationId] }))
+      .catch((err) => {
+        setLazyExtractError(err.message || 'Failed to extract full frame set');
+        lazyRequestedRef.current = false;
+      })
+      .finally(() => setLazyExtracting(false));
+  }, [iteration, iterationId, queryClient, renderPathProp]);
+
   const handleExtract = async (path) => {
     if (!path) return;
     setExtracting(true);
     try {
-      await api.extractFrames(path, iterationId, 4);
+      await api.extractFrames(iterationId, path, 32);
       queryClient.invalidateQueries({ queryKey: ['frames', iterationId] });
     } catch (err) {
       alert(`Extract failed: ${err.message}`);
@@ -135,6 +152,18 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
       {error && (
         <div className="border border-score-low/50 bg-score-low/10 rounded px-3 py-2">
           <p className="text-xs font-mono text-score-low">{error}</p>
+        </div>
+      )}
+
+      {lazyExtracting && (
+        <div className="border border-accent/40 bg-accent/5 rounded px-3 py-2">
+          <p className="text-xs font-mono text-accent">Expanding to full 32-frame set...</p>
+        </div>
+      )}
+
+      {lazyExtractError && (
+        <div className="border border-score-low/50 bg-score-low/10 rounded px-3 py-2">
+          <p className="text-xs font-mono text-score-low">Lazy full extraction failed: {lazyExtractError}</p>
         </div>
       )}
 

@@ -40,7 +40,7 @@ export function createContactSheetRoutes(config) {
         if (existsSync(framesDir)) {
           const { readdirSync } = await import('fs');
           const files = readdirSync(framesDir)
-            .filter(f => (f.endsWith('.png') || f.endsWith('.jpg')) && !f.startsWith('contact_sheet'))
+            .filter(f => (f.endsWith('.png') || f.endsWith('.jpg') || f.endsWith('.webp')) && !f.startsWith('contact_sheet'))
             .sort()
             .map(f => join(framesDir, f));
           framePaths = files;
@@ -137,7 +137,7 @@ export function createContactSheetRoutes(config) {
         }
       })
         .composite(composites)
-        .png()
+        .webp({ quality: 90 })
         .toBuffer();
 
       // Save alongside frames (same directory) so they're grouped in explorer
@@ -149,7 +149,7 @@ export function createContactSheetRoutes(config) {
         }
       }
       await mkdir(saveDir, { recursive: true });
-      const outFilename = filename || `contact_sheet_${metadata?.seed || frame_id || 'manual'}.png`;
+      const outFilename = filename || `contact_sheet_${metadata?.seed || frame_id || 'manual'}.webp`;
       const outPath = join(saveDir, outFilename);
       // Also save to central sheets dir for the serving endpoint
       await mkdir(sheetsDir, { recursive: true });

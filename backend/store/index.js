@@ -14,7 +14,8 @@ export function createStore(dbPathOrDir) {
   mkdirSync(parentDir, { recursive: true });
 
   const db = Database(dbPath);
-  db.pragma('journal_mode = WAL');
+db.pragma('journal_mode = WAL');
+db.pragma('auto_vacuum = INCREMENTAL');
 
   // Track which tables have been ensured so we only CREATE TABLE once per collection
   const ensuredTables = new Set();

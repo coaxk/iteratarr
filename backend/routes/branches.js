@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, readdir, unlink } from 'fs/promises';
 import { join, basename } from 'path';
+import { existsSync } from 'fs';
 import { validateBranch } from '../store/validators.js';
 import { getClipPaths } from '../paths.js';
 import { WAN2GP_FIELDS } from './iterations.js';
@@ -11,6 +12,7 @@ import { WAN2GP_FIELDS } from './iterations.js';
  */
 export function createBranchRoutes(store, config = {}) {
   const router = Router();
+  const framesRoot = join(config.iteratarr_data_dir || '.', 'frames');
 
   /**
    * GET /api/clips/:clipId/branches — list all branches for a clip
@@ -118,6 +120,38 @@ export function createBranchRoutes(store, config = {}) {
       }
 
       const updated = await store.update('branches', req.params.id, patch);
+
+      const transitionedToTerminal = ['locked', 'abandoned'].includes(updated.status)
+        && !['locked', 'abandoned'].includes(branch.status);
+
+      if (transitionedToTerminal) {
+        const iterations = await store.list('iterations', i => i.branch_id === branch.id);
+        let deletedFrames = 0;
+
+        for (const iter of iterations) {
+          const frameDir = join(framesRoot, iter.id);
+          if (!existsSync(frameDir)) continue;
+          let files = [];
+          try {
+            files = await readdir(frameDir);
+          } catch {
+            continue;
+          }
+
+          const frameFiles = files.filter(filename => /^frame_\d{3}\.(webp|png|jpg|jpeg)$/i.test(filename));
+          for (const filename of frameFiles) {
+            try {
+              await unlink(join(frameDir, filename));
+              deletedFrames++;
+            } catch {}
+          }
+        }
+
+        if (deletedFrames > 0) {
+          console.log(`[Branches] Purged ${deletedFrames} frame(s) for branch ${branch.name || branch.id} on status transition to ${updated.status}`);
+        }
+      }
+
       res.json(updated);
     } catch (err) {
       res.status(err.message.includes('not found') ? 404 : 400).json({ error: err.message });

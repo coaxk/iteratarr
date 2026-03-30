@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import supertest from 'supertest';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { createTestApp } from '../helpers.js';
@@ -108,6 +108,44 @@ describe('Branches API', () => {
     const res = await request.patch(`/api/clips/${clip.id}/branches/${branchRes.body.id}`).send({ status: 'locked' });
     expect(res.status).toBe(200);
     expect(res.body.locked_at).toBeTruthy();
+  });
+
+  it('PATCH to locked purges frame files for branch iterations and preserves contact sheets', async () => {
+    const clip = await createClip();
+    const branchRes = await request.post(`/api/clips/${clip.id}/branches`).send({ seed: 544083690 });
+    const branch = branchRes.body;
+    const iter = await store.create('iterations', {
+      clip_id: clip.id, branch_id: branch.id, iteration_number: 1, seed_used: 544083690
+    });
+
+    const iterDir = join(tmpDir, 'frames', iter.id);
+    mkdirSync(iterDir, { recursive: true });
+    writeFileSync(join(iterDir, 'frame_001.webp'), 'frame');
+    writeFileSync(join(iterDir, 'frame_002.png'), 'frame');
+    writeFileSync(join(iterDir, 'contact_sheet_544083690.webp'), 'sheet');
+
+    const res = await request.patch(`/api/clips/${clip.id}/branches/${branch.id}`).send({ status: 'locked' });
+    expect(res.status).toBe(200);
+    expect(existsSync(join(iterDir, 'frame_001.webp'))).toBe(false);
+    expect(existsSync(join(iterDir, 'frame_002.png'))).toBe(false);
+    expect(existsSync(join(iterDir, 'contact_sheet_544083690.webp'))).toBe(true);
+  });
+
+  it('PATCH to stalled does not purge frame files', async () => {
+    const clip = await createClip();
+    const branchRes = await request.post(`/api/clips/${clip.id}/branches`).send({ seed: 544083690 });
+    const branch = branchRes.body;
+    const iter = await store.create('iterations', {
+      clip_id: clip.id, branch_id: branch.id, iteration_number: 1, seed_used: 544083690
+    });
+
+    const iterDir = join(tmpDir, 'frames', iter.id);
+    mkdirSync(iterDir, { recursive: true });
+    writeFileSync(join(iterDir, 'frame_001.webp'), 'frame');
+
+    const res = await request.patch(`/api/clips/${clip.id}/branches/${branch.id}`).send({ status: 'stalled' });
+    expect(res.status).toBe(200);
+    expect(existsSync(join(iterDir, 'frame_001.webp'))).toBe(true);
   });
 
   it('PATCH rejects invalid status', async () => {

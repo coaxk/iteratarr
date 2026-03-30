@@ -152,7 +152,7 @@ export default function SeedScreening({ clip, onSeedSelected, onBack }) {
 
       try {
         // Try extracting frames — if the render exists, this will succeed
-        const result = await api.extractFrames(record.render_path, record.id, 4);
+        const result = await api.extractFrames(record.id, record.render_path, 4);
         if (result.frames && result.frames.length > 0) {
           // Persist frames to the seed_screen record
           await api.updateSeedScreen(clip.id, record.id, { frames: result.frames });

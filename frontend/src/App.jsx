@@ -13,6 +13,7 @@ import TemplateLibrary from './components/templates/TemplateLibrary';
 import RenderStatus from './components/render/RenderStatus';
 import GpuStatus from './components/gpu/GpuStatus';
 import CrossClipDashboard from './components/analytics/CrossClipDashboard';
+import StoragePage from './components/storage/StoragePage';
 
 import { useAutoRender } from './hooks/useAutoRender';
 import { useQueueStatus, useClips } from './hooks/useQueries';
@@ -33,7 +34,8 @@ const VIEWS = {
   queue: 'Queue Manager',
   characters: 'Character Registry',
   templates: 'Templates',
-  trends: 'Score Trends'
+  trends: 'Score Trends',
+  storage: 'Storage'
 };
 
 function TrendsView() {
@@ -155,6 +157,21 @@ function QueueBadge({ active }) {
   );
 }
 
+function StorageBadge({ active }) {
+  const { data } = useQuery({
+    queryKey: ['storage'],
+    queryFn: () => api.getStorage(),
+    staleTime: 5 * 60 * 1000
+  });
+  const stagnantCount = data?.stagnant?.length || 0;
+  if (stagnantCount === 0) return null;
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${active ? 'bg-black/20 text-black' : 'bg-yellow-500/20 text-yellow-400'}`}>
+      {stagnantCount}
+    </span>
+  );
+}
+
 function AutoRenderToggle() {
   const { autoRender, toggleAutoRender } = useAutoRender();
 
@@ -207,6 +224,7 @@ function AppContent() {
               >
                 <span>{label}</span>
                 {key === 'queue' && <QueueBadge active={view === key} />}
+                {key === 'storage' && <StorageBadge active={view === key} />}
               </button>
             ))}
           </nav>
@@ -250,6 +268,7 @@ function AppContent() {
           {view === 'characters' && <CharacterRegistry onNavigateToClip={(clip) => { setSelectedClip(clip); setView('episodes'); }} />}
           {view === 'templates' && <TemplateLibrary />}
           {view === 'trends' && <TrendsView />}
+          {view === 'storage' && <StoragePage />}
         </main>
 
         {/* Right panel — Production Queue */}

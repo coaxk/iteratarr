@@ -18,6 +18,7 @@ import { createQueueRoutes } from './routes/queue.js';
 import { createGpuRoutes } from './routes/gpu.js';
 import { createAnalyticsRoutes } from './routes/analytics.js';
 import { createVisionRoutes } from './routes/vision.js';
+import { createStorageRoutes } from './routes/storage.js';
 import { createWatcher } from './watcher.js';
 import { createTelemetry } from './telemetry/index.js';
 import config from './config.js';
@@ -52,7 +53,7 @@ app.use('/api/iterations', createIterationRoutes(store, config, telemetry));
 app.use('/api/characters', createCharacterRoutes(store, config, telemetry));
 app.use('/api/export', createExportRoutes(store, config));
 app.use('/api/telemetry', createTelemetryRoutes(telemetry, config));
-app.use('/api/frames', createFrameRoutes(config.iteratarr_data_dir));
+app.use('/api/frames', createFrameRoutes(config.iteratarr_data_dir, store));
 app.use('/api/browser', createBrowserRoutes(config));
 app.use('/api/templates', createTemplateRoutes(store));
 app.use('/api/render', createRenderRoutes(store, config));
@@ -64,6 +65,7 @@ app.use('/api/queue', createQueueRoutes(store, config));
 app.use('/api/gpu', createGpuRoutes());
 app.use('/api/analytics', createAnalyticsRoutes(store, config));
 app.use('/api/vision', createVisionRoutes(store, config));
+app.use('/api/storage', createStorageRoutes(store, config));
 
 // Video file serving — streams MP4 files from allowed directories
 import { resolve, relative, extname } from 'path';

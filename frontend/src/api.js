@@ -36,7 +36,7 @@ export const api = {
   updateIteration: (id, data) => request(`/iterations/${id}`, { method: 'PATCH', body: data }),
   evaluate: (id, data) => request(`/iterations/${id}/evaluate`, { method: 'POST', body: data }),
   lock: (id) => request(`/iterations/${id}/lock`, { method: 'POST' }),
-  generateNext: (id) => request(`/iterations/${id}/next`, { method: 'POST' }),
+  generateNext: (id, body) => request(`/iterations/${id}/next`, { method: 'POST', body }),
 
   // Characters
   listCharacters: () => request('/characters'),
@@ -79,7 +79,7 @@ export const api = {
 
   // Frames
   listFrames: (iterationId) => request(`/frames/${iterationId}`),
-  extractFrames: (videoPath, iterationId, count = 4) =>
+  extractFrames: (iterationId, videoPath, count = 32) =>
     request('/frames/extract', { method: 'POST', body: { video_path: videoPath, iteration_id: iterationId, count } }),
 
   // Telemetry
@@ -134,6 +134,10 @@ export const api = {
   getSeedThumbnails: (clipId) => request(`/analytics/clips/${clipId}/seed-thumbnails`),
   startSeedPersonalityProfile: (seed, data = {}) => request(`/analytics/seeds/${seed}/personality-profile`, { method: 'POST', body: data }),
   getSeedPersonalityProfileStatus: (seed) => request(`/analytics/seeds/${seed}/personality-profile/status`),
+
+  // Storage
+  getStorage: () => request('/storage'),
+  purgeStorageBranch: (branchId) => request(`/storage/branch/${branchId}/frames`, { method: 'DELETE' }),
 
   // GPU Monitoring
   gpuStatus: () => request('/gpu/status'),

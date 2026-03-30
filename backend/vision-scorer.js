@@ -93,7 +93,7 @@ async function loadImageBase64(filePath) {
 /**
  * Score frames using Claude Vision API.
  *
- * @param {string[]} framePaths — paths to frame PNG files
+ * @param {string[]} framePaths — paths to frame image files
  * @param {object} context — additional context for scoring
  * @param {string} context.prompt — the generation prompt
  * @param {string} context.characterDescription — character identity description
@@ -112,7 +112,9 @@ export async function scoreFrames(framePaths, context = {}) {
   const images = [];
   for (const fp of framePaths) {
     if (!existsSync(fp)) continue;
-    const ext = fp.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const ext = fp.toLowerCase().endsWith('.png') ? 'image/png'
+      : fp.toLowerCase().endsWith('.webp') ? 'image/webp'
+      : 'image/jpeg';
     const base64 = await loadImageBase64(fp);
     images.push({ type: 'image', source: { type: 'base64', media_type: ext, data: base64 } });
   }
@@ -127,7 +129,9 @@ export async function scoreFrames(framePaths, context = {}) {
     for (const refPath of context.referenceImagePaths.slice(0, 3)) { // max 3 reference photos
       try {
         if (existsSync(refPath)) {
-          const ext = refPath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+          const ext = refPath.toLowerCase().endsWith('.png') ? 'image/png'
+            : refPath.toLowerCase().endsWith('.webp') ? 'image/webp'
+            : 'image/jpeg';
           const base64 = await loadImageBase64(refPath);
           referenceImages.push({ type: 'image', source: { type: 'base64', media_type: ext, data: base64 } });
         }

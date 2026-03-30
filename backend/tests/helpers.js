@@ -11,6 +11,8 @@ import { createBranchRoutes, createBranchIterationRoutes } from '../routes/branc
 import { createTelemetry } from '../telemetry/index.js';
 import { createTelemetryRoutes } from '../routes/telemetry.js';
 import { createAnalyticsRoutes } from '../routes/analytics.js';
+import { createFrameRoutes } from '../routes/frames.js';
+import { createStorageRoutes } from '../routes/storage.js';
 
 export function createTestApp(dataDir, config = {}) {
   config = { iteratarr_data_dir: dataDir, ...config };
@@ -30,6 +32,8 @@ export function createTestApp(dataDir, config = {}) {
   app.use('/api/branches', createBranchIterationRoutes(store));
   app.use('/api/telemetry', createTelemetryRoutes(telemetry, config));
   app.use('/api/analytics', createAnalyticsRoutes(store, config));
+  app.use('/api/frames', createFrameRoutes(dataDir, store));
+  app.use('/api/storage', createStorageRoutes(store, config));
 
   return { app, store, telemetry };
 }

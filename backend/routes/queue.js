@@ -43,7 +43,17 @@ export function createQueueRoutes(store, config) {
   router.get('/', async (req, res) => {
     try {
       const items = await store.list('render_queue');
-      items.sort((a, b) => {
+
+      // Auto-purge completed/failed items older than 7 days — no reason to keep them
+      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const stale = items.filter(i =>
+        (i.status === 'complete' || i.status === 'failed') &&
+        (i.completed_at || i.updated_at) < cutoff
+      );
+      await Promise.all(stale.map(i => store.delete('render_queue', i.id)));
+      const active = stale.length > 0 ? items.filter(i => !stale.find(s => s.id === i.id)) : items;
+
+      active.sort((a, b) => {
         // queued items first, then rendering, then complete/failed
         const statusOrder = { rendering: 0, queued: 1, failed: 2, complete: 3 };
         const sa = statusOrder[a.status] ?? 4;
@@ -55,7 +65,7 @@ export function createQueueRoutes(store, config) {
         }
         return new Date(a.queued_at) - new Date(b.queued_at);
       });
-      res.json(items);
+      res.json(active);
     } catch {
       res.json([]);
     }
@@ -389,18 +399,19 @@ export function createQueueRoutes(store, config) {
             }
             await store.update('iterations', item.iteration_id, updates);
 
-            // Auto-extract frames if render exists
+            // Extract 6 key frames immediately for quick preview.
+            // Full 32-frame extraction happens lazily on first view.
             if (iter.render_path && existsSync(iter.render_path)) {
               try {
                 await fetch(`http://localhost:${config.port || 3847}/api/frames/extract`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ video_path: iter.render_path, iteration_id: item.iteration_id, count: 4 })
+                  body: JSON.stringify({ video_path: iter.render_path, iteration_id: item.iteration_id, count: 6 })
                 });
-                console.log(`[Queue] Frames extracted for ${item.clip_name}`);
-              } catch {
-                // Try direct extraction via the extract endpoint using internal fetch
-                console.log(`[Queue] Frame extraction skipped — will extract on view`);
+                await store.update('iterations', item.iteration_id, { frames_extracted: false });
+                console.log(`[Queue] 6 key frames extracted for ${item.clip_name} (lazy full extraction pending)`);
+              } catch (frameErr) {
+                console.log(`[Queue] Frame extraction skipped — will extract on view: ${frameErr.message}`);
               }
             }
           } catch (e) {

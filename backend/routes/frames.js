@@ -11,12 +11,12 @@ ffmpeg.setFfprobePath(ffprobeStatic.path);
 
 /**
  * Frame extraction routes for Iteratarr.
- * Extracts evenly-spaced PNG frames from rendered MP4 videos so they
+ * Extracts evenly-spaced WebP frames from rendered MP4 videos so they
  * can be displayed inline in the evaluation panel.
  *
- * Frames are stored under: backend/data/frames/{iteration_id}/frame_001.png
+ * Frames are stored under: backend/data/frames/{iteration_id}/frame_001.webp
  */
-export function createFrameRoutes(dataDir) {
+export function createFrameRoutes(dataDir, store = null) {
   const router = Router();
   const framesRoot = resolve(dataDir, 'frames');
 
@@ -58,7 +58,7 @@ export function createFrameRoutes(dataDir) {
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       throw new Error('Invalid filename');
     }
-    if (!/^frame_\d{3}\.png$/.test(filename)) {
+    if (!/^frame_\d{3}\.webp$/.test(filename)) {
       throw new Error('Invalid frame filename format');
     }
     return filename;
@@ -85,6 +85,7 @@ export function createFrameRoutes(dataDir) {
         .seekInput(timestamp)
         .frames(1)
         .output(outputPath)
+        .outputOptions(['-vcodec', 'libwebp', '-quality', '85'])
         .on('end', () => resolve(outputPath))
         .on('error', (err) => reject(new Error(`Frame extraction failed: ${err.message}`)))
         .run();
@@ -102,7 +103,7 @@ export function createFrameRoutes(dataDir) {
     try {
       const videoPath = validateVideoPath(req.body.video_path);
       const iterationId = validateIterationId(req.body.iteration_id);
-      const count = Math.min(Math.max(parseInt(req.body.count) || 4, 1), 20);
+      const count = Math.min(Math.max(parseInt(req.body.count) || 4, 1), 32);
 
       // Verify the video file exists
       try {
@@ -128,13 +129,28 @@ export function createFrameRoutes(dataDir) {
       // Extract all frames
       const frames = [];
       for (let i = 0; i < timestamps.length; i++) {
-        const filename = `frame_${String(i + 1).padStart(3, '0')}.png`;
+        const filename = `frame_${String(i + 1).padStart(3, '0')}.webp`;
         const outputPath = join(outDir, filename);
         await extractFrame(videoPath, timestamps[i], outputPath);
         frames.push(filename);
       }
 
-      res.json({ frames, iteration_id: iterationId, frames_dir: outDir });
+      const response = { frames, iteration_id: iterationId, frames_dir: outDir };
+
+      // Full extraction (32 frames) marks the iteration as fully extracted.
+      if (store && count >= 32) {
+        try {
+          await store.update('iterations', iterationId, {
+            frames_extracted: true,
+            frames_extracted_at: new Date().toISOString()
+          });
+          response.frames_extracted = true;
+        } catch {
+          // Iteration may not exist (e.g. seed screen frames). Ignore.
+        }
+      }
+
+      res.json(response);
     } catch (err) {
       console.error('[Frames] Extraction error:', err.message);
       res.status(400).json({ error: err.message });
@@ -158,7 +174,7 @@ export function createFrameRoutes(dataDir) {
       }
 
       const frames = files
-        .filter(f => /^frame_\d{3}\.png$/.test(f))
+        .filter(f => /^frame_\d{3}\.webp$/.test(f))
         .sort();
 
       // Check for existing contact sheet
@@ -189,7 +205,7 @@ export function createFrameRoutes(dataDir) {
 
   /**
    * GET /api/frames/:iteration_id/:filename
-   * Serves an individual frame PNG.
+   * Serves an individual frame WebP.
    */
   router.get('/:iteration_id/:filename', async (req, res) => {
     try {
@@ -203,6 +219,7 @@ export function createFrameRoutes(dataDir) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
+      res.setHeader('Content-Type', 'image/webp');
       res.sendFile(resolved);
     } catch (err) {
       res.status(400).json({ error: err.message });

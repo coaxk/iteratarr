@@ -61,7 +61,7 @@ function CompletedThumbnail({ iterationId, jsonPath }) {
           // Try Wan2GP output directory
           api.getConfigPaths().then(paths => {
             const renderPath = `${paths.wan2gp_output_dir}/${basename}.mp4`;
-            api.extractFrames(renderPath, screenId, 1).then(r => {
+            api.extractFrames(screenId, renderPath, 1).then(r => {
               if (r.frames?.length > 0) setFrameSrc(`/api/frames/${screenId}/${r.frames[0]}`);
             }).catch(() => {});
           }).catch(() => {});
@@ -76,6 +76,42 @@ function CompletedThumbnail({ iterationId, jsonPath }) {
       alt="Render preview"
       className="h-16 w-auto rounded border border-gray-700 shrink-0"
     />
+  );
+}
+
+function CompletedSection({ items, onRemove, onRetry }) {
+  const [open, setOpen] = useState(false);
+  const failedCount = items.filter(i => i.status === 'failed').length;
+  return (
+    <div className="border border-gray-800 rounded">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-3 py-2 text-xs font-mono text-gray-600 hover:text-gray-400 transition-colors"
+      >
+        <span>
+          History ({items.length - failedCount} complete{failedCount > 0 ? `, ${failedCount} failed` : ''})
+        </span>
+        <span>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="border-t border-gray-800 p-2 space-y-1.5">
+          <p className="text-[10px] font-mono text-gray-700 px-1 pb-1">Items older than 7 days are removed automatically.</p>
+          {items.map(item => (
+            <QueueItemRow
+              key={item.id}
+              item={item}
+              index={0}
+              totalQueued={0}
+              onMoveUp={() => {}}
+              onMoveDown={() => {}}
+              onRemove={onRemove}
+              onRetry={onRetry}
+              isActive={false}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -476,28 +512,9 @@ export default function QueueManager() {
         </div>
       )}
 
-      {/* Completed items */}
+      {/* Completed items — collapsed by default */}
       {completedItems.length > 0 && (
-        <div>
-          <h3 className="text-xs font-mono text-gray-600 uppercase tracking-wider mb-2">
-            Completed ({completedItems.length})
-          </h3>
-          <div className="space-y-1.5">
-            {completedItems.map(item => (
-              <QueueItemRow
-                key={item.id}
-                item={item}
-                index={0}
-                totalQueued={0}
-                onMoveUp={() => {}}
-                onMoveDown={() => {}}
-                onRemove={handleRemove}
-                onRetry={fetchAll}
-                isActive={false}
-              />
-            ))}
-          </div>
-        </div>
+        <CompletedSection items={completedItems} onRemove={handleRemove} onRetry={fetchAll} />
       )}
     </div>
   );

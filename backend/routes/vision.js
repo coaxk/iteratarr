@@ -26,6 +26,7 @@ function checkRateLimit() {
 export function createVisionRoutes(store, config) {
   const router = Router();
   const framesRoot = join(config.iteratarr_data_dir, 'frames');
+  const frameFilePattern = /^frame_\d{3}\.(webp|png)$/i;
 
   /**
    * GET /api/vision/status — check if Vision API is configured
@@ -48,7 +49,7 @@ export function createVisionRoutes(store, config) {
       if (existsSync(framesDir)) {
         const files = await readdir(framesDir);
         const cs = files.find(f => f.startsWith('contact_sheet'));
-        const frames = files.filter(f => /^frame_\d{3}\.png$/.test(f));
+        const frames = files.filter(f => frameFilePattern.test(f));
 
         if (cs) {
           method = 'contact_sheet';
@@ -109,7 +110,7 @@ export function createVisionRoutes(store, config) {
         if (use_frames) {
           // Forced individual frames mode — for A/B testing vs contact sheet
           framePaths = files
-            .filter(f => /^frame_\d{3}\.png$/.test(f))
+            .filter(f => frameFilePattern.test(f))
             .sort()
             .map(f => join(framesDir, f));
           method = 'individual_frames';
@@ -121,7 +122,7 @@ export function createVisionRoutes(store, config) {
             method = 'contact_sheet';
           } else {
             framePaths = files
-              .filter(f => /^frame_\d{3}\.png$/.test(f))
+              .filter(f => frameFilePattern.test(f))
               .sort()
               .map(f => join(framesDir, f));
             method = 'individual_frames';
@@ -243,7 +244,7 @@ export function createVisionRoutes(store, config) {
           if (cs) {
             framePaths = [join(framesDir, cs)];
           } else {
-            framePaths = files.filter(f => /^frame_\d{3}\.png$/.test(f)).sort().map(f => join(framesDir, f));
+            framePaths = files.filter(f => frameFilePattern.test(f)).sort().map(f => join(framesDir, f));
           }
         }
 

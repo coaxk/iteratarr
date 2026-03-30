@@ -280,8 +280,8 @@ describe('Analytics API — /api/analytics/clips/:clipId/seed-thumbnails', () =>
     const iterFramesDir = join(tmpDir, 'frames', iteration.id);
     mkdirSync(screenFramesDir, { recursive: true });
     mkdirSync(iterFramesDir, { recursive: true });
-    writeFileSync(join(screenFramesDir, 'frame_001.png'), 'fake');
-    writeFileSync(join(iterFramesDir, 'frame_001.png'), 'fake');
+    writeFileSync(join(screenFramesDir, 'frame_001.webp'), 'fake');
+    writeFileSync(join(iterFramesDir, 'frame_001.webp'), 'fake');
 
     const res = await request.get(`/api/analytics/clips/${clip.id}/seed-thumbnails`);
     expect(res.status).toBe(200);

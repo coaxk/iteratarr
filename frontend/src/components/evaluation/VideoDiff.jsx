@@ -94,6 +94,8 @@ export default function VideoDiff({
 }) {
   const [browsing, setBrowsing] = useState(null);
   const [outputDir, setOutputDir] = useState(null);
+  const currentIteration = allIterations?.find(i => i.id === currentIterationId) || null;
+  const previousIteration = allIterations?.find(i => i.id === previousIterationId) || null;
 
   useEffect(() => {
     api.getConfigPaths().then(p => setOutputDir(p.wan2gp_output_dir)).catch(() => {});
@@ -124,7 +126,12 @@ export default function VideoDiff({
             onBrowse={() => setBrowsing('previous')}
           />
           {previousIterationId && (
-            <FrameStrip key={`prev-${previousIterationId}`} iterationId={previousIterationId} renderPath={previousVideoPath} />
+            <FrameStrip
+              key={`prev-${previousIterationId}`}
+              iterationId={previousIterationId}
+              renderPath={previousVideoPath}
+              iteration={previousIteration}
+            />
           )}
         </div>
         <div className="flex-1 min-w-0 space-y-2">
@@ -136,7 +143,12 @@ export default function VideoDiff({
             onBrowse={() => setBrowsing('current')}
           />
           {currentIterationId && (
-            <FrameStrip key={`cur-${currentIterationId}`} iterationId={currentIterationId} renderPath={currentVideoPath} />
+            <FrameStrip
+              key={`cur-${currentIterationId}`}
+              iterationId={currentIterationId}
+              renderPath={currentVideoPath}
+              iteration={currentIteration}
+            />
           )}
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constants';
 import { useCharacters, useSeedAnalytics, useSeedPersonalityProfileStatus, useVisionStatus } from '../../hooks/useQueries';
@@ -167,6 +167,7 @@ const SeedRow = memo(function SeedRow({
 
 export default function SeedsTab({ data, isLoading, isError, onRetry }) {
   const [selectedSeed, setSelectedSeed] = useState(null);
+  const detailRef = useRef(null);
   const [compareSeedA, setCompareSeedA] = useState(null);
   const [compareSeedB, setCompareSeedB] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -375,6 +376,11 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
 
     return `Scope: Seed ${selectedSeed} • Evidence: ${clipEvidence}${sampleCount != null ? ` (${sampleCount} samples)` : ''}${characterEvidence ? ` • Characters: ${characterEvidence}` : ''}`;
   }, [seedDetail, selectedSeed]);
+
+  const handleSelectSeed = useCallback((seedValue) => {
+    setSelectedSeed(seedValue);
+    setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+  }, []);
 
   const handleSetCompareA = useCallback((seedValue) => {
     setCompareStatus('');
@@ -761,7 +767,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
                 key={seed.seed}
                 seed={seed}
                 isSelected={seed.seed === selectedSeed}
-                onSelect={setSelectedSeed}
+                onSelect={handleSelectSeed}
                 compareSeedA={compareSeedA}
                 compareSeedB={compareSeedB}
                 onSetCompareA={handleSetCompareA}
@@ -777,7 +783,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
         )}
       </div>
 
-      <div className="border border-gray-700 rounded-lg p-4 bg-surface-raised">
+      <div ref={detailRef} className="border border-gray-700 rounded-lg p-4 bg-surface-raised">
         <div className="flex items-center justify-between mb-3">
           <div className="text-xs font-mono text-gray-500 uppercase tracking-wider">
             Seed Detail {selectedSeed != null ? `- ${selectedSeed}` : ''}

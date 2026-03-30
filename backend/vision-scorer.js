@@ -187,8 +187,23 @@ export async function scoreFrames(framePaths, context = {}) {
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Claude API error ${response.status}: ${err.substring(0, 200)}`);
+    const errText = await response.text();
+    let humanMessage;
+    if (response.status === 529 || response.status === 503) {
+      humanMessage = 'Claude API is overloaded — try again in a moment';
+    } else if (response.status === 429) {
+      humanMessage = 'Claude API rate limit hit — try again in a moment';
+    } else if (response.status === 401) {
+      humanMessage = 'API key is invalid or missing';
+    } else {
+      try {
+        const parsed = JSON.parse(errText);
+        humanMessage = parsed?.error?.message || `Claude API error ${response.status}`;
+      } catch {
+        humanMessage = `Claude API error ${response.status}`;
+      }
+    }
+    throw new Error(humanMessage);
   }
 
   const result = await response.json();

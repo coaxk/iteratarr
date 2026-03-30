@@ -27,7 +27,7 @@ export function useIterationState(clipId, selectedBranchId, onUnsavedScoresChang
         (i.iteration_number || 0) > (max.iteration_number || 0) ? i : max, iterations[0]);
       setSelectedIteration(latest);
     }
-  }, [iterations]);
+  }, [iterations, selectedIteration]);
 
   // Derived: child iteration (the one whose parent is the current selection)
   const childIteration = selectedIteration && iterations

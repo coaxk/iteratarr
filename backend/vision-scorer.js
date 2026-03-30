@@ -13,6 +13,7 @@ import { existsSync } from 'fs';
 import config from './config.js';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const VISION_MODEL = config.vision_model;
 
 /**
  * The scoring rubric — sent as system prompt to Claude Vision.
@@ -171,7 +172,7 @@ export async function scoreFrames(framePaths, context = {}) {
       'anthropic-beta': 'prompt-caching-2024-07-31'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: VISION_MODEL,
       max_tokens: 1024,
       system: [{ type: 'text', text: SCORING_RUBRIC, cache_control: { type: 'ephemeral' } }],
       messages: [{
@@ -254,7 +255,7 @@ export async function scoreFrames(framePaths, context = {}) {
       qualitative_notes: parsed.qualitative_notes || '',
       scoring_source: 'vision_api',
       grand_total: grandTotal,
-      model_used: 'claude-sonnet-4-6',
+      model_used: VISION_MODEL,
       scored_at: new Date().toISOString(),
       cache_hit: (usage.cache_read_input_tokens || 0) > 0,
       tokens_used: {
@@ -286,19 +287,19 @@ export async function checkVisionApi() {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: VISION_MODEL,
         max_tokens: 10,
         messages: [{ role: 'user', content: 'ping' }]
       })
     });
 
     if (response.ok || response.status === 200) {
-      return { available: true, model: 'claude-sonnet-4-6' };
+      return { available: true, model: VISION_MODEL };
     }
     if (response.status === 401) {
       return { available: false, reason: 'Invalid API key' };
     }
-    return { available: true, model: 'claude-sonnet-4-6' };
+    return { available: true, model: VISION_MODEL };
   } catch (err) {
     return { available: false, reason: err.message };
   }

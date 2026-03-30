@@ -20,7 +20,8 @@ const defaults = {
   wan2gp_output_dir: 'C:/pinokio/api/wan2gp.git/app/outputs',
   anthropic_api_key: null,
   anthropic_key: null,
-  api_keys: {}
+  api_keys: {},
+  vision_model: 'claude-sonnet-4-6'
 };
 
 let userConfig = {};

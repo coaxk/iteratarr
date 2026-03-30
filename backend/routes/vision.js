@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { readdir } from 'fs/promises';
+import { readdir, stat } from 'fs/promises';
 import { scoreFrames, checkVisionApi } from '../vision-scorer.js';
 
 // Rate limiting — max 10 requests per minute
@@ -27,6 +27,31 @@ export function createVisionRoutes(store, config) {
   const router = Router();
   const framesRoot = join(config.iteratarr_data_dir, 'frames');
   const frameFilePattern = /^frame_\d{3}\.(webp|png)$/i;
+  const MIN_FRAME_BYTES = 1024; // anything under 1 KB is a corrupted/empty write
+
+  /**
+   * Deduplicate frame filenames: when both frame_NNN.png and frame_NNN.webp exist,
+   * keep WebP only. Also filters out files below MIN_FRAME_BYTES.
+   */
+  async function dedupeFrames(dir, files) {
+    const byNumber = {};
+    for (const f of files) {
+      const m = f.match(/^frame_(\d{3})\.(webp|png)$/i);
+      if (!m) continue;
+      const num = m[1];
+      const ext = m[2].toLowerCase();
+      if (!byNumber[num] || ext === 'webp') byNumber[num] = f; // prefer webp
+    }
+    const candidates = Object.values(byNumber).sort();
+    const valid = [];
+    for (const f of candidates) {
+      try {
+        const s = await stat(join(dir, f));
+        if (s.size >= MIN_FRAME_BYTES) valid.push(f);
+      } catch {}
+    }
+    return valid;
+  }
 
   /**
    * GET /api/vision/status — check if Vision API is configured
@@ -109,10 +134,8 @@ export function createVisionRoutes(store, config) {
 
         if (use_frames) {
           // Forced individual frames mode — for A/B testing vs contact sheet
-          framePaths = files
-            .filter(f => frameFilePattern.test(f))
-            .sort()
-            .map(f => join(framesDir, f));
+          const deduped = await dedupeFrames(framesDir, files);
+          framePaths = deduped.map(f => join(framesDir, f));
           method = 'individual_frames';
         } else {
           // Default: contact sheet first (cheaper)
@@ -121,10 +144,8 @@ export function createVisionRoutes(store, config) {
             framePaths = [join(framesDir, cs)];
             method = 'contact_sheet';
           } else {
-            framePaths = files
-              .filter(f => frameFilePattern.test(f))
-              .sort()
-              .map(f => join(framesDir, f));
+            const deduped = await dedupeFrames(framesDir, files);
+            framePaths = deduped.map(f => join(framesDir, f));
             method = 'individual_frames';
           }
         }
@@ -244,7 +265,8 @@ export function createVisionRoutes(store, config) {
           if (cs) {
             framePaths = [join(framesDir, cs)];
           } else {
-            framePaths = files.filter(f => frameFilePattern.test(f)).sort().map(f => join(framesDir, f));
+            const deduped = await dedupeFrames(framesDir, files);
+            framePaths = deduped.map(f => join(framesDir, f));
           }
         }
 

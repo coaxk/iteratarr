@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constants';
 import { useCharacters, useSeedAnalytics, useSeedPersonalityProfileStatus, useVisionStatus } from '../../hooks/useQueries';
@@ -104,7 +104,7 @@ const SeedRow = memo(function SeedRow({
     <tr
       onClick={() => onSelect(seed.seed)}
       className={`border-b border-gray-800 cursor-pointer transition-colors ${
-        isSelected ? 'bg-accent/10' : 'hover:bg-surface-overlay'
+        isSelected ? 'bg-accent/20 border-l-2 border-accent' : 'hover:bg-surface-overlay border-l-2 border-transparent'
       } ${seed.evaluated_count === 0 ? 'opacity-60' : ''}`}
     >
       <td className="py-2.5 px-3">
@@ -224,11 +224,15 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
       setCompareSeedB(null);
       return;
     }
-    const exists = seeds.some(seed => seed.seed === selectedSeed);
-    if (!exists) setSelectedSeed(seeds[0].seed);
+    // Use functional update to read current selectedSeed without adding it to deps —
+    // this prevents the effect from re-running on every user click.
+    setSelectedSeed(prev => {
+      const exists = seeds.some(seed => seed.seed === prev);
+      return exists ? prev : seeds[0].seed;
+    });
     if (compareSeedA != null && !seeds.some(seed => seed.seed === compareSeedA)) setCompareSeedA(null);
     if (compareSeedB != null && !seeds.some(seed => seed.seed === compareSeedB)) setCompareSeedB(null);
-  }, [compareSeedA, compareSeedB, seeds, selectedSeed]);
+  }, [compareSeedA, compareSeedB, seeds]);
 
   useEffect(() => {
     const profiledSeeds = seeds.filter(seed => seed.has_profile);
@@ -372,7 +376,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
     return `Scope: Seed ${selectedSeed} • Evidence: ${clipEvidence}${sampleCount != null ? ` (${sampleCount} samples)` : ''}${characterEvidence ? ` • Characters: ${characterEvidence}` : ''}`;
   }, [seedDetail, selectedSeed]);
 
-  const handleSetCompareA = (seedValue) => {
+  const handleSetCompareA = useCallback((seedValue) => {
     setCompareStatus('');
     if (compareSeedA === seedValue) {
       setCompareSeedA(null);
@@ -383,9 +387,9 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
       return;
     }
     setCompareSeedA(seedValue);
-  };
+  }, [compareSeedA, compareSeedB]);
 
-  const handleSetCompareB = (seedValue) => {
+  const handleSetCompareB = useCallback((seedValue) => {
     setCompareStatus('');
     if (compareSeedB === seedValue) {
       setCompareSeedB(null);
@@ -396,7 +400,7 @@ export default function SeedsTab({ data, isLoading, isError, onRetry }) {
       return;
     }
     setCompareSeedB(seedValue);
-  };
+  }, [compareSeedA, compareSeedB]);
 
   function deltaText(a, b) {
     if (a == null || b == null) return '—';

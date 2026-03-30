@@ -69,7 +69,7 @@ export function createAnalyticsRoutes(store, config = {}) {
     if (contactSheet) {
       return { source_id: sourceId, filename: contactSheet, url: `/api/frames/${sourceId}/${contactSheet}` };
     }
-    const frame = files.filter(filename => /^frame_\d{3}\.webp$/.test(filename)).sort()[0];
+    const frame = files.filter(filename => /^frame_\d{3}\.(webp|png)$/.test(filename)).sort()[0];
     if (!frame) return null;
     return { source_id: sourceId, filename: frame, url: `/api/frames/${sourceId}/${frame}` };
   }
@@ -119,7 +119,7 @@ export function createAnalyticsRoutes(store, config = {}) {
       if (!existsSync(frameDir)) continue;
       const files = await readdir(frameDir);
       const contactSheet = files.find(filename => filename.startsWith('contact_sheet'));
-      const frameFiles = files.filter(filename => /^frame_\d{3}\.webp$/.test(filename)).sort();
+      const frameFiles = files.filter(filename => /^frame_\d{3}\.(webp|png)$/.test(filename)).sort();
       const framePaths = contactSheet
         ? [join(frameDir, contactSheet)]
         : frameFiles.slice(0, 4).map(filename => join(frameDir, filename));

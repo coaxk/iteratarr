@@ -58,7 +58,7 @@ export function createFrameRoutes(dataDir, store = null) {
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       throw new Error('Invalid filename');
     }
-    if (!/^frame_\d{3}\.webp$/.test(filename)) {
+    if (!/^(frame_\d{3}\.(webp|png)|contact_sheet_[a-zA-Z0-9_\-]+\.(webp|png))$/.test(filename)) {
       throw new Error('Invalid frame filename format');
     }
     return filename;
@@ -174,7 +174,7 @@ export function createFrameRoutes(dataDir, store = null) {
       }
 
       const frames = files
-        .filter(f => /^frame_\d{3}\.webp$/.test(f))
+        .filter(f => /^frame_\d{3}\.(webp|png)$/.test(f))
         .sort();
 
       // Check for existing contact sheet
@@ -219,7 +219,7 @@ export function createFrameRoutes(dataDir, store = null) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      res.setHeader('Content-Type', 'image/webp');
+      res.setHeader('Content-Type', filename.endsWith('.png') ? 'image/png' : 'image/webp');
       res.sendFile(resolved);
     } catch (err) {
       res.status(400).json({ error: err.message });

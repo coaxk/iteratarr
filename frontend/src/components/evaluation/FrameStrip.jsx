@@ -80,7 +80,7 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
   // On first open we expand to full 32-frame set and persist that status.
   useEffect(() => {
     if (!iterationId || !renderPathProp || !iteration) return;
-    if (iteration.frames_extracted !== false) return;
+    if (iteration.frames_extracted === true) return;
     if (lazyRequestedRef.current) return;
 
     lazyRequestedRef.current = true;

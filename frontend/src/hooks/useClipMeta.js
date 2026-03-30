@@ -13,6 +13,7 @@ export function useClipMeta(clip) {
 
   // Clip name
   const [renamingClip, setRenamingClip] = useState(false);
+  const [currentClipName, setCurrentClipName] = useState(clip.name);
   const [clipNameDraft, setClipNameDraft] = useState(clip.name);
 
   const handleGoalSave = async () => {
@@ -36,6 +37,8 @@ export function useClipMeta(clip) {
   const handleRenameSave = async () => {
     try {
       await api.updateClip(clip.id, { name: clipNameDraft });
+      // Update local name immediately so ClipHeader reflects it without waiting for cache refetch
+      setCurrentClipName(clipNameDraft);
       // Invalidate clips cache so EpisodeTracker list updates — fixes prop mutation bug
       queryClient.invalidateQueries({ queryKey: ['clips'] });
       setRenamingClip(false);
@@ -55,6 +58,7 @@ export function useClipMeta(clip) {
     handleGoalSave,
     handleGoalCancel,
     // Clip name
+    currentClipName,
     renamingClip,
     clipNameDraft,
     setClipNameDraft,

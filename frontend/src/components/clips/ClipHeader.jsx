@@ -2,7 +2,7 @@ export default function ClipHeader({ clip, status, meta, onBack }) {
   const {
     currentGoal, editingGoal, goalDraft, goalSaving,
     startEditGoal, setGoalDraft, handleGoalSave, handleGoalCancel,
-    renamingClip, clipNameDraft, setClipNameDraft,
+    currentClipName, renamingClip, clipNameDraft, setClipNameDraft,
     startRename, cancelRename, handleRenameSave,
   } = meta;
 
@@ -48,7 +48,7 @@ export default function ClipHeader({ clip, status, meta, onBack }) {
               onClick={startRename}
               title="Click to rename"
             >
-              {clip.name}
+              {currentClipName}
             </h2>
           )}
           <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${status.color} text-black font-bold`}>

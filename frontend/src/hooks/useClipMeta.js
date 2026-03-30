@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 
@@ -15,6 +15,14 @@ export function useClipMeta(clip) {
   const [renamingClip, setRenamingClip] = useState(false);
   const [currentClipName, setCurrentClipName] = useState(clip.name);
   const [clipNameDraft, setClipNameDraft] = useState(clip.name);
+
+  // Re-sync all local derived state when the clip identity changes
+  useEffect(() => {
+    setCurrentGoal(clip.goal || '');
+    setGoalDraft(clip.goal || '');
+    setCurrentClipName(clip.name);
+    setClipNameDraft(clip.name);
+  }, [clip.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGoalSave = async () => {
     setGoalSaving(true);

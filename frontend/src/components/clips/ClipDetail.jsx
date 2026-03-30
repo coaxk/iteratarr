@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { CLIP_STATUSES, SCORE_LOCK_THRESHOLD, GRAND_MAX, ROPES } from '../../constants';
 import { useClipMeta } from '../../hooks/useClipMeta';
 import { useBranchNav } from '../../hooks/useBranchNav';
@@ -27,11 +27,29 @@ export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parent
 
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
 
-  const guardNavigation = (action) => {
+  const guardNavigation = useCallback((action) => {
     if (iters.hasUnsavedScores && !window.confirm('You have unsaved Vision API scores. Leave without saving?')) return;
     iters.setHasUnsavedScores(false);
     action();
-  };
+  }, [iters.hasUnsavedScores, iters.setHasUnsavedScores]);
+
+  const handleLaunchBranch = useCallback(async (seed) => {
+    try {
+      const result = await api.selectSeed(clip.id, { seed });
+      nav.refetchBranches();
+      iters.refetchSeeds();
+      nav.drillIntoBranch(result.iteration?.branch_id || null);
+    } catch (err) {
+      alert(`Launch failed: ${err.message}`);
+    }
+  }, [clip.id, nav.refetchBranches, nav.drillIntoBranch, iters.refetchSeeds]);
+
+  const handleSeedSelected = useCallback(() => {
+    setShowSeedGen(false);
+    iters.refetch();
+    nav.refetchBranches();
+    iters.refetchSeeds();
+  }, [iters.refetch, nav.refetchBranches, iters.refetchSeeds]);
 
   return (
     <div className="space-y-4">
@@ -52,16 +70,7 @@ export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parent
           onGenerateSeeds={() => setShowSeedGen(true)}
           onRefresh={() => { nav.refetchBranches(); iters.refetchSeeds(); }}
           onManageBranch={nav.setManagingBranchId}
-          onLaunchBranch={async (seed) => {
-            try {
-              const result = await api.selectSeed(clip.id, { seed });
-              nav.refetchBranches();
-              iters.refetchSeeds();
-              nav.drillIntoBranch(result.iteration?.branch_id || null);
-            } catch (err) {
-              alert(`Launch failed: ${err.message}`);
-            }
-          }}
+          onLaunchBranch={handleLaunchBranch}
           onNavigateToAnalytics={onNavigateToAnalytics}
         />
       )}
@@ -70,12 +79,7 @@ export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parent
       {showSeedGen && (
         <SeedScreening
           clip={clip}
-          onSeedSelected={() => {
-            setShowSeedGen(false);
-            iters.refetch();
-            nav.refetchBranches();
-            iters.refetchSeeds();
-          }}
+          onSeedSelected={handleSeedSelected}
           onBack={() => setShowSeedGen(false)}
         />
       )}

@@ -8,13 +8,6 @@ export function useBranchNav(clipId) {
   const [managingBranchId, setManagingBranchId] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
 
-  // When drilling into a branch, sync selectedBranchId
-  useEffect(() => {
-    if (drillBranchId) {
-      setSelectedBranchId(drillBranchId);
-    }
-  }, [drillBranchId]);
-
   // Auto-select the most recently active branch when branches load
   useEffect(() => {
     if (branches?.length > 0 && selectedBranchId === null && drillBranchId) {

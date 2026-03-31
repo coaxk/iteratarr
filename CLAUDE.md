@@ -39,3 +39,21 @@ MANDATORY RULES — APPLY TO ALL CODE YOU WRITE OR REVIEW:
    - Be explicit about trade-offs and why a pattern is superior.
 
 This philosophy must guide every line of code, every suggestion, and every review — not just data fetching.
+
+<!-- caliber:managed:pre-commit -->
+## Before Committing
+
+Run `caliber refresh` before creating git commits to keep docs in sync with code changes.
+After it completes, stage any modified doc files before committing:
+
+```bash
+caliber refresh && git add CLAUDE.md .claude/ .cursor/ .github/copilot-instructions.md AGENTS.md CALIBER_LEARNINGS.md 2>/dev/null
+```
+<!-- /caliber:managed:pre-commit -->
+
+<!-- caliber:managed:learnings -->
+## Session Learnings
+
+Read `CALIBER_LEARNINGS.md` for patterns and anti-patterns learned from previous sessions.
+These are auto-extracted from real tool usage — treat them as project-specific rules.
+<!-- /caliber:managed:learnings -->

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useIterationQueueStatus, useRenderStatus, useVisionStatus } from '../../hooks/useQueries';
 import ScoreGroup from './ScoreGroup';
 import ScoreRing from './ScoreRing';
@@ -51,6 +51,10 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [renderProgress, setRenderProgress] = useState(null);
   const [renderStatus, setRenderStatus] = useState(null);
   const [queueAdded, setQueueAdded] = useState(false);
+
+  const [showJsonPatch, setShowJsonPatch] = useState(false);
+  const [jsonPatchText, setJsonPatchText] = useState('');
+  const [jsonPatchError, setJsonPatchError] = useState(null);
 
   const isEvaluated = !!iteration.evaluation;
   const hasChild = !!childIteration;
@@ -166,6 +170,41 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const locationHistory = buildHistory('location');
   const motionHistory = buildHistory('motion');
 
+  // Proposed next iteration JSON — parent contents with eval attribution changes applied.
+  // Used to pre-populate the custom JSON editor before generate.
+  const proposedNextJson = useMemo(() => {
+    if (!iteration?.json_contents) return null;
+    const next = { ...iteration.json_contents };
+    if (attribution?.next_changes && typeof attribution.next_changes === 'object') {
+      Object.assign(next, attribution.next_changes);
+    } else if (attribution?.next_change_json_field && attribution?.next_change_value !== undefined) {
+      next[attribution.next_change_json_field] = attribution.next_change_value;
+    }
+    return next;
+  }, [iteration?.json_contents, attribution]);
+
+  const handleOpenJsonPatch = () => {
+    setShowJsonPatch(true);
+    if (!jsonPatchText && proposedNextJson) {
+      setJsonPatchText(JSON.stringify(proposedNextJson, null, 2));
+    }
+  };
+
+  const handleJsonPatchChange = (val) => {
+    setJsonPatchText(val);
+    try {
+      JSON.parse(val);
+      setJsonPatchError(null);
+    } catch (e) {
+      setJsonPatchError(e.message);
+    }
+  };
+
+  const getJsonOverride = () => {
+    if (!showJsonPatch || !jsonPatchText || jsonPatchError) return undefined;
+    try { return JSON.parse(jsonPatchText); } catch { return undefined; }
+  };
+
   // Combined Save & Generate action
   const handleSaveAndGenerate = async () => {
     setSaving(true);
@@ -177,7 +216,8 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         qualitative_notes: notes,
         scoring_source: scoringSource
       });
-      const next = await api.generateNext(iteration.id);
+      const override = getJsonOverride();
+      const next = await api.generateNext(iteration.id, override ? { json_contents_override: override } : undefined);
       setGeneratedPath(next.json_path || next.json_filename);
       setRenderPath(next.render_path || null);
       setOutputJson(next.json_contents);
@@ -235,7 +275,8 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const handleNext = async () => {
     setSaving(true);
     try {
-      const next = await api.generateNext(iteration.id);
+      const override = getJsonOverride();
+      const next = await api.generateNext(iteration.id, override ? { json_contents_override: override } : undefined);
       setGeneratedPath(next.json_path || next.json_filename);
       setRenderPath(next.render_path || null);
       setOutputJson(next.json_contents);
@@ -900,6 +941,40 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           label="Output JSON — settings for the next iteration"
           json={outputJson}
         />
+
+        {/* Custom JSON override — collapsible, pre-generate only */}
+        {!isReadOnly && !hasChild && attribution?.rope && (
+          <div className="border border-gray-700 rounded">
+            <button
+              onClick={showJsonPatch ? () => setShowJsonPatch(false) : handleOpenJsonPatch}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-mono text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              <span>Customise next iteration JSON</span>
+              <span className="text-gray-600">{showJsonPatch ? '▲' : '▼'}</span>
+            </button>
+            {showJsonPatch && (
+              <div className="border-t border-gray-700 p-3 space-y-2">
+                <p className="text-xs font-mono text-gray-600">
+                  Proposed JSON (eval changes applied). Edit anything before generating — your changes persist through the chain.
+                </p>
+                <textarea
+                  value={jsonPatchText}
+                  onChange={e => handleJsonPatchChange(e.target.value)}
+                  className={`w-full h-64 text-xs font-mono bg-surface-overlay text-gray-200 rounded p-2 border resize-y focus:outline-none ${
+                    jsonPatchError ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-gray-500'
+                  }`}
+                  spellCheck={false}
+                />
+                {jsonPatchError && (
+                  <p className="text-xs font-mono text-red-400">Invalid JSON — {jsonPatchError}</p>
+                )}
+                {!jsonPatchError && jsonPatchText && (
+                  <p className="text-xs font-mono text-score-high">✓ Valid JSON — will be applied on generate</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Action buttons */}
         {!isReadOnly && (

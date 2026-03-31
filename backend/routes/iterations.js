@@ -627,6 +627,23 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
       // Strip any fields not in the Wan2GP whitelist to prevent junk propagation
       Object.keys(nextJson).forEach(k => { if (!WAN2GP_FIELDS.has(k)) delete nextJson[k]; });
 
+      // Apply user-supplied JSON overrides AFTER the whitelist strip.
+      // These bypass the whitelist intentionally — the user owns the risk on
+      // unrecognised fields (Wan2GP silently ignores what it doesn't know).
+      const userOverride = req.body?.json_contents_override;
+      if (userOverride && typeof userOverride === 'object' && !Array.isArray(userOverride)) {
+        const manualFields = [];
+        for (const [field, value] of Object.entries(userOverride)) {
+          if (JSON.stringify(nextJson[field]) !== JSON.stringify(value)) {
+            nextJson[field] = value;
+            manualFields.push(field);
+          }
+        }
+        if (manualFields.length > 0) {
+          change_from_parent += ` + manual: ${manualFields.join(', ')}`;
+        }
+      }
+
       await mkdir(saveDir, { recursive: true });
       const savePath = join(saveDir, nextFilename);
       await writeFile(savePath, JSON.stringify(nextJson, null, 2));

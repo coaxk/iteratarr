@@ -55,14 +55,16 @@ Six controllable levers (called ropes) drive every prompt engineering decision:
 - **Import Evaluation** — paste structured JSON from AI assistant, pre-fills everything
 - **AI vs human score tracking** — ai_scores, human_scores, score_deltas on every evaluation
 - **Side-by-side video comparison** — previous vs current render with auto-polling
-- **FFmpeg frame extraction** — auto-extract thumbnails, copy path for external review
+- **FFmpeg frame extraction** — auto-extract thumbnails, copy path for external review; dedupes PNG/WebP frames and skips corrupted files before vision scoring
+- **Frame strip** — thumbnail strip in evaluation panel via `FrameStrip` component
 - **JSON diff panel** — see exactly which generation settings changed
 - **Ghost markers** — previous iteration scores as trend-coloured dots on sliders
 - **Character Registry** — LoRA files, locked identity blocks, proven settings
 - **Production lock** — 7-step workflow: LOCKED folder, 81-frame JSON, DaVinci sidecar, queue
 - **Structured file layout** — episode/scene/clip hierarchy with auto-naming
 - **Wan2GP integration** — output_filename auto-set, render path auto-detected
-- **Cross-clip analytics dashboard** — overview pills, per-character performance, rope effectiveness bars, stalling/locked/healthy clip sections; shortcut in Seed HQ header
+- **Cross-clip analytics dashboard** — overview pills, per-character performance, rope effectiveness bars, seeds analysis tab (`SeedsTab`), stalling/locked/healthy clip sections; shortcut in Seed HQ header
+- **Storage monitoring** — disk usage tracking per clip, iteration, and frame directory; surfaced in `StoragePage`
 - **Telemetry foundation** — opt-in, anonymized, off by default
 
 ## Stack
@@ -97,6 +99,7 @@ Edit `backend/config.json`:
   "wan2gp_output_dir": "path/to/wan2gp/app/outputs",
   "wan2gp_lora_dir": "path/to/wan2gp/app/loras/wan",
   "project_base_dir": "path/to/your/project",
+  "vision_model": "claude-sonnet-4-6",
   "score_lock_threshold": 65,
   "iteration_frame_count": 32,
   "production_frame_count": 81,

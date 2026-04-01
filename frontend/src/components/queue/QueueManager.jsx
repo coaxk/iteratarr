@@ -2,6 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useQueueList, useQueueStatus, useInvalidateQueue } from '../../hooks/useQueries';
 import { api } from '../../api';
+import CopyButton from '../common/CopyButton';
 
 /**
  * QueueManager — full-page render queue management view.
@@ -270,12 +271,7 @@ const QueueItemRow = memo(function QueueItemRow({ item, index, totalQueued, onMo
         <span className="text-xs font-mono text-gray-700 truncate flex-1" title={item.json_path}>
           {item.json_path}
         </span>
-        <button
-          onClick={async () => { await navigator.clipboard.writeText(item.json_path); }}
-          className="text-xs font-mono text-gray-700 hover:text-gray-400 shrink-0 transition-colors"
-        >
-          Copy
-        </button>
+        <CopyButton text={item.json_path} compact className="text-xs font-mono text-gray-700 hover:text-gray-400 shrink-0 transition-colors" />
       </div>
     </div>
   );

@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useIterationQueueStatus, useRenderStatus, useVisionStatus } from '../../hooks/useQueries';
+import { useVisionStatus } from '../../hooks/useQueries';
+import { useEvalScoring } from '../../hooks/useEvalScoring';
+import { useEvalRender } from '../../hooks/useEvalRender';
+import { useEvalGenerate } from '../../hooks/useEvalGenerate';
+import { useEvalVideo } from '../../hooks/useEvalVideo';
 import ScoreGroup from './ScoreGroup';
 import ScoreRing from './ScoreRing';
 import AttributionPanel from './AttributionPanel';
@@ -12,51 +16,124 @@ import VideoDiff from './VideoDiff';
 import GeneratedModal from './GeneratedModal';
 import TagInput from '../clips/TagInput';
 import ForkModal from './ForkModal';
+import RenderStatusPanel from './RenderStatusPanel';
 import { api } from '../../api';
 import { IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS, SCORE_LOCK_THRESHOLD, GRAND_MAX, ROPE_CATEGORY_MAP, ROPES, MODEL_TYPES } from '../../constants';
 
-const defaultScores = (fields) => Object.fromEntries(fields.map(f => [f.key, 3]));
-
-// Use shared CopyButton, alias for backward compat with inline usage
 import CopyButton from '../common/CopyButton';
 import PromptDiffInline from '../common/PromptDiffInline';
 const CopyBtn = ({ text }) => <CopyButton text={text} />;
 
+const ALL_SCORE_FIELDS = ['face_match','head_shape','jaw','cheekbones','eyes_brow','skin_texture','hair','frame_consistency','location_correct','lighting_correct','wardrobe_correct','geometry_correct','action_executed','smoothness','camera_movement'];
+const SCORE_CAT_MAP = { face_match:'identity',head_shape:'identity',jaw:'identity',cheekbones:'identity',eyes_brow:'identity',skin_texture:'identity',hair:'identity',frame_consistency:'identity',location_correct:'location',lighting_correct:'location',wardrobe_correct:'location',geometry_correct:'location',action_executed:'motion',smoothness:'motion',camera_movement:'motion' };
+const PROMPT_ROPES = new Set(['rope_1','rope_1_prompt_position','rope_2a_attention_weighting','rope_2b_negative_prompt','rope_6_alt_prompt']);
+
+function tokenizePrompt(p) {
+  return (p || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function diffPrompts(oldP, newP) {
+  const oldSet = new Set(tokenizePrompt(oldP));
+  const newSet = new Set(tokenizePrompt(newP));
+  return {
+    added: tokenizePrompt(newP).filter(p => !oldSet.has(p)),
+    removed: tokenizePrompt(oldP).filter(p => !newSet.has(p))
+  };
+}
+
+function PromptDeltaSection({ iteration, parentIteration }) {
+  const delta = useMemo(() => {
+    if (!parentIteration?.evaluation || !iteration.evaluation) return null;
+
+    const promptDiff = diffPrompts(parentIteration.json_contents?.prompt, iteration.json_contents?.prompt);
+    const negDiff = diffPrompts(parentIteration.json_contents?.negative_prompt, iteration.json_contents?.negative_prompt);
+    const hasChange = promptDiff.added.length > 0 || promptDiff.removed.length > 0 || negDiff.added.length > 0 || negDiff.removed.length > 0;
+    if (!hasChange) return null;
+
+    const pScores = parentIteration.evaluation.scores;
+    const cScores = iteration.evaluation.scores;
+    const movedFields = ALL_SCORE_FIELDS
+      .map(f => ({ field: f, delta: (cScores[SCORE_CAT_MAP[f]]?.[f] ?? 0) - (pScores[SCORE_CAT_MAP[f]]?.[f] ?? 0) }))
+      .filter(d => d.delta !== 0);
+
+    const rope = iteration.evaluation?.attribution?.rope;
+    const confidence = PROMPT_ROPES.has(rope) ? 'high' : 'mixed';
+
+    return { promptDiff, negDiff, movedFields, confidence };
+  }, [iteration.id, parentIteration?.id]);
+
+  if (!delta) return null;
+  const { promptDiff, negDiff, movedFields, confidence } = delta;
+
+  return (
+    <details className="border border-gray-700 rounded px-3 py-2" open>
+      <summary className="text-xs font-mono text-gray-400 cursor-pointer hover:text-gray-300">
+        Prompt Delta
+        <span className={`ml-2 text-[10px] px-1.5 rounded ${confidence === 'high' ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-400'}`}>
+          {confidence === 'high' ? 'high confidence' : 'mixed change'}
+        </span>
+      </summary>
+      <div className="mt-2 space-y-2">
+        {(promptDiff.added.length > 0 || promptDiff.removed.length > 0) && (
+          <div>
+            <span className="text-[10px] font-mono text-gray-500 uppercase">prompt</span>
+            <div className="mt-0.5"><PromptDiffInline diff={promptDiff} maxPhrases={10} /></div>
+          </div>
+        )}
+        {(negDiff.added.length > 0 || negDiff.removed.length > 0) && (
+          <div>
+            <span className="text-[10px] font-mono text-gray-500 uppercase">negative prompt</span>
+            <div className="mt-0.5"><PromptDiffInline diff={negDiff} maxPhrases={10} /></div>
+          </div>
+        )}
+        {movedFields.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 items-center">
+            <span className="text-[10px] font-mono text-gray-500 uppercase">score impact</span>
+            {movedFields.map(({ field, delta }) => (
+              <span key={field} className={`text-[10px] font-mono px-1 rounded ${delta > 0 ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-score-low'}`}>
+                {field.replace(/_/g, ' ')}: {delta > 0 ? '+' : ''}{delta}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
+
 export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], allIterations = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange, onUnsavedScoresChange, clipId, clip, onForked, isForkPoint = false }) {
-  const [identity, setIdentity] = useState(defaultScores(IDENTITY_FIELDS));
-  const [location, setLocation] = useState(defaultScores(LOCATION_FIELDS));
-  const [motion, setMotion] = useState(defaultScores(MOTION_FIELDS));
-  const [attribution, setAttribution] = useState({});
-  const [notes, setNotes] = useState('');
+  // --- Extracted hooks (34 useState → 4 hooks + 6 local) ---
+  const scoring = useEvalScoring(iteration, { onScoreChange, onUnsavedScoresChange });
+  const { identity, setIdentity, location, setLocation, motion, setMotion,
+          attribution, setAttribution, notes, setNotes,
+          aiScores, setAiScores, scoringSource, setScoringSource,
+          grandTotal, canLock, importScores } = scoring;
+
+  const render = useEvalRender(iteration);
+  const { isPending, renderStatus, setRenderStatus, renderProgress, setRenderProgress,
+          queueAdded, setQueueAdded, iterQueueStatus } = render;
+
+  const generate = useEvalGenerate(iteration, childIteration, attribution);
+  const { generatedPath, renderPath, outputJson, generatedIterNum, generatedChild,
+          showGenerated, setShowGenerated,
+          showJsonPatch, setShowJsonPatch,
+          jsonPatchText, jsonPatchError, jsonPatchPromptWarning,
+          handleJsonPatchChange, handleOpenJsonPatch, getJsonOverride,
+          setGenerationResult } = generate;
+
+  const video = useEvalVideo(iteration, parentIteration);
+  const { currentVideoPath, setCurrentVideoPath, previousVideoPath, setPreviousVideoPath,
+          comparisonVideoPath, comparisonIter, setComparisonIter, setComparisonVideoPath } = video;
+
+  // Remaining local state — UI modals and flags that don't warrant a hook
   const [saving, setSaving] = useState(false);
-  const [generatedPath, setGeneratedPath] = useState(null);
-  const [outputJson, setOutputJson] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
-  const [showGenerated, setShowGenerated] = useState(false);
-  const [renderPath, setRenderPath] = useState(null);
-  const [generatedIterNum, setGeneratedIterNum] = useState(null);
-  const [generatedChild, setGeneratedChild] = useState(null);
-  const [aiScores, setAiScores] = useState(null); // Tenzing/Claude's original scores before human adjustment
-  const [scoringSource, setScoringSource] = useState('manual');
-  const [currentVideoPath, setCurrentVideoPath] = useState(null);
-  const [previousVideoPath, setPreviousVideoPath] = useState(null);
-  const [comparisonVideoPath, setComparisonVideoPath] = useState(null);
-  const [comparisonIter, setComparisonIter] = useState(null);
   const [lockCharacterUpdates, setLockCharacterUpdates] = useState(null);
   const [showFork, setShowFork] = useState(false);
   const [localTags, setLocalTags] = useState(iteration.tags || []);
-  const [renderSubmitted, setRenderSubmitted] = useState(false);
   const [autoScoring, setAutoScoring] = useState(false);
   const [visionUseFrames, setVisionUseFrames] = useState(false);
-  const [renderProgress, setRenderProgress] = useState(null);
-  const [renderStatus, setRenderStatus] = useState(null);
-  const [queueAdded, setQueueAdded] = useState(false);
-
-  const [showJsonPatch, setShowJsonPatch] = useState(false);
-  const [jsonPatchText, setJsonPatchText] = useState('');
-  const [jsonPatchError, setJsonPatchError] = useState(null);
-  const [jsonPatchPromptWarning, setJsonPatchPromptWarning] = useState(null);
 
   const isEvaluated = !!iteration.evaluation;
   const hasChild = !!childIteration;
@@ -66,103 +143,10 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const { data: visionData } = useVisionStatus();
   const visionAvailable = visionData?.available ?? null;
 
-  const isPending = iteration.status === 'pending' || iteration.status === 'failed';
-  const { data: iterQueueStatus } = useIterationQueueStatus(isPending ? iteration.id : null, {
-    refetchInterval: isPending ? (renderStatus === 'rendering' || queueAdded === 'rendering' ? 10000 : queueAdded === 'queued' ? 30000 : false) : false
-  });
-  const { data: renderStatusData } = useRenderStatus();
-
-  // Signal unsaved scores to parent + warn before navigating away
+  // Sync tags on iteration change
   useEffect(() => {
-    onUnsavedScoresChange?.(!!(aiScores && !isEvaluated));
-  }, [aiScores, isEvaluated]);
-
-  useEffect(() => {
-    if (!aiScores || isEvaluated) return;
-    const handler = (e) => {
-      e.preventDefault();
-      e.returnValue = 'You have unsaved Vision API scores. Leave without saving?';
-      return e.returnValue;
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [aiScores, isEvaluated]);
-
-  useEffect(() => {
-    if (iteration.evaluation) {
-      const ev = iteration.evaluation;
-      if (ev.scores?.identity) setIdentity(ev.scores.identity);
-      if (ev.scores?.location) setLocation(ev.scores.location);
-      if (ev.scores?.motion) setMotion(ev.scores.motion);
-      setAttribution(ev.attribution || {});
-      setNotes(ev.qualitative_notes || '');
-      setAiScores(ev.ai_scores || null);
-      setScoringSource(ev.scoring_source || 'manual');
-    } else {
-      setIdentity(defaultScores(IDENTITY_FIELDS));
-      setLocation(defaultScores(LOCATION_FIELDS));
-      setMotion(defaultScores(MOTION_FIELDS));
-      setAttribution({});
-      setNotes('');
-      setAiScores(null);
-      setScoringSource('manual');
-    }
-    if (childIteration) {
-      setOutputJson(childIteration.json_contents);
-      setGeneratedPath(childIteration.json_path || childIteration.json_filename);
-    } else {
-      setOutputJson(null);
-      setGeneratedPath(null);
-    }
     setLocalTags(iteration.tags || []);
-    setRenderSubmitted(false);
-    setQueueAdded(false);
-    // Try to derive video paths from iteration data (render_path stored on iteration)
-    setCurrentVideoPath(iteration.render_path || null);
-    setPreviousVideoPath(parentIteration?.render_path || null);
-    setComparisonVideoPath(null);
-    setComparisonIter(null);
-
-    // One-time HEAD check for existing video
-    if (isPending && iteration.render_path) {
-      fetch(`/api/video?path=${encodeURIComponent(iteration.render_path)}`, { method: 'HEAD' })
-        .then(r => { if (r.ok) { setRenderStatus('complete'); api.updateIteration(iteration.id, { status: 'rendered' }).catch(() => {}); } })
-        .catch(() => {});
-    }
   }, [iteration.id]);
-
-  // Sync render/queue status from TanStack Query data
-  useEffect(() => {
-    if (!isPending || renderStatus === 'complete') return;
-    if (iterQueueStatus?.in_queue) {
-      setQueueAdded(iterQueueStatus.status);
-      if (iterQueueStatus.status === 'rendering') {
-        setRenderStatus('rendering');
-        setRenderProgress(iterQueueStatus.progress || null);
-      }
-    } else if (renderStatusData?.renders) {
-      const normalize = p => p?.replace(/\\/g, '/');
-      const myRenders = renderStatusData.renders.filter(r =>
-        r.json_path && iteration.json_path && normalize(r.json_path) === normalize(iteration.json_path)
-      );
-      const active = myRenders.find(r => r.status === 'rendering');
-      const complete = myRenders.find(r => r.status === 'complete');
-      if (active) { setRenderStatus('rendering'); setRenderProgress(active.progress || null); }
-      else if (complete) { setRenderStatus('complete'); setRenderProgress(null); }
-    }
-  }, [iterQueueStatus, renderStatusData]);
-
-  const grandTotal =
-    IDENTITY_FIELDS.reduce((s, f) => s + (identity[f.key] || 1), 0) +
-    LOCATION_FIELDS.reduce((s, f) => s + (location[f.key] || 1), 0) +
-    MOTION_FIELDS.reduce((s, f) => s + (motion[f.key] || 1), 0);
-
-  const canLock = grandTotal >= SCORE_LOCK_THRESHOLD;
-
-  // Push live score up to parent for the persistent score ring
-  useEffect(() => {
-    onScoreChange?.(grandTotal);
-  }, [grandTotal]);
 
   // Build history scores for ghost markers from ancestor chain
   const buildHistory = (group) => ancestorChain
@@ -172,48 +156,43 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const locationHistory = buildHistory('location');
   const motionHistory = buildHistory('motion');
 
-  // Proposed next iteration JSON — parent contents with eval attribution changes applied.
-  // Used to pre-populate the custom JSON editor before generate.
-  const proposedNextJson = useMemo(() => {
-    if (!iteration?.json_contents) return null;
-    const next = { ...iteration.json_contents };
-    if (attribution?.next_changes && typeof attribution.next_changes === 'object') {
-      Object.assign(next, attribution.next_changes);
-    } else if (attribution?.next_change_json_field && attribution?.next_change_value !== undefined) {
-      next[attribution.next_change_json_field] = attribution.next_change_value;
-    }
-    return next;
-  }, [iteration?.json_contents, attribution]);
+  // Iteration navigation — prev/next in the sorted list
+  const iterationNav = useMemo(() => {
+    const sorted = [...allIterations].sort((a, b) => a.iteration_number - b.iteration_number);
+    const idx = sorted.findIndex(i => i.id === iteration.id);
+    return {
+      prev: idx > 0 ? sorted[idx - 1] : null,
+      next: idx < sorted.length - 1 ? sorted[idx + 1] : null,
+    };
+  }, [allIterations, iteration.id]);
 
-  const handleOpenJsonPatch = () => {
-    setShowJsonPatch(true);
-    if (!jsonPatchText && proposedNextJson) {
-      setJsonPatchText(JSON.stringify(proposedNextJson, null, 2));
-    }
-  };
+  // Regression warnings — flag unexpected score drops in non-targeted categories
+  const regressionWarnings = useMemo(() => {
+    const parentEval = parentIteration?.evaluation?.scores;
+    const ropeId = attribution?.rope;
+    const targetCategory = ropeId ? ROPE_CATEGORY_MAP[ropeId] : null;
+    if (!parentEval || !targetCategory || targetCategory === 'all' || grandTotal === 45) return [];
 
-  const NEGATIVE_QUALITY_TERMS = ['blurry', 'distorted', 'deformed', 'low quality', 'video game', 'CGI', 'over-rendered'];
-  const handleJsonPatchChange = (val) => {
-    setJsonPatchText(val);
-    try {
-      const parsed = JSON.parse(val);
-      setJsonPatchError(null);
-      // Warn if positive prompt contains negative quality terms (fields-swapped bug)
-      const prompt = parsed?.prompt || '';
-      const found = NEGATIVE_QUALITY_TERMS.filter(t => prompt.toLowerCase().includes(t.toLowerCase()));
-      setJsonPatchPromptWarning(found.length > 0
-        ? `Positive prompt contains negative quality terms: ${found.join(', ')} — did the negative_prompt get pasted into prompt by mistake?`
-        : null);
-    } catch (e) {
-      setJsonPatchError(e.message);
-      setJsonPatchPromptWarning(null);
-    }
-  };
+    const identityTotal = IDENTITY_FIELDS.reduce((s, f) => s + (identity[f.key] || 1), 0);
+    const locationTotal = LOCATION_FIELDS.reduce((s, f) => s + (location[f.key] || 1), 0);
+    const motionTotal = MOTION_FIELDS.reduce((s, f) => s + (motion[f.key] || 1), 0);
 
-  const getJsonOverride = () => {
-    if (!showJsonPatch || !jsonPatchText || jsonPatchError) return undefined;
-    try { return JSON.parse(jsonPatchText); } catch { return undefined; }
-  };
+    const parentIdentity = parentEval.identity ? IDENTITY_FIELDS.reduce((s, f) => s + (parentEval.identity[f.key] || 1), 0) : null;
+    const parentLocation = parentEval.location ? LOCATION_FIELDS.reduce((s, f) => s + (parentEval.location[f.key] || 1), 0) : null;
+    const parentMotion = parentEval.motion ? MOTION_FIELDS.reduce((s, f) => s + (parentEval.motion[f.key] || 1), 0) : null;
+
+    const categories = [
+      { name: 'Identity', current: identityTotal, parent: parentIdentity, max: 40, key: 'identity' },
+      { name: 'Location', current: locationTotal, parent: parentLocation, max: 20, key: 'location' },
+      { name: 'Motion', current: motionTotal, parent: parentMotion, max: 15, key: 'motion' }
+    ];
+
+    const ropeLabel = ROPES.find(r => r.id === ropeId)?.label || ropeId;
+
+    return categories
+      .filter(c => c.key !== targetCategory && c.parent !== null && (c.parent - c.current) >= 3)
+      .map(c => `${c.name} regressed from ${c.parent}/${c.max} to ${c.current}/${c.max} but change was to ${ropeLabel} (${targetCategory} lever). Possible side effect.`);
+  }, [parentIteration?.evaluation?.scores, attribution?.rope, identity, location, motion, grandTotal]);
 
   // Combined Save & Generate action
   const handleSaveAndGenerate = async () => {
@@ -228,12 +207,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
       });
       const override = getJsonOverride();
       const next = await api.generateNext(iteration.id, override ? { json_contents_override: override } : undefined);
-      setGeneratedPath(next.json_path || next.json_filename);
-      setRenderPath(next.render_path || null);
-      setOutputJson(next.json_contents);
-      setGeneratedIterNum(next.iteration_number);
-      setGeneratedChild(next);
-      setShowGenerated(true);
+      setGenerationResult(next);
       onUnsavedScoresChange?.(false);
       onSaved?.();
     } catch (err) {
@@ -244,20 +218,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   };
 
   const handleImport = (imported) => {
-    // Store AI's original scores for delta tracking
-    setAiScores({
-      identity: { ...imported.scores.identity },
-      location: { ...imported.scores.location },
-      motion: { ...imported.scores.motion }
-    });
-    // Pre-fill sliders with imported scores
-    setIdentity(prev => ({ ...prev, ...imported.scores.identity }));
-    setLocation(prev => ({ ...prev, ...imported.scores.location }));
-    setMotion(prev => ({ ...prev, ...imported.scores.motion }));
-    // Pre-fill attribution and notes
-    if (imported.attribution) setAttribution(imported.attribution);
-    if (imported.qualitative_notes) setNotes(imported.qualitative_notes);
-    setScoringSource(imported.scoring_source || 'ai_assisted');
+    importScores(imported);
     setShowImport(false);
     setShowImportConfirm(true);
     setTimeout(() => setShowImportConfirm(false), 8000);
@@ -287,12 +248,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     try {
       const override = getJsonOverride();
       const next = await api.generateNext(iteration.id, override ? { json_contents_override: override } : undefined);
-      setGeneratedPath(next.json_path || next.json_filename);
-      setRenderPath(next.render_path || null);
-      setOutputJson(next.json_contents);
-      setGeneratedIterNum(next.iteration_number);
-      setGeneratedChild(next);
-      setShowGenerated(true);
+      setGenerationResult(next);
       onSaved?.();
     } catch (err) {
       alert(`Generate failed: ${err.message}`);
@@ -305,7 +261,6 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     setSaving(true);
     try {
       const result = await api.lock(iteration.id);
-      // Show character proven settings update notification
       if (result.updated_characters && result.updated_characters.length > 0) {
         setLockCharacterUpdates(result.updated_characters);
         setTimeout(() => setLockCharacterUpdates(null), 10000);
@@ -417,30 +372,20 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
       {/* Header with iteration info + prev/next navigation */}
       <div>
         <div className="flex items-center gap-2">
-          {(() => {
-            const sorted = [...allIterations].sort((a, b) => a.iteration_number - b.iteration_number);
-            const idx = sorted.findIndex(i => i.id === iteration.id);
-            const prev = idx > 0 ? sorted[idx - 1] : null;
-            const next = idx < sorted.length - 1 ? sorted[idx + 1] : null;
-            return (
-              <>
-                <button
-                  onClick={() => prev && onGoToIteration?.(prev)}
-                  disabled={!prev}
-                  className="text-gray-600 hover:text-accent disabled:text-gray-800 font-mono text-sm px-1"
-                >
-                  ←
-                </button>
-                <button
-                  onClick={() => next && onGoToIteration?.(next)}
-                  disabled={!next}
-                  className="text-gray-600 hover:text-accent disabled:text-gray-800 font-mono text-sm px-1"
-                >
-                  →
-                </button>
-              </>
-            );
-          })()}
+          <button
+            onClick={() => iterationNav.prev && onGoToIteration?.(iterationNav.prev)}
+            disabled={!iterationNav.prev}
+            className="text-gray-600 hover:text-accent disabled:text-gray-800 font-mono text-sm px-1"
+          >
+            ←
+          </button>
+          <button
+            onClick={() => iterationNav.next && onGoToIteration?.(iterationNav.next)}
+            disabled={!iterationNav.next}
+            className="text-gray-600 hover:text-accent disabled:text-gray-800 font-mono text-sm px-1"
+          >
+            →
+          </button>
           <h3 className="text-sm font-mono text-gray-200">{iteration.json_filename}</h3>
           {isForkPoint && (
             <span className="px-2 py-0.5 text-xs font-mono font-bold rounded border" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', borderColor: 'rgba(168, 85, 247, 0.4)', color: '#c4b5fd' }}>
@@ -474,203 +419,17 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
           <p className="text-xs text-accent font-mono mt-1 break-words">Changed: {iteration.change_from_parent}</p>
         )}
         {/* Render / Queue status for pending iterations */}
-        {(iteration.status === 'pending' || iteration.status === 'failed') && iteration.json_path && (() => {
-          // Queue states: null (not queued), 'queued', 'rendering', 'complete', 'failed'
-          const queueState = queueAdded; // queueAdded now holds the queue status string or false
-
-          if (renderStatus === 'checking') {
-            return (
-              <div className="mt-2 border border-gray-600 bg-surface-overlay rounded px-3 py-2">
-                <span className="text-xs font-mono text-gray-400 animate-pulse">Checking render status...</span>
-              </div>
-            );
-          }
-
-          if (renderStatus === 'complete' || queueState === 'complete') {
-            return (
-              <div className="mt-2 border border-green-500/30 bg-green-500/5 rounded px-3 py-2">
-                <span className="text-xs font-mono text-green-400 font-bold">Render complete</span>
-              </div>
-            );
-          }
-
-          if (queueState === 'queued') {
-            const queuePosition = iterQueueStatus?.position;
-            return (
-              <div className="mt-2 border border-accent/30 bg-accent/5 rounded px-3 py-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-accent font-bold">
-                    In queue{queuePosition != null ? ` — position ${queuePosition}` : ' — waiting to render'}
-                  </span>
-                  <button
-                    onClick={async () => {
-                      try {
-                        const qs = await api.getIterationQueueStatus(iteration.id);
-                        if (qs.in_queue && qs.id) {
-                          await api.removeFromQueue(qs.id);
-                          setQueueAdded(false);
-                        }
-                      } catch (err) { alert(`Remove failed: ${err.message}`); }
-                    }}
-                    className="px-2 py-0.5 text-xs font-mono text-gray-500 hover:text-red-400 border border-gray-600 hover:border-red-400/50 rounded transition-colors"
-                  >
-                    Remove from queue
-                  </button>
-                </div>
-              </div>
-            );
-          }
-
-          if (queueState === 'rendering' || renderStatus === 'rendering') {
-            const p = renderProgress;
-            const phaseLabel = p?.phase === 'loading_model' ? 'Loading model...' :
-              p?.phase === 'loading_lora' ? 'Loading LoRA...' :
-              p?.phase === 'task_ready' ? 'Task ready' :
-              p?.phase === 'denoising' ? 'Denoising' :
-              p?.phase === 'denoise_phase' ? `Phase ${p.currentPhase}/${p.totalPhases} — ${p.phaseLabel}` :
-              p?.phase === 'vae_decoding' ? 'VAE Decoding' :
-              p?.phase === 'video_saved' ? 'Video saved' :
-              p?.phase || null;
-            return (
-              <div className="mt-2 border border-blue-500/30 bg-blue-500/5 rounded px-3 py-2 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-blue-400 font-bold animate-pulse">Rendering...</span>
-                  {phaseLabel && <span className="text-xs font-mono text-blue-400/60">{phaseLabel}</span>}
-                </div>
-                {p?.percent != null && (
-                  <>
-                    <div className="w-full bg-gray-700 rounded-full h-2">
-                      <div className="bg-blue-400 h-2 rounded-full transition-all duration-500" style={{ width: `${p.percent}%` }} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono text-gray-300">
-                        <span className="text-blue-400 font-bold">{p.percent}%</span>
-                        {p.step && p.totalSteps && <> — Step {p.step}/{p.totalSteps}</>}
-                      </span>
-                      {p.secsPerStep && (
-                        <span className="text-xs font-mono text-gray-400">
-                          <span className="text-green-400 font-bold">{p.secsPerStep.toFixed(1)}s/step</span>
-                          {p.totalSteps && p.step && <> — <span className="text-accent">~{Math.round((p.totalSteps - p.step) * p.secsPerStep)}s left</span></>}
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          }
-
-          if (queueState === 'failed' || renderStatus === 'failed') {
-            return (
-              <div className="mt-2 border border-red-500/30 bg-red-500/5 rounded px-3 py-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-red-400 font-bold">Render failed</span>
-                  <button
-                    onClick={async () => {
-                      try {
-                        setRenderStatus('checking');
-                        // Find the failed queue item and retry via backend
-                        const qs = await api.getIterationQueueStatus(iteration.id);
-                        if (qs.in_queue && qs.id && qs.status === 'failed') {
-                          await api.retryQueueItem(qs.id);
-                        } else {
-                          // No failed item found — create fresh
-                          await api.updateIteration(iteration.id, { status: 'pending' });
-                          await api.addToQueue({
-                            json_path: iteration.json_path,
-                            clip_name: iteration.json_filename?.replace('.json', '') || `Iteration #${iteration.iteration_number}`,
-                            iteration_id: iteration.id,
-                            seed: iteration.seed_used || null,
-                            source: 'iteration',
-                            priority: 0
-                          });
-                          try { await api.startQueue(); } catch {}
-                        }
-                        setQueueAdded('queued');
-                        setRenderStatus(null);
-                      } catch (err) {
-                        setRenderStatus('failed');
-                        alert(`Retry failed: ${err.message}`);
-                      }
-                    }}
-                    className="px-3 py-1 text-xs font-mono font-bold bg-red-500/20 text-red-400 border border-red-500/30 rounded hover:bg-red-500/30 transition-colors"
-                  >
-                    Retry Render
-                  </button>
-                </div>
-              </div>
-            );
-          }
-
-          // Default: not queued, ready to render
-          return (
-            <div className="mt-2 border border-accent/30 bg-accent/5 rounded px-3 py-2 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-accent font-bold">Ready to render</span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={async () => {
-                      try {
-                        await api.addToQueue({
-                          json_path: iteration.json_path,
-                          clip_name: iteration.json_filename?.replace('.json', '') || `Iteration #${iteration.iteration_number}`,
-                          iteration_id: iteration.id,
-                          seed: iteration.seed_used || null,
-                          source: 'iteration'
-                        });
-                        setQueueAdded('queued');
-                      } catch (err) {
-                        alert(`Queue failed: ${err.message}`);
-                      }
-                    }}
-                    className="bg-surface-overlay text-gray-300 border border-gray-600 hover:border-accent hover:text-accent px-3 py-1 text-xs font-mono font-bold rounded transition-colors"
-                  >
-                    Add to Render Queue
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        setRenderStatus('submitting');
-                        // Add to queue at top priority + auto-start
-                        await api.addToQueue({
-                          json_path: iteration.json_path,
-                          clip_name: iteration.json_filename?.replace('.json', '') || `Iteration #${iteration.iteration_number}`,
-                          iteration_id: iteration.id,
-                          seed: iteration.seed_used || null,
-                          source: 'iteration',
-                          priority: 0
-                        });
-                        // Auto-start queue if not running
-                        try { await api.startQueue(); } catch {}
-                        setQueueAdded('queued');
-                        setRenderStatus(null);
-                      } catch (err) {
-                        setRenderStatus(null);
-                        alert(`Render failed: ${err.message}`);
-                      }
-                    }}
-                    disabled={renderStatus === 'submitting'}
-                    className={`px-3 py-1 text-xs font-mono font-bold rounded transition-colors ${
-                      renderStatus === 'submitting'
-                        ? 'bg-accent/50 text-black/50 cursor-wait'
-                        : 'bg-accent text-black hover:bg-accent/90'
-                    }`}
-                  >
-                    {renderStatus === 'submitting' ? 'Submitting...' : 'Render Now'}
-                  </button>
-                  <button
-                    onClick={() => navigator.clipboard.writeText(iteration.json_path)}
-                    className="px-3 py-1 text-xs font-mono bg-surface-overlay text-gray-400 hover:text-gray-200 rounded transition-colors"
-                    title="Copy JSON path for manual rendering"
-                  >
-                    Copy JSON
-                  </button>
-                </div>
-              </div>
-              <p className="text-xs font-mono text-gray-600 truncate" title={iteration.json_path}>{iteration.json_path}</p>
-            </div>
-          );
-        })()}
+        {isPending && iteration.json_path && (
+          <RenderStatusPanel
+            iteration={iteration}
+            renderStatus={renderStatus}
+            setRenderStatus={setRenderStatus}
+            renderProgress={renderProgress}
+            queueAdded={queueAdded}
+            setQueueAdded={setQueueAdded}
+            iterQueueStatus={iterQueueStatus}
+          />
+        )}
         {/* Tags */}
         <div className="mt-2">
           <TagInput
@@ -688,7 +447,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
          STAGE 1: EVALUATE — what did you see?
          ════════════════════════════════════════════════════════════════════ */}
       <div className="space-y-4">
-        <h4 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Evaluate</h4>
+        <h4 className="text-xs font-mono text-gray-500 uppercase tracking-wider" title="Compare this render against reference photos and previous iterations. Score each field 1–5.">Evaluate</h4>
 
         {/* Video diff — side by side comparison with previous iteration */}
         <VideoDiff
@@ -792,69 +551,10 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         )}
 
         {/* Prompt Delta — shows what changed in prompt and which scores moved */}
-        {parentIteration?.evaluation && iteration.evaluation && (() => {
-          const tokenize = (p) => (p || '').split(',').map(s => s.trim()).filter(Boolean);
-          const diff = (oldP, newP) => {
-            const oldSet = new Set(tokenize(oldP));
-            const newSet = new Set(tokenize(newP));
-            return {
-              added: tokenize(newP).filter(p => !oldSet.has(p)),
-              removed: tokenize(oldP).filter(p => !newSet.has(p))
-            };
-          };
-
-          const promptDiff = diff(parentIteration.json_contents?.prompt, iteration.json_contents?.prompt);
-          const negDiff = diff(parentIteration.json_contents?.negative_prompt, iteration.json_contents?.negative_prompt);
-          const hasChange = promptDiff.added.length > 0 || promptDiff.removed.length > 0 || negDiff.added.length > 0 || negDiff.removed.length > 0;
-          if (!hasChange) return null;
-
-          const ALL_SCORE_FIELDS = ['face_match','head_shape','jaw','cheekbones','eyes_brow','skin_texture','hair','frame_consistency','location_correct','lighting_correct','wardrobe_correct','geometry_correct','action_executed','smoothness','camera_movement'];
-          const CAT_MAP = { face_match:'identity',head_shape:'identity',jaw:'identity',cheekbones:'identity',eyes_brow:'identity',skin_texture:'identity',hair:'identity',frame_consistency:'identity',location_correct:'location',lighting_correct:'location',wardrobe_correct:'location',geometry_correct:'location',action_executed:'motion',smoothness:'motion',camera_movement:'motion' };
-          const pScores = parentIteration.evaluation.scores;
-          const cScores = iteration.evaluation.scores;
-          const movedFields = ALL_SCORE_FIELDS
-            .map(f => ({ field: f, delta: (cScores[CAT_MAP[f]]?.[f] ?? 0) - (pScores[CAT_MAP[f]]?.[f] ?? 0) }))
-            .filter(d => d.delta !== 0);
-
-          const rope = iteration.evaluation?.attribution?.rope;
-          const isPromptRope = ['rope_1','rope_1_prompt_position','rope_2a_attention_weighting','rope_2b_negative_prompt','rope_6_alt_prompt'].includes(rope);
-          const confidence = isPromptRope ? 'high' : 'mixed';
-
-          return (
-            <details className="border border-gray-700 rounded px-3 py-2" open>
-              <summary className="text-xs font-mono text-gray-400 cursor-pointer hover:text-gray-300">
-                Prompt Delta
-                <span className={`ml-2 text-[10px] px-1.5 rounded ${confidence === 'high' ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-400'}`}>
-                  {confidence === 'high' ? 'high confidence' : 'mixed change'}
-                </span>
-              </summary>
-              <div className="mt-2 space-y-2">
-                {(promptDiff.added.length > 0 || promptDiff.removed.length > 0) && (
-                  <div>
-                    <span className="text-[10px] font-mono text-gray-500 uppercase">prompt</span>
-                    <div className="mt-0.5"><PromptDiffInline diff={promptDiff} maxPhrases={10} /></div>
-                  </div>
-                )}
-                {(negDiff.added.length > 0 || negDiff.removed.length > 0) && (
-                  <div>
-                    <span className="text-[10px] font-mono text-gray-500 uppercase">negative prompt</span>
-                    <div className="mt-0.5"><PromptDiffInline diff={negDiff} maxPhrases={10} /></div>
-                  </div>
-                )}
-                {movedFields.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 items-center">
-                    <span className="text-[10px] font-mono text-gray-500 uppercase">score impact</span>
-                    {movedFields.map(({ field, delta }) => (
-                      <span key={field} className={`text-[10px] font-mono px-1 rounded ${delta > 0 ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-score-low'}`}>
-                        {field.replace(/_/g, ' ')}: {delta > 0 ? '+' : ''}{delta}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </details>
-          );
-        })()}
+        <PromptDeltaSection
+          iteration={iteration}
+          parentIteration={parentIteration}
+        />
 
         {/* Score sliders */}
         <ScoreGroup title="Identity" fields={IDENTITY_FIELDS} scores={identity}
@@ -879,44 +579,13 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         )}
 
         {/* Regression warnings — flag unexpected score drops in non-targeted categories */}
-        {(() => {
-          // Only show when: parent exists with evaluation, current has been scored (not default 45),
-          // and a rope is selected that targets a specific category
-          const parentEval = parentIteration?.evaluation?.scores;
-          const ropeId = attribution?.rope;
-          const targetCategory = ropeId ? ROPE_CATEGORY_MAP[ropeId] : null;
-          if (!parentEval || !targetCategory || targetCategory === 'all' || grandTotal === 45) return null;
-
-          const identityTotal = IDENTITY_FIELDS.reduce((s, f) => s + (identity[f.key] || 1), 0);
-          const locationTotal = LOCATION_FIELDS.reduce((s, f) => s + (location[f.key] || 1), 0);
-          const motionTotal = MOTION_FIELDS.reduce((s, f) => s + (motion[f.key] || 1), 0);
-
-          const parentIdentity = parentEval.identity ? IDENTITY_FIELDS.reduce((s, f) => s + (parentEval.identity[f.key] || 1), 0) : null;
-          const parentLocation = parentEval.location ? LOCATION_FIELDS.reduce((s, f) => s + (parentEval.location[f.key] || 1), 0) : null;
-          const parentMotion = parentEval.motion ? MOTION_FIELDS.reduce((s, f) => s + (parentEval.motion[f.key] || 1), 0) : null;
-
-          const categories = [
-            { name: 'Identity', current: identityTotal, parent: parentIdentity, max: 40, key: 'identity' },
-            { name: 'Location', current: locationTotal, parent: parentLocation, max: 20, key: 'location' },
-            { name: 'Motion', current: motionTotal, parent: parentMotion, max: 15, key: 'motion' }
-          ];
-
-          const ropeLabel = ROPES.find(r => r.id === ropeId)?.label || ropeId;
-
-          const regressions = categories
-            .filter(c => c.key !== targetCategory && c.parent !== null && (c.parent - c.current) >= 3)
-            .map(c => `${c.name} regressed from ${c.parent}/${c.max} to ${c.current}/${c.max} but change was to ${ropeLabel} (${targetCategory} lever). Possible side effect.`);
-
-          if (regressions.length === 0) return null;
-
-          return (
-            <div className="border border-amber-500/50 bg-amber-500/10 rounded px-3 py-2 space-y-1">
-              {regressions.map((msg, i) => (
-                <p key={i} className="text-xs font-mono text-accent">{msg}</p>
-              ))}
-            </div>
-          );
-        })()}
+        {regressionWarnings.length > 0 && (
+          <div className="border border-amber-500/50 bg-amber-500/10 rounded px-3 py-2 space-y-1">
+            {regressionWarnings.map((msg, i) => (
+              <p key={i} className="text-xs font-mono text-accent">{msg}</p>
+            ))}
+          </div>
+        )}
 
         {/* Grand total */}
         <div className="border-t border-gray-700 pt-3 flex items-center justify-between">
@@ -972,7 +641,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
          STAGE 2: ACT — what do you do about it?
          ════════════════════════════════════════════════════════════════════ */}
       <div className="border-t border-gray-700 pt-4 space-y-4">
-        <h4 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Act</h4>
+        <h4 className="text-xs font-mono text-gray-500 uppercase tracking-wider" title="Attribute the lowest score to a rope, describe the change, then generate the next iteration.">Act</h4>
 
         {/* Attribution */}
         <AttributionPanel attribution={attribution} onChange={isReadOnly ? undefined : setAttribution} readOnly={isReadOnly} modelType={iteration.model_type} />

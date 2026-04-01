@@ -1,19 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import EpisodeTracker from './components/kanban/EpisodeTracker';
 import ClipDetail from './components/clips/ClipDetail';
-import CharacterRegistry from './components/characters/CharacterRegistry';
-import ScoreTrendChart from './components/trends/ScoreTrendChart';
-import RopeEffectivenessChart from './components/trends/RopeEffectivenessChart';
-import ParameterScatterChart from './components/trends/ParameterScatterChart';
-import CreateProjectModal from './components/forms/CreateProjectModal';
 import ProductionQueue from './components/queue/ProductionQueue';
-import QueueManager from './components/queue/QueueManager';
-import TemplateLibrary from './components/templates/TemplateLibrary';
 import RenderStatus from './components/render/RenderStatus';
 import GpuStatus from './components/gpu/GpuStatus';
-import CrossClipDashboard from './components/analytics/CrossClipDashboard';
-import StoragePage from './components/storage/StoragePage';
+
+// Lazy-loaded views — only fetched when navigated to
+const CharacterRegistry = lazy(() => import('./components/characters/CharacterRegistry'));
+const ScoreTrendChart = lazy(() => import('./components/trends/ScoreTrendChart'));
+const RopeEffectivenessChart = lazy(() => import('./components/trends/RopeEffectivenessChart'));
+const ParameterScatterChart = lazy(() => import('./components/trends/ParameterScatterChart'));
+const CreateProjectModal = lazy(() => import('./components/forms/CreateProjectModal'));
+const QueueManager = lazy(() => import('./components/queue/QueueManager'));
+const TemplateLibrary = lazy(() => import('./components/templates/TemplateLibrary'));
+const CrossClipDashboard = lazy(() => import('./components/analytics/CrossClipDashboard'));
+const StoragePage = lazy(() => import('./components/storage/StoragePage'));
 
 import { useAutoRender } from './hooks/useAutoRender';
 import { useQueueStatus, useClips } from './hooks/useQueries';
@@ -261,14 +263,16 @@ function AppContent() {
               onNavigateToAnalytics={() => guardedNavigate(() => { setSelectedClip(null); setView('analytics'); })}
             />
           )}
-          {view === 'analytics' && (
-            <CrossClipDashboard onBack={() => guardedNavigate(() => setView('episodes'))} />
-          )}
-          {view === 'queue' && <QueueManager />}
-          {view === 'characters' && <CharacterRegistry onNavigateToClip={(clip) => { setSelectedClip(clip); setView('episodes'); }} />}
-          {view === 'templates' && <TemplateLibrary />}
-          {view === 'trends' && <TrendsView />}
-          {view === 'storage' && <StoragePage />}
+          <Suspense fallback={<p className="text-xs font-mono text-gray-500 animate-pulse">Loading...</p>}>
+            {view === 'analytics' && (
+              <CrossClipDashboard onBack={() => guardedNavigate(() => setView('episodes'))} />
+            )}
+            {view === 'queue' && <QueueManager />}
+            {view === 'characters' && <CharacterRegistry onNavigateToClip={(clip) => { setSelectedClip(clip); setView('episodes'); }} />}
+            {view === 'templates' && <TemplateLibrary />}
+            {view === 'trends' && <TrendsView />}
+            {view === 'storage' && <StoragePage />}
+          </Suspense>
         </main>
 
         {/* Right panel — Production Queue */}
@@ -279,10 +283,12 @@ function AppContent() {
 
       {/* Create Project Modal */}
       {showCreateProject && (
-        <CreateProjectModal
-          onCreated={() => setShowCreateProject(false)}
-          onClose={() => setShowCreateProject(false)}
-        />
+        <Suspense fallback={null}>
+          <CreateProjectModal
+            onCreated={() => setShowCreateProject(false)}
+            onClose={() => setShowCreateProject(false)}
+          />
+        </Suspense>
       )}
     </div>
   );

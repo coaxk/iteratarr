@@ -1,19 +1,12 @@
 import { useState } from 'react';
+import CopyButton from '../common/CopyButton';
 
 export default function JsonViewer({ label, json, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
-  const [copied, setCopied] = useState(false);
 
   if (!json) return null;
 
   const jsonText = typeof json === 'string' ? json : JSON.stringify(json, null, 2);
-
-  const handleCopy = async (e) => {
-    e.stopPropagation();
-    await navigator.clipboard.writeText(jsonText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
 
   return (
     <div className="border border-gray-700 rounded">
@@ -23,16 +16,7 @@ export default function JsonViewer({ label, json, defaultOpen = false }) {
       >
         <span>{label}</span>
         <div className="flex items-center gap-2">
-          {open && (
-            <span
-              onClick={handleCopy}
-              className={`px-2 py-0.5 rounded text-xs font-mono cursor-pointer ${
-                copied ? 'bg-score-high/20 text-score-high' : 'bg-surface-overlay text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </span>
-          )}
+          {open && <CopyButton text={jsonText} compact />}
           <span className="text-gray-600">{open ? '\u25BC' : '\u25B6'}</span>
         </div>
       </button>

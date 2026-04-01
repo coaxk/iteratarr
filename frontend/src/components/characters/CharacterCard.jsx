@@ -1,20 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { api } from '../../api';
-
-function CopyButton({ text }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = async (e) => {
-    e.stopPropagation();
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-  return (
-    <span onClick={handleCopy} className={`px-2 py-0.5 rounded text-xs font-mono cursor-pointer ${copied ? 'bg-score-high/20 text-score-high' : 'bg-surface-overlay text-gray-500 hover:text-gray-300'}`}>
-      {copied ? 'Copied' : 'Copy'}
-    </span>
-  );
-}
+import CopyButton from '../common/CopyButton';
 
 function MonoBlock({ label, text }) {
   if (!text) return null;
@@ -176,7 +162,6 @@ export default function CharacterCard({ character, clipCount = 0, seedStats = nu
   const [editData, setEditData] = useState({});
   const [testing, setTesting] = useState(false);
   const [baselineJson, setBaselineJson] = useState(null);
-  const [jsonCopied, setJsonCopied] = useState(false);
 
   const loraCount = character.lora_files?.length || 0;
   const canTest = !!character.locked_identity_block && loraCount > 0;
@@ -285,16 +270,12 @@ export default function CharacterCard({ character, clipCount = 0, seedStats = nu
             <div className="border border-accent/30 bg-accent/5 rounded p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono text-accent font-bold">Baseline JSON Generated</span>
-                <button
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(JSON.stringify(baselineJson.json, null, 2));
-                    setJsonCopied(true);
-                    setTimeout(() => setJsonCopied(false), 2000);
-                  }}
-                  className={`px-2 py-1 rounded text-xs font-mono font-bold transition-colors ${jsonCopied ? 'bg-score-high/20 text-score-high' : 'bg-accent text-black hover:bg-accent/90'}`}
-                >
-                  {jsonCopied ? 'Copied!' : 'Copy JSON'}
-                </button>
+                <CopyButton
+                  text={JSON.stringify(baselineJson.json, null, 2)}
+                  label="Copy JSON"
+                  copiedLabel="Copied!"
+                  className="px-2 py-1 rounded text-xs font-mono font-bold bg-accent text-black hover:bg-accent/90 transition-colors"
+                />
               </div>
               <p className="text-xs font-mono text-gray-500">{baselineJson.note}</p>
               <p className="text-xs font-mono text-gray-600">Seed: {baselineJson.seed} — paste into seed screener or cold JSON fork</p>

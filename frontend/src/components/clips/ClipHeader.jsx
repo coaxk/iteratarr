@@ -1,6 +1,6 @@
 export default function ClipHeader({ clip, status, meta, onBack }) {
   const {
-    currentGoal, editingGoal, goalDraft, goalSaving,
+    currentGoal, editingGoal, goalDraft, goalSaving, goalSaved,
     startEditGoal, setGoalDraft, handleGoalSave, handleGoalCancel,
     currentClipName, renamingClip, clipNameDraft, setClipNameDraft,
     startRename, cancelRename, handleRenameSave,
@@ -103,6 +103,9 @@ export default function ClipHeader({ clip, status, meta, onBack }) {
               <div className="text-xs font-mono text-gray-400 border-l-2 border-accent/30 pl-3 flex-1 whitespace-pre-wrap">
                 {currentGoal}
               </div>
+              {goalSaved && (
+                <span className="shrink-0 text-xs font-mono text-score-high transition-opacity">Saved</span>
+              )}
               <button
                 onClick={startEditGoal}
                 className="shrink-0 text-xs font-mono text-gray-500 hover:text-accent transition-colors"

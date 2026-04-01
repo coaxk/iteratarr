@@ -13,6 +13,12 @@ const ROPE_SHORT_LABELS = Object.fromEntries(
 // Full label lookup for title attribute
 const ROPE_FULL_LABELS = Object.fromEntries(ROPES.map(r => [r.id, r.label]));
 
+function PromptDeltaCell({ promptIntel, iterationNumber }) {
+  const pi = promptIntel?.iterations?.find(p => p.iteration_number === iterationNumber);
+  if (!pi || pi.confidence === 'no_prompt_change') return <span className="text-gray-700">{'\u2014'}</span>;
+  return <PromptDiffInline diff={pi.prompt_diff} maxPhrases={2} />;
+}
+
 // Compute category totals from an evaluation's score sub-object
 function sumFields(scoreGroup, fields) {
   if (!scoreGroup) return null;
@@ -191,11 +197,7 @@ export default function IterationTable({ iterations, selectedId, onSelect, compa
 
                 {/* Prompt delta */}
                 <td className="px-2 py-1.5">
-                  {(() => {
-                    const pi = promptIntel?.iterations?.find(p => p.iteration_number === row.iteration_number);
-                    if (!pi || pi.confidence === 'no_prompt_change') return <span className="text-gray-700">{'\u2014'}</span>;
-                    return <PromptDiffInline diff={pi.prompt_diff} maxPhrases={2} />;
-                  })()}
+                  <PromptDeltaCell promptIntel={promptIntel} iterationNumber={row.iteration_number} />
                 </td>
 
                 {/* Source badge */}

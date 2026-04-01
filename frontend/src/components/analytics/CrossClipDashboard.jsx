@@ -67,6 +67,7 @@ export default function CrossClipDashboard({ onBack }) {
             ← back
           </button>
           <h2 className="text-xs font-mono text-gray-500 uppercase tracking-wider">Analytics</h2>
+          <p className="text-xs font-mono text-gray-600 ml-4">Cross-clip scoring trends, rope effectiveness, and character performance.</p>
         </div>
         <button
           onClick={() => {

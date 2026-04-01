@@ -5,6 +5,7 @@ const SUGGESTED_TAGS = ['breakthrough', 'dead end', 'baseline', 'test', 'rollbac
 export default function TagInput({ tags = [], onChange, readOnly = false }) {
   const [input, setInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState(null);
   const inputRef = useRef(null);
   const containerRef = useRef(null);
 
@@ -36,8 +37,13 @@ export default function TagInput({ tags = [], onChange, readOnly = false }) {
       e.preventDefault();
       if (input.trim()) addTag(input);
     } else if (e.key === 'Backspace' && !input && tags.length > 0) {
-      // Remove last tag on backspace when input is empty
-      removeTag(tags[tags.length - 1]);
+      const lastTag = tags[tags.length - 1];
+      if (pendingRemove === lastTag) {
+        removeTag(lastTag);
+        setPendingRemove(null);
+      } else {
+        setPendingRemove(lastTag);
+      }
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
       inputRef.current?.blur();
@@ -66,7 +72,11 @@ export default function TagInput({ tags = [], onChange, readOnly = false }) {
     <div ref={containerRef} className="relative">
       <div className="flex flex-wrap items-center gap-1.5 min-h-[28px]">
         {tags.map(tag => (
-          <span key={tag} className="bg-accent/20 text-accent text-xs font-mono px-2 py-0.5 rounded-full flex items-center gap-0.5">
+          <span key={tag} className={`text-xs font-mono px-2 py-0.5 rounded-full flex items-center gap-0.5 transition-colors ${
+            pendingRemove === tag
+              ? 'bg-red-500/30 text-red-400 ring-1 ring-red-500/50'
+              : 'bg-accent/20 text-accent'
+          }`}>
             {tag}
             <button
               onClick={() => removeTag(tag)}
@@ -80,7 +90,7 @@ export default function TagInput({ tags = [], onChange, readOnly = false }) {
         <input
           ref={inputRef}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => { setInput(e.target.value); setPendingRemove(null); }}
           onFocus={() => setShowSuggestions(true)}
           onKeyDown={handleKeyDown}
           placeholder={tags.length === 0 ? 'Add tags...' : ''}

@@ -54,15 +54,18 @@ Six controllable levers (called ropes) drive every prompt engineering decision:
 - **Smart rope guidance** — contextual suggestions based on lowest-scoring element
 - **Import Evaluation** — paste structured JSON from AI assistant, pre-fills everything
 - **AI vs human score tracking** — ai_scores, human_scores, score_deltas on every evaluation
-- **Side-by-side video comparison** — previous vs current render with auto-polling
+- **Side-by-side video comparison** — previous vs current render via `VideoDiff` component
 - **FFmpeg frame extraction** — auto-extract thumbnails, copy path for external review; dedupes PNG/WebP frames and skips corrupted files before vision scoring
 - **Frame strip** — thumbnail strip in evaluation panel via `FrameStrip` component
 - **JSON diff panel** — see exactly which generation settings changed
+- **Prompt intelligence** — phrase-level prompt diffing, score correlation, and inline diff UI via `PromptDiffInline`
+- **Iteration lineage** — ancestor chain visualization and scoring pattern analysis via `IterationLineage`
 - **Ghost markers** — previous iteration scores as trend-coloured dots on sliders
 - **Character Registry** — LoRA files, locked identity blocks, proven settings
 - **Production lock** — 7-step workflow: LOCKED folder, 81-frame JSON, DaVinci sidecar, queue
 - **Structured file layout** — episode/scene/clip hierarchy with auto-naming
 - **Wan2GP integration** — output_filename auto-set, render path auto-detected
+- **Autopilot** — fully automated score → recommend → apply → render loop
 - **Cross-clip analytics dashboard** — overview pills, per-character performance, rope effectiveness bars, seeds analysis tab (`SeedsTab`), stalling/locked/healthy clip sections; shortcut in Seed HQ header
 - **Storage monitoring** — disk usage tracking per clip, iteration, and frame directory; surfaced in `StoragePage`
 - **Telemetry foundation** — opt-in, anonymized, off by default

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCharacters, useTemplates } from '../../hooks/useQueries';
 import { api } from '../../api';
+import CopyButton from '../common/CopyButton';
 
 /**
  * TemplateLibrary — browse, create, and generate Wan2GP starter JSONs from
@@ -318,11 +319,7 @@ function GenerateModal({ template, onClose, onGenerated }) {
     }
   };
 
-  const handleCopyJson = () => {
-    if (result?.generated_json) {
-      navigator.clipboard.writeText(JSON.stringify(result.generated_json, null, 2));
-    }
-  };
+  const generatedJsonText = result?.generated_json ? JSON.stringify(result.generated_json, null, 2) : '';
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
@@ -382,10 +379,8 @@ function GenerateModal({ template, onClose, onGenerated }) {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-mono font-bold text-score-high">Generated Successfully</h4>
-                <button onClick={handleCopyJson}
-                  className="text-xs font-mono text-accent hover:text-accent/80 border border-accent/30 rounded px-2 py-1">
-                  Copy JSON
-                </button>
+                <CopyButton text={generatedJsonText} label="Copy JSON"
+                  className="text-xs font-mono text-accent hover:text-accent/80 border border-accent/30 rounded px-2 py-1" />
               </div>
               <pre className="text-xs font-mono text-gray-300 bg-surface rounded p-3 border border-gray-700 max-h-64 overflow-auto whitespace-pre-wrap">
                 {JSON.stringify(result.generated_json, null, 2)}

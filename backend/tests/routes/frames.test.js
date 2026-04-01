@@ -36,27 +36,67 @@ describe('Frames API — WebP output', () => {
     expect(res.body.frames).toEqual([]);
   });
 
-  it('GET /:iteration_id lists only .webp frames (not .png)', async () => {
+  it('GET /:iteration_id lists only .webp frames when WebP exists (dedup, size filter)', async () => {
     const iterDir = join(tmpDir, 'frames', 'test-iter-001');
     mkdirSync(iterDir, { recursive: true });
-    writeFileSync(join(iterDir, 'frame_001.webp'), 'fake-webp-data');
-    writeFileSync(join(iterDir, 'frame_002.webp'), 'fake-webp-data');
-    writeFileSync(join(iterDir, 'frame_003.png'), 'old-png-data');
+    // Files must be >= 1024 bytes to pass the corrupted-file filter
+    const validData = Buffer.alloc(1024, 0x42);
+    writeFileSync(join(iterDir, 'frame_001.webp'), validData);
+    writeFileSync(join(iterDir, 'frame_002.webp'), validData);
+    writeFileSync(join(iterDir, 'frame_003.png'), validData);
 
     const res = await request.get('/api/frames/test-iter-001');
     expect(res.status).toBe(200);
+    // WebP exists → PNG-only frames excluded; frame_003 has no WebP counterpart so it's dropped
     expect(res.body.frames).toEqual(['frame_001.webp', 'frame_002.webp']);
     expect(res.body.frames).not.toContain('frame_003.png');
   });
 
-  it('GET /:iteration_id/:filename rejects .png filenames', async () => {
+  it('GET /:iteration_id falls back to .png when no WebP exists', async () => {
+    const iterDir = join(tmpDir, 'frames', 'test-iter-002');
+    mkdirSync(iterDir, { recursive: true });
+    const validData = Buffer.alloc(1024, 0x42);
+    writeFileSync(join(iterDir, 'frame_001.png'), validData);
+    writeFileSync(join(iterDir, 'frame_002.png'), validData);
+
+    const res = await request.get('/api/frames/test-iter-002');
+    expect(res.status).toBe(200);
+    expect(res.body.frames).toEqual(['frame_001.png', 'frame_002.png']);
+  });
+
+  it('GET /:iteration_id filters out corrupted frames under 1KB', async () => {
+    const iterDir = join(tmpDir, 'frames', 'test-iter-003');
+    mkdirSync(iterDir, { recursive: true });
+    const validData = Buffer.alloc(1024, 0x42);
+    writeFileSync(join(iterDir, 'frame_001.webp'), validData);
+    writeFileSync(join(iterDir, 'frame_002.webp'), Buffer.alloc(100)); // corrupted
+
+    const res = await request.get('/api/frames/test-iter-003');
+    expect(res.status).toBe(200);
+    expect(res.body.frames).toEqual(['frame_001.webp']);
+  });
+
+  it('GET /:iteration_id deduplicates WebP over PNG for same frame number', async () => {
+    const iterDir = join(tmpDir, 'frames', 'test-iter-004');
+    mkdirSync(iterDir, { recursive: true });
+    const validData = Buffer.alloc(1024, 0x42);
+    writeFileSync(join(iterDir, 'frame_001.webp'), validData);
+    writeFileSync(join(iterDir, 'frame_001.png'), validData);
+    writeFileSync(join(iterDir, 'frame_002.webp'), validData);
+
+    const res = await request.get('/api/frames/test-iter-004');
+    expect(res.status).toBe(200);
+    expect(res.body.frames).toEqual(['frame_001.webp', 'frame_002.webp']);
+  });
+
+  it('GET /:iteration_id/:filename serves legacy .png files', async () => {
     const iterDir = join(tmpDir, 'frames', 'test-iter-001');
     mkdirSync(iterDir, { recursive: true });
-    writeFileSync(join(iterDir, 'frame_001.png'), 'png-data');
+    writeFileSync(join(iterDir, 'frame_001.png'), Buffer.alloc(1024, 0x42));
 
     const res = await request.get('/api/frames/test-iter-001/frame_001.png');
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/invalid frame filename/i);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('image/png');
   });
 
   it('GET /:iteration_id/:filename accepts .webp filenames', async () => {

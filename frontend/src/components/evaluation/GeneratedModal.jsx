@@ -1,23 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../../api';
 import { getAutoRender } from '../../hooks/useAutoRender';
-
-function CopyButton({ text }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-  return (
-    <button onClick={handleCopy}
-      className={`px-2 py-0.5 rounded text-xs font-mono flex-shrink-0 ${
-        copied ? 'bg-score-high/20 text-score-high' : 'bg-surface-overlay text-gray-500 hover:text-gray-300'
-      }`}>
-      {copied ? 'Copied' : 'Copy'}
-    </button>
-  );
-}
+import CopyButton from '../common/CopyButton';
 
 export default function GeneratedModal({ jsonPath, renderPath, iterationNumber, clipName, iterationId, seed, onClose, onGoToIteration }) {
   const [wan2gpAvailable, setWan2gpAvailable] = useState(false);

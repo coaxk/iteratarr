@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../../api';
+import CopyButton from '../common/CopyButton';
 
 /**
  * SeedCard — individual card in the seed screening contact sheet.
@@ -19,17 +20,9 @@ import { api } from '../../api';
  *   renderConfirm — screenId that just submitted a render (for brief confirmation)
  */
 export default function SeedCard({ record, onSelect, onRate, onExpand, onDelete, onRender, isSelected, expanded, frameSrc, renderConfirm }) {
-  const [copied, setCopied] = useState(false);
   const [copiedDir, setCopiedDir] = useState(false);
   const [contactSheet, setContactSheet] = useState(null);
   const [hoveredStar, setHoveredStar] = useState(0);
-
-  const handleCopySeed = async (e) => {
-    e.stopPropagation();
-    await navigator.clipboard.writeText(String(record.seed));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
 
   const handleRate = (e, star) => {
     e.stopPropagation();
@@ -158,14 +151,7 @@ export default function SeedCard({ record, onSelect, onRate, onExpand, onDelete,
       {/* Seed number with copy */}
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-sm font-mono text-gray-200 font-bold">Seed: {record.seed}</span>
-        <button
-          onClick={handleCopySeed}
-          className={`px-1.5 py-0.5 rounded text-xs font-mono ${
-            copied ? 'bg-score-high/20 text-score-high' : 'bg-surface-overlay text-gray-500 hover:text-gray-300'
-          }`}
-        >
-          {copied ? 'Copied' : 'Copy'}
-        </button>
+        <CopyButton text={String(record.seed)} compact />
       </div>
 
       {/* Star rating */}

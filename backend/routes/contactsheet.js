@@ -38,12 +38,25 @@ export function createContactSheetRoutes(config) {
       } else if (frame_id) {
         const framesDir = join(config.iteratarr_data_dir || '.', 'frames', frame_id);
         if (existsSync(framesDir)) {
-          const { readdirSync } = await import('fs');
-          const files = readdirSync(framesDir)
-            .filter(f => (f.endsWith('.png') || f.endsWith('.jpg') || f.endsWith('.webp')) && !f.startsWith('contact_sheet'))
-            .sort()
+          const { readdirSync, statSync } = await import('fs');
+          const files = readdirSync(framesDir);
+          // Dedup: prefer WebP over PNG for same frame number, skip corrupted files (<1KB).
+          // If ANY WebP frames exist, only use WebP — prevents legacy PNG full-extractions
+          // from inflating a preview-only set.
+          const byNumber = {};
+          for (const f of files) {
+            const m = f.match(/^frame_(\d{3})\.(webp|png)$/i);
+            if (!m) continue;
+            const [, num, ext] = m;
+            if (!byNumber[num] || ext.toLowerCase() === 'webp') byNumber[num] = f;
+          }
+          const hasWebp = Object.values(byNumber).some(f => f.toLowerCase().endsWith('.webp'));
+          framePaths = Object.values(byNumber).sort()
+            .filter(f => {
+              if (hasWebp && !f.toLowerCase().endsWith('.webp')) return false;
+              try { return statSync(join(framesDir, f)).size >= 1024; } catch { return false; }
+            })
             .map(f => join(framesDir, f));
-          framePaths = files;
         }
       }
 

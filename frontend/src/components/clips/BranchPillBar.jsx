@@ -8,7 +8,9 @@ import { BRANCH_STATUSES, SCORE_LOCK_THRESHOLD, GRAND_MAX } from '../../constant
 export default function BranchPillBar({ branches, selectedBranchId, onSelect, onManage }) {
   const scrollRef = useRef(null);
 
-  if (!branches || branches.length === 0) return null;
+  if (!branches || branches.length === 0) {
+    return <p className="text-xs font-mono text-gray-600 py-1">No branches yet — score a seed to create one</p>;
+  }
 
   const statusOrder = { active: 0, locked: 1, screening: 2, stalled: 3, abandoned: 4, superseded: 5 };
   const sorted = [...branches].sort((a, b) => {

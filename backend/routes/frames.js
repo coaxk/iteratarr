@@ -173,9 +173,29 @@ export function createFrameRoutes(dataDir, store = null) {
         return res.json({ frames: [] });
       }
 
-      const frames = files
-        .filter(f => /^frame_\d{3}\.(webp|png)$/.test(f))
+      // Deduplicate: prefer WebP over PNG for the same frame number.
+      // If ANY WebP frames exist, only return WebP — don't fall back to PNG-only
+      // frames for higher numbers (prevents legacy full PNG extractions bleeding
+      // into a WebP preview set). If no WebP at all, return PNG (legacy iteration).
+      // Also filter out corrupted files under 1KB (empty ffmpeg writes).
+      const byNumber = {};
+      for (const f of files) {
+        const m = f.match(/^frame_(\d{3})\.(webp|png)$/i);
+        if (!m) continue;
+        const [, num, ext] = m;
+        if (!byNumber[num] || ext.toLowerCase() === 'webp') byNumber[num] = f;
+      }
+      const hasWebp = Object.values(byNumber).some(f => f.toLowerCase().endsWith('.webp'));
+      const candidates = Object.values(byNumber)
+        .filter(f => !hasWebp || f.toLowerCase().endsWith('.webp'))
         .sort();
+      const frames = [];
+      for (const f of candidates) {
+        try {
+          const s = await stat(join(dir, f));
+          if (s.size >= 1024) frames.push(f);
+        } catch {}
+      }
 
       // Check for existing contact sheet
       const csFile = files.find(f => f.startsWith('contact_sheet'));

@@ -2,6 +2,7 @@ import { useState, useMemo, memo } from 'react';
 import { useClipIterations, useSeedThumbnails } from '../../hooks/useQueries';
 import { useSeedAnalytics } from '../../hooks/useQueries';
 import { BRANCH_STATUSES, GRAND_MAX } from '../../constants';
+import CopyButton from '../common/CopyButton';
 
 /**
  * SeedHQ — the clip's home screen. Shows the full seed→branch→iteration tree
@@ -256,13 +257,7 @@ function SeedGroup({ seed, branches, seedScreen, thumbnail, onEnterBranch, onMan
               Launch Branch
             </button>
           )}
-          <button
-            onClick={async () => { await navigator.clipboard.writeText(String(seed)); }}
-            className="px-2 py-1 text-xs font-mono text-gray-600 hover:text-gray-300 transition-colors"
-            title="Copy seed"
-          >
-            Copy
-          </button>
+          <CopyButton text={String(seed)} title="Copy seed" compact className="px-2 py-1 text-xs font-mono text-gray-600 hover:text-gray-300 transition-colors" />
         </div>
       </div>
 

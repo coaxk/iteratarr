@@ -53,6 +53,7 @@ IMPORTANT GUIDELINES:
 - Be specific in your qualitative notes about what's working and what needs improvement
 - Suggest which "rope" (aspect) to adjust: Rope 1 (positive prompt wording), Rope 2a (attention weighting — boost/reduce token weights in positive prompt like (token:1.3)), Rope 2b (negative prompt — add/remove terms), Rope 3 (LoRA multipliers), Rope 4 (guidance scale), Rope 5 (seed), Rope 6 (alt prompt)
 - CRITICAL: Rope 2a modifies the POSITIVE prompt with attention weights. Rope 2b modifies the NEGATIVE prompt. Never put negative-style terms (blurry, distorted, CGI, etc.) into a Rope 1 or Rope 2a recommendation — those belong in Rope 2b only.
+- MULTI-TARGET AWARENESS: Report your top 3 pain points (lowest-scoring or most-improvable fields). If iteration history shows a field is stuck despite repeated attempts, deprioritize it and target a different field. Diversify rope selection — do not recommend the same rope+field combination that has already failed.
 
 You MUST respond with ONLY a valid JSON object in this exact format, no other text:
 {
@@ -63,6 +64,11 @@ You MUST respond with ONLY a valid JSON object in this exact format, no other te
   },
   "attribution": {
     "lowest_element": "the_key_of_the_lowest_scoring_field",
+    "top_pain_points": [
+      { "field": "field_name", "score": "N", "suggested_rope": "rope_N", "rationale": "brief reason" },
+      { "field": "field_name", "score": "N", "suggested_rope": "rope_N", "rationale": "brief reason" },
+      { "field": "field_name", "score": "N", "suggested_rope": "rope_N", "rationale": "brief reason" }
+    ],
     "rope": "rope_N",
     "confidence": "low|medium|high",
     "next_change_description": "Specific description of what single change to make next",
@@ -173,6 +179,13 @@ export async function scoreFrames(framePaths, context = {}) {
   if (context.changeFromParent) {
     userPrompt += `\nChange from previous iteration: ${context.changeFromParent}`;
   }
+  if (context.iterationHistory) {
+    const { formatHistoryForPrompt } = await import('./iteration-history.js');
+    const historyBlock = formatHistoryForPrompt(context.iterationHistory);
+    if (historyBlock) {
+      userPrompt += `\n\n${historyBlock}`;
+    }
+  }
 
   // Call Claude API — system prompt uses prompt caching so repeated evaluations
   // in the same session only pay rubric tokens once (cache TTL: 5 minutes).
@@ -186,7 +199,7 @@ export async function scoreFrames(framePaths, context = {}) {
     },
     body: JSON.stringify({
       model: VISION_MODEL,
-      max_tokens: 1024,
+      max_tokens: 1536,
       system: [{ type: 'text', text: SCORING_RUBRIC, cache_control: { type: 'ephemeral' } }],
       messages: [{
         role: 'user',
@@ -260,6 +273,19 @@ export async function scoreFrames(framePaths, context = {}) {
       Object.values(parsed.scores.identity).reduce((s, v) => s + v, 0) +
       Object.values(parsed.scores.location).reduce((s, v) => s + v, 0) +
       Object.values(parsed.scores.motion).reduce((s, v) => s + v, 0);
+
+    // Ensure top_pain_points exists (backward compat with responses that omit it)
+    if (!parsed.attribution?.top_pain_points) {
+      const lowest = parsed.attribution?.lowest_element;
+      if (lowest && parsed.attribution) {
+        parsed.attribution.top_pain_points = [{
+          field: lowest,
+          score: (() => { for (const g of ['identity','location','motion']) { if (parsed.scores[g]?.[lowest] != null) return parsed.scores[g][lowest]; } return null; })(),
+          suggested_rope: parsed.attribution.rope,
+          rationale: 'single lowest field (legacy response)'
+        }];
+      }
+    }
 
     const usage = result.usage || {};
     return {

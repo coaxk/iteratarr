@@ -224,6 +224,18 @@ export function createVisionRoutes(store, config) {
         } catch {}
       }
 
+      // Build iteration history for chain-aware scoring (#40)
+      try {
+        const { buildAncestorChain, analyzeHistory } = await import('../iteration-history.js');
+        const chain = await buildAncestorChain(store, iteration_id);
+        if (chain.length > 1) {
+          context.iterationHistory = analyzeHistory(chain);
+          console.log(`[Vision] Chain-aware: ${chain.length} ancestors, ${context.iterationHistory.patterns?.stuck_fields?.length || 0} stuck fields`);
+        }
+      } catch (err) {
+        console.log(`[Vision] Could not build iteration history (non-fatal): ${err.message}`);
+      }
+
       console.log(`[Vision] Scoring iter#${iteration.iteration_number} (${iteration_id.substring(0, 8)}) via ${method}`);
       const result = await scoreFrames(framePaths, context);
       result.method = method;

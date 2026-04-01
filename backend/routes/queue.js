@@ -462,8 +462,8 @@ export function createQueueRoutes(store, config) {
                   signal: frameAbort.signal
                 });
                 clearTimeout(frameTimeout);
-                await store.update('iterations', item.iteration_id, { frames_extracted: false });
-                console.log(`[Queue] 6 key frames extracted for ${item.clip_name} (lazy full extraction pending)`);
+                await store.update('iterations', item.iteration_id, { frames_extracted: true });
+                console.log(`[Queue] 6 key frames extracted for ${item.clip_name}`);
               } catch (frameErr) {
                 console.log(`[Queue] Frame extraction skipped — will extract on view: ${frameErr.message}`);
               }

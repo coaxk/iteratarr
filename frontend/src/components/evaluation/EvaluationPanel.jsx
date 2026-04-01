@@ -736,7 +736,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                     setMotion(prev => ({ ...prev, ...result.scores.motion }));
                     if (result.attribution) {
                       // Map Vision API rope shorthand (rope_1) to full ID (rope_1_prompt_position)
-                      const ropeMap = { rope_1: 'rope_1_prompt_position', rope_2: 'rope_2_attention_weighting', rope_3: 'rope_3_lora_multipliers', rope_4: 'rope_4a_cfg_high', rope_4a: 'rope_4a_cfg_high', rope_4b: 'rope_4b_cfg_low', rope_5: 'rope_5_steps_skipping', rope_6: 'rope_6_alt_prompt' };
+                      const ropeMap = { rope_1: 'rope_1_prompt_position', rope_2: 'rope_2b_negative_prompt', rope_2a: 'rope_2a_attention_weighting', rope_2b: 'rope_2b_negative_prompt', rope_3: 'rope_3_lora_multipliers', rope_4: 'rope_4a_cfg_high', rope_4a: 'rope_4a_cfg_high', rope_4b: 'rope_4b_cfg_low', rope_5: 'rope_5_steps_skipping', rope_6: 'rope_6_alt_prompt' };
                       const mappedRope = ropeMap[result.attribution.rope] || result.attribution.rope;
                       const ropeField = ROPES.find(r => r.id === mappedRope)?.field || null;
                       setAttribution({

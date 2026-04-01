@@ -2,7 +2,8 @@
 // Each rope maps to a specific JSON field in the generation parameters.
 export const ROPES = [
   { id: 'rope_1_prompt_position', label: 'Rope 1 — Prompt Position', field: 'prompt', description: 'Identity block must appear before location. Every additional word dilutes attention.' },
-  { id: 'rope_2_attention_weighting', label: 'Rope 2 — Attention Weighting', field: 'prompt', description: 'Boost identity tokens: (mckdhn:1.3). Reduce competing: (Monaco:0.9). Range: 0.5-1.5' },
+  { id: 'rope_2a_attention_weighting', label: 'Rope 2a — Attention Weighting', field: 'prompt', description: 'Boost identity tokens: (mckdhn:1.3). Reduce competing: (Monaco:0.9). Range: 0.5-1.5' },
+  { id: 'rope_2b_negative_prompt', label: 'Rope 2b — Negative Prompt', field: 'negative_prompt', description: 'Add/remove quality and style terms from the negative prompt.' },
   { id: 'rope_3_lora_multipliers', label: 'Rope 3 — LoRA Multipliers', field: 'loras_multipliers', description: 'Phase-aware: "high;low high;low". First=high noise LoRA, second=low noise LoRA.' },
   { id: 'rope_4a_cfg_high', label: 'Rope 4a — CFG High Noise', field: 'guidance_scale', description: 'Prompt adherence in composition pass. Sweet spot: 5.9-6.2' },
   { id: 'rope_4b_cfg_low', label: 'Rope 4b — CFG Low Noise', field: 'guidance2_scale', description: 'Prompt adherence in identity refinement. Default 3, untested above 4.' },
@@ -30,19 +31,19 @@ export const MODEL_TYPES = [
 // Other models get a generic subset until we learn their rope mappings.
 export const MODEL_ROPE_CONFIG = {
   'wan2.2_t2v_14B': {
-    availableRopes: ['rope_1_prompt_position', 'rope_2_attention_weighting', 'rope_3_lora_multipliers', 'rope_4a_cfg_high', 'rope_4b_cfg_low', 'rope_5_steps_skipping', 'rope_6_alt_prompt', 'bonus_flow_shift', 'bonus_nag_scale', 'bonus_sample_solver', 'multiple'],
+    availableRopes: ['rope_1_prompt_position', 'rope_2a_attention_weighting', 'rope_2b_negative_prompt', 'rope_3_lora_multipliers', 'rope_4a_cfg_high', 'rope_4b_cfg_low', 'rope_5_steps_skipping', 'rope_6_alt_prompt', 'bonus_flow_shift', 'bonus_nag_scale', 'bonus_sample_solver', 'multiple'],
     notes: 'Dual-DiT architecture. Phase-aware LoRA multipliers. Alt prompt drives low noise phase.'
   },
   'wan2.1_t2v_14B': {
-    availableRopes: ['rope_1_prompt_position', 'rope_2_attention_weighting', 'rope_3_lora_multipliers', 'rope_4a_cfg_high', 'rope_5_steps_skipping', 'bonus_flow_shift', 'bonus_nag_scale', 'multiple'],
+    availableRopes: ['rope_1_prompt_position', 'rope_2a_attention_weighting', 'rope_2b_negative_prompt', 'rope_3_lora_multipliers', 'rope_4a_cfg_high', 'rope_5_steps_skipping', 'bonus_flow_shift', 'bonus_nag_scale', 'multiple'],
     notes: 'Single-DiT. No alt_prompt. Single LoRA file. No guidance2_scale.'
   },
   'hunyuan_video': {
-    availableRopes: ['rope_1_prompt_position', 'rope_2_attention_weighting', 'rope_3_lora_multipliers', 'rope_4a_cfg_high', 'rope_5_steps_skipping', 'multiple'],
+    availableRopes: ['rope_1_prompt_position', 'rope_2a_attention_weighting', 'rope_2b_negative_prompt', 'rope_3_lora_multipliers', 'rope_4a_cfg_high', 'rope_5_steps_skipping', 'multiple'],
     notes: 'Different LoRA format. No phase-aware multipliers.'
   },
   'default': {
-    availableRopes: ['rope_1_prompt_position', 'rope_2_attention_weighting', 'rope_3_lora_multipliers', 'rope_4a_cfg_high', 'rope_5_steps_skipping', 'multiple'],
+    availableRopes: ['rope_1_prompt_position', 'rope_2a_attention_weighting', 'rope_2b_negative_prompt', 'rope_3_lora_multipliers', 'rope_4a_cfg_high', 'rope_5_steps_skipping', 'multiple'],
     notes: 'Generic model. Basic rope set.'
   }
 };
@@ -138,7 +139,8 @@ export const SETTINGS_TIERS = {
 // 'all' means the rope affects everything (no regression check applies).
 export const ROPE_CATEGORY_MAP = {
   rope_1_prompt_position: 'identity',
-  rope_2_attention_weighting: 'identity',
+  rope_2a_attention_weighting: 'identity',
+  rope_2b_negative_prompt: 'identity',
   rope_3_lora_multipliers: 'identity',
   rope_4a_cfg_high: 'location',
   rope_4b_cfg_low: 'identity',
@@ -155,7 +157,7 @@ export const ROPE_CATEGORY_MAP = {
 export const ROPE_GUIDANCE = {
   // Identity elements
   face_match: [
-    { rope: 'rope_2_attention_weighting', hint: 'Boost trigger word weight — e.g. (mckdhn:1.4)' },
+    { rope: 'rope_2a_attention_weighting', hint: 'Boost trigger word weight — e.g. (mckdhn:1.4)' },
     { rope: 'rope_6_alt_prompt', hint: 'Move identity block to alt_prompt so low noise pass focuses entirely on face' },
     { rope: 'rope_3_lora_multipliers', hint: 'Increase low noise LoRA weight for stronger identity lock' }
   ],
@@ -165,25 +167,25 @@ export const ROPE_GUIDANCE = {
   ],
   jaw: [
     { rope: 'rope_3_lora_multipliers', hint: 'Low noise LoRA refines facial structure — increase its weight' },
-    { rope: 'rope_2_attention_weighting', hint: 'Boost jaw descriptor weight — e.g. (sharp jaw:1.3)' }
+    { rope: 'rope_2a_attention_weighting', hint: 'Boost jaw descriptor weight — e.g. (sharp jaw:1.3)' }
   ],
   cheekbones: [
     { rope: 'rope_3_lora_multipliers', hint: 'Low noise LoRA handles facial detail refinement' },
-    { rope: 'rope_2_attention_weighting', hint: 'Boost cheekbone descriptor weight' }
+    { rope: 'rope_2a_attention_weighting', hint: 'Boost cheekbone descriptor weight' }
   ],
   eyes_brow: [
     { rope: 'rope_3_lora_multipliers', hint: 'Eye/brow detail is low noise territory — increase low LoRA weight' },
-    { rope: 'rope_2_attention_weighting', hint: 'Boost eye descriptors — e.g. (deep set dark eyes:1.3)' },
+    { rope: 'rope_2a_attention_weighting', hint: 'Boost eye descriptors — e.g. (deep set dark eyes:1.3)' },
     { rope: 'rope_6_alt_prompt', hint: 'Dedicate alt_prompt to identity so eye detail gets full low noise attention' }
   ],
   skin_texture: [
     { rope: 'rope_6_alt_prompt', hint: 'Skin detail lives in low noise pass — alt_prompt focuses it on identity' },
     { rope: 'rope_3_lora_multipliers', hint: 'Increase low noise LoRA weight for skin texture refinement' },
-    { rope: 'rope_2_attention_weighting', hint: 'Boost age/skin descriptors — e.g. (weathered tanned skin:1.3)' },
+    { rope: 'rope_2a_attention_weighting', hint: 'Boost age/skin descriptors — e.g. (weathered tanned skin:1.3)' },
     { rope: 'rope_4b_cfg_low', hint: 'Increase low noise CFG for stronger prompt adherence on skin details' }
   ],
   hair: [
-    { rope: 'rope_2_attention_weighting', hint: 'Boost hair descriptors — e.g. (short silver grey hair:1.2)' },
+    { rope: 'rope_2a_attention_weighting', hint: 'Boost hair descriptors — e.g. (short silver grey hair:1.2)' },
     { rope: 'rope_3_lora_multipliers', hint: 'Hair texture is refined in low noise pass — increase low LoRA' },
     { rope: 'rope_1_prompt_position', hint: 'Move hair description closer to trigger word for more attention' }
   ],
@@ -196,15 +198,15 @@ export const ROPE_GUIDANCE = {
   // Location elements
   location_correct: [
     { rope: 'rope_1_prompt_position', hint: 'Location description may be too far back in prompt — move it forward' },
-    { rope: 'rope_2_attention_weighting', hint: 'Boost location tokens — but be careful not to compete with identity' },
+    { rope: 'rope_2a_attention_weighting', hint: 'Boost location tokens — but be careful not to compete with identity' },
     { rope: 'rope_4a_cfg_high', hint: 'Higher CFG = stronger prompt adherence in composition pass (where location is set)' }
   ],
   lighting_correct: [
-    { rope: 'rope_2_attention_weighting', hint: 'Boost lighting descriptor weight' },
+    { rope: 'rope_2a_attention_weighting', hint: 'Boost lighting descriptor weight' },
     { rope: 'rope_4a_cfg_high', hint: 'Lighting is set in composition pass — higher CFG for more adherence' }
   ],
   wardrobe_correct: [
-    { rope: 'rope_2_attention_weighting', hint: 'Boost wardrobe descriptor weight' },
+    { rope: 'rope_2a_attention_weighting', hint: 'Boost wardrobe descriptor weight' },
     { rope: 'rope_1_prompt_position', hint: 'Move wardrobe description closer to character trigger' }
   ],
   geometry_correct: [
@@ -215,7 +217,7 @@ export const ROPE_GUIDANCE = {
   action_executed: [
     { rope: 'rope_1_prompt_position', hint: 'Action description may need more prominence in prompt' },
     { rope: 'rope_4a_cfg_high', hint: 'Higher CFG for stronger action adherence in composition' },
-    { rope: 'rope_2_attention_weighting', hint: 'Boost action tokens for more attention' }
+    { rope: 'rope_2a_attention_weighting', hint: 'Boost action tokens for more attention' }
   ],
   smoothness: [
     { rope: 'bonus_flow_shift', hint: 'Higher flow_shift = smoother motion (range 1-20, default 12)' },

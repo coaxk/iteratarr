@@ -51,7 +51,8 @@ IMPORTANT GUIDELINES:
 - A score of 5 means "indistinguishable from professional quality"
 - A score of 1 means "clearly wrong or broken"
 - Be specific in your qualitative notes about what's working and what needs improvement
-- Suggest which "rope" (aspect) to adjust: Rope 1 (prompt wording), Rope 2 (negative prompt), Rope 3 (LoRA multipliers), Rope 4 (guidance scale), Rope 5 (seed), Rope 6 (alt prompt)
+- Suggest which "rope" (aspect) to adjust: Rope 1 (positive prompt wording), Rope 2a (attention weighting — boost/reduce token weights in positive prompt like (token:1.3)), Rope 2b (negative prompt — add/remove terms), Rope 3 (LoRA multipliers), Rope 4 (guidance scale), Rope 5 (seed), Rope 6 (alt prompt)
+- CRITICAL: Rope 2a modifies the POSITIVE prompt with attention weights. Rope 2b modifies the NEGATIVE prompt. Never put negative-style terms (blurry, distorted, CGI, etc.) into a Rope 1 or Rope 2a recommendation — those belong in Rope 2b only.
 
 You MUST respond with ONLY a valid JSON object in this exact format, no other text:
 {
@@ -65,7 +66,7 @@ You MUST respond with ONLY a valid JSON object in this exact format, no other te
     "rope": "rope_N",
     "confidence": "low|medium|high",
     "next_change_description": "Specific description of what single change to make next",
-    "next_change_value": "The LITERAL value to place in that JSON field. Rules by rope: Rope 1/6 = prompt text string only (NO quality/negative terms — those belong in negative_prompt only). Rope 2 = negative_prompt text string. Rope 3 = a single decimal number as a string e.g. '1.0' or '1.1' (NOT prose, NOT 'increase to X'). Rope 4 = a single decimal number e.g. '6.5'. Rope 5 = a new integer seed. Always output the raw value, never a description of the value."
+    "next_change_value": "The LITERAL value to place in that JSON field. Rules by rope: Rope 1 = positive prompt text (character description + scene, NO negative quality terms). Rope 2a = positive prompt with attention weights like (token:1.3). Rope 2b = negative prompt text string (quality/style exclusions). Rope 3 = a single decimal number as a string e.g. '1.0' or '1.1' (NOT prose, NOT 'increase to X'). Rope 4 = a single decimal number e.g. '6.5'. Rope 5 = a new integer seed. Rope 6 = alt prompt text. NEVER put negative terms (blurry, distorted, CGI, deformed, etc.) into Rope 1/2a/6 values. Always output the raw value, never a description."
   },
   "qualitative_notes": "REQUIRED — 2-3 sentences about what you observed. Must never be empty."
 }`;

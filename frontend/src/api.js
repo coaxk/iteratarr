@@ -153,6 +153,13 @@ export const api = {
   visionScore: (iterationId, characterName, useFrames = false) => request('/vision/score', { method: 'POST', body: { iteration_id: iterationId, character_name: characterName, use_frames: useFrames } }),
   visionEstimate: (iterationId) => request(`/vision/estimate/${iterationId}`),
   visionBatch: (iterationIds, characterName) => request('/vision/batch', { method: 'POST', body: { iteration_ids: iterationIds, character_name: characterName } }),
+  visionConsistencyTest: (iterationId, runs = 5) => request('/vision/consistency-test', { method: 'POST', body: { iteration_id: iterationId, runs } }),
+
+  // Autopilot
+  autopilotStart: (branchId, opts = {}) => request('/autopilot/start', { method: 'POST', body: { branch_id: branchId, ...opts } }),
+  autopilotStatus: (branchId) => request(`/autopilot/status/${branchId}`),
+  autopilotStop: (branchId) => request(`/autopilot/stop/${branchId}`, { method: 'POST' }),
+  autopilotSessions: () => request('/autopilot/sessions'),
 
   // Contact Sheets
   createContactSheet: (data) => request('/contactsheet', { method: 'POST', body: data }),

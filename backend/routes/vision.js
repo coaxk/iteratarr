@@ -303,5 +303,119 @@ export function createVisionRoutes(store, config) {
     res.json({ results, scored: results.filter(r => !r.error).length, failed: results.filter(r => r.error).length });
   });
 
+  /**
+   * POST /api/vision/consistency-test
+   * Scores the same iteration N times to measure scoring variance.
+   * Body: { iteration_id: string, runs?: number (default 5, max 10) }
+   * Returns all score sets + computed statistics (mean, stdev per field and grand total).
+   */
+  router.post('/consistency-test', async (req, res) => {
+    try {
+      const { iteration_id, runs: rawRuns } = req.body;
+      const runs = Math.min(Math.max(parseInt(rawRuns) || 5, 2), 10);
+
+      if (!iteration_id) return res.status(400).json({ error: 'iteration_id required' });
+
+      // Resolve frames (same logic as /score)
+      const framesDir = join(framesRoot, iteration_id);
+      let framePaths = [];
+      if (existsSync(framesDir)) {
+        const files = await readdir(framesDir);
+        const cs = files.find(f => f.startsWith('contact_sheet'));
+        if (cs) {
+          framePaths = [join(framesDir, cs)];
+        } else {
+          const deduped = await dedupeFrames(framesDir, files);
+          framePaths = deduped.map(f => join(framesDir, f));
+        }
+      }
+      if (framePaths.length === 0) {
+        return res.status(400).json({ error: 'No frames or contact sheet found for this iteration.' });
+      }
+
+      // Build context
+      const iteration = await store.get('iterations', iteration_id);
+      const context = {
+        prompt: iteration.json_contents?.prompt || '',
+        negativePrompt: iteration.json_contents?.negative_prompt || '',
+        iterationNumber: iteration.iteration_number
+      };
+
+      // Load character reference images if available
+      if (iteration.clip_id) {
+        try {
+          const clip = await store.get('clips', iteration.clip_id);
+          const charName = clip.characters?.[0];
+          if (charName) {
+            const chars = await store.list('characters', c => c.name === charName);
+            if (chars[0]?.reference_images?.length > 0) {
+              context.referenceImagePaths = chars[0].reference_images;
+              context.characterDescription = chars[0].locked_identity_block || chars[0].description || '';
+            }
+          }
+        } catch {}
+      }
+
+      // Run N scores sequentially with retry on transient failures
+      const results = [];
+      for (let i = 0; i < runs; i++) {
+        let retries = 3;
+        while (retries > 0) {
+          try {
+            console.log(`[Vision] Consistency test run ${i + 1}/${runs} for ${iteration_id.substring(0, 8)}`);
+            const result = await scoreFrames(framePaths, context);
+            results.push(result);
+            break;
+          } catch (err) {
+            retries--;
+            if (retries === 0) throw err;
+            const isTransient = err.message.includes('temporarily unavailable') || err.message.includes('rate limit') || err.message.includes('gateway');
+            if (!isTransient) throw err;
+            console.log(`[Vision] Transient error on run ${i + 1}, retrying in 15s (${retries} left): ${err.message}`);
+            await new Promise(r => setTimeout(r, 15000));
+          }
+        }
+      }
+
+      // Compute statistics
+      const allFields = [
+        'face_match', 'head_shape', 'jaw', 'cheekbones', 'eyes_brow', 'skin_texture', 'hair', 'frame_consistency',
+        'location_correct', 'lighting_correct', 'wardrobe_correct', 'geometry_correct',
+        'action_executed', 'smoothness', 'camera_movement'
+      ];
+      const fieldStats = {};
+      for (const field of allFields) {
+        const group = ['face_match', 'head_shape', 'jaw', 'cheekbones', 'eyes_brow', 'skin_texture', 'hair', 'frame_consistency'].includes(field) ? 'identity'
+          : ['location_correct', 'lighting_correct', 'wardrobe_correct', 'geometry_correct'].includes(field) ? 'location' : 'motion';
+        const values = results.map(r => r.scores[group][field]);
+        const mean = values.reduce((s, v) => s + v, 0) / values.length;
+        const stdev = Math.sqrt(values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length);
+        const range = Math.max(...values) - Math.min(...values);
+        fieldStats[field] = { values, mean: +mean.toFixed(2), stdev: +stdev.toFixed(2), range, min: Math.min(...values), max: Math.max(...values) };
+      }
+
+      const grandTotals = results.map(r => r.grand_total);
+      const grandMean = grandTotals.reduce((s, v) => s + v, 0) / grandTotals.length;
+      const grandStdev = Math.sqrt(grandTotals.reduce((s, v) => s + (v - grandMean) ** 2, 0) / grandTotals.length);
+
+      res.json({
+        iteration_id,
+        runs,
+        scores: results.map(r => ({ scores: r.scores, grand_total: r.grand_total, qualitative_notes: r.qualitative_notes })),
+        grand_totals: grandTotals,
+        grand_mean: +grandMean.toFixed(2),
+        grand_stdev: +grandStdev.toFixed(2),
+        grand_range: Math.max(...grandTotals) - Math.min(...grandTotals),
+        field_stats: fieldStats,
+        verdict: grandStdev < 3 ? 'PASS — scoring is stable enough for iteration decisions'
+          : grandStdev < 5 ? 'MARGINAL — moderate variance, results should be interpreted cautiously'
+          : 'FAIL — too noisy for reliable iteration decisions, rubric needs tightening'
+      });
+    } catch (err) {
+      console.error('[Vision] Consistency test error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   return router;
 }

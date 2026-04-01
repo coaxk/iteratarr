@@ -81,7 +81,6 @@ function CompletedThumbnail({ iterationId, jsonPath }) {
 
 function CompletedSection({ items, onRemove, onRetry }) {
   const [open, setOpen] = useState(false);
-  const failedCount = items.filter(i => i.status === 'failed').length;
   return (
     <div className="border border-gray-800 rounded">
       <button
@@ -89,7 +88,7 @@ function CompletedSection({ items, onRemove, onRetry }) {
         className="w-full flex items-center justify-between px-3 py-2 text-xs font-mono text-gray-600 hover:text-gray-400 transition-colors"
       >
         <span>
-          History ({items.length - failedCount} complete{failedCount > 0 ? `, ${failedCount} failed` : ''})
+          History ({items.length} complete)
         </span>
         <span>{open ? '▲' : '▼'}</span>
       </button>
@@ -365,8 +364,8 @@ export default function QueueManager() {
 
   // Separate items by category
   const renderingItems = items.filter(i => i.status === 'rendering');
-  const queuedItems = items.filter(i => i.status === 'queued');
-  const completedItems = items.filter(i => i.status === 'complete' || i.status === 'failed');
+  const queuedItems = items.filter(i => i.status === 'queued' || i.status === 'failed');
+  const completedItems = items.filter(i => i.status === 'complete');
 
   if (loading) {
     return (

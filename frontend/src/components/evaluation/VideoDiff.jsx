@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import FileBrowserModal from '../forms/FileBrowserModal';
 import FrameStrip from './FrameStrip';
@@ -11,14 +11,24 @@ import { api } from '../../api';
 function VideoPanel({ label, path, side, onBrowse, iterationId }) {
   const videoSrc = path ? `/api/video?path=${encodeURIComponent(path)}` : null;
 
-  // Check if video file exists — polls only until found, then stops
+  // Stable cache-buster per path — computed once when path changes, not on every render.
+  // Using Date.now() in the render path caused key={src} to remount the <video> element
+  // on every re-render, forcing the browser to abort and restart video loading (4-5s freeze).
+  const cacheBusterRef = useRef({});
+  if (path && !cacheBusterRef.current[path]) {
+    cacheBusterRef.current[path] = Date.now();
+  }
+
+  // Check if video file exists — polls only until found, then stops.
+  // staleTime: Infinity prevents refetches on re-render once video is confirmed present,
+  // which avoids repeated renderComplete calls and re-render cascades.
   const { data: loaded } = useQuery({
     queryKey: ['video-exists', path],
     queryFn: async () => {
       if (!path) return false;
       const res = await fetch(`/api/video?path=${encodeURIComponent(path)}`, { method: 'HEAD' });
       if (res.ok) {
-        // Record render completion
+        // Record render completion (fires once — query won't refetch after this)
         if (iterationId) api.renderComplete(iterationId, new Date().toISOString()).catch(() => {});
         return true;
       }
@@ -26,11 +36,11 @@ function VideoPanel({ label, path, side, onBrowse, iterationId }) {
     },
     enabled: !!path,
     refetchInterval: (query) => query.state.data === true ? false : 15000, // stop polling once found
-    staleTime: 5000,
+    staleTime: Infinity, // video presence doesn't change — never re-check once confirmed
   });
 
   const waiting = path && loaded === false;
-  const src = videoSrc ? `${videoSrc}&_t=${Date.now()}` : null;
+  const src = videoSrc && cacheBusterRef.current[path] ? `${videoSrc}&_t=${cacheBusterRef.current[path]}` : videoSrc;
 
   return (
     <div className="flex-1 min-w-0">

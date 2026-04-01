@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { renderSingle, onProgress, offProgress } from '../wan2gp-bridge.js';
 import { existsSync } from 'fs';
+import { join } from 'path';
 import { execFile } from 'child_process';
 
 /**
@@ -54,14 +55,19 @@ export function createQueueRoutes(store, config) {
       const active = stale.length > 0 ? items.filter(i => !stale.find(s => s.id === i.id)) : items;
 
       active.sort((a, b) => {
-        // queued items first, then rendering, then complete/failed
-        const statusOrder = { rendering: 0, queued: 1, failed: 2, complete: 3 };
+        // rendering first, then queued, then complete/failed
+        const statusOrder = { rendering: 0, queued: 1, failed: 1, complete: 3 };
         const sa = statusOrder[a.status] ?? 4;
         const sb = statusOrder[b.status] ?? 4;
         if (sa !== sb) return sa - sb;
-        // Within same status: by priority (lower = higher priority), then queued_at
+        // Within queued: by priority then queued_at (oldest first)
         if (a.status === 'queued') {
           if ((a.priority || 0) !== (b.priority || 0)) return (a.priority || 0) - (b.priority || 0);
+          return new Date(a.queued_at) - new Date(b.queued_at);
+        }
+        // Within complete/failed: newest completed first
+        if (a.status === 'complete' || a.status === 'failed') {
+          return new Date(b.completed_at || b.queued_at) - new Date(a.completed_at || a.queued_at);
         }
         return new Date(a.queued_at) - new Date(b.queued_at);
       });
@@ -128,7 +134,7 @@ export function createQueueRoutes(store, config) {
    */
   router.patch('/:id', async (req, res) => {
     try {
-      const allowed = ['priority', 'clip_name'];
+      const allowed = ['priority', 'clip_name', 'status', 'error'];
       const patch = {};
       for (const key of allowed) {
         if (req.body[key] !== undefined) patch[key] = req.body[key];
@@ -323,6 +329,7 @@ export function createQueueRoutes(store, config) {
    * renders it via the bridge, updates status, then moves to next.
    */
   async function processQueue() {
+    try {
     while (queueRunning && !queuePaused) {
       // Find next queued item
       const items = await store.list('render_queue', i => i.status === 'queued');
@@ -365,7 +372,7 @@ export function createQueueRoutes(store, config) {
             secsPerStep: data.secsPerStep
           };
           if (data.percent % 10 === 0) {
-            store.update('render_queue', item.id, { progress: activeProgress }).catch(() => {});
+            store.update('render_queue', item.id, { status: 'rendering', progress: activeProgress }).catch(() => {});
           }
         } else if (data.type === 'info') {
           activeProgress = {
@@ -376,38 +383,85 @@ export function createQueueRoutes(store, config) {
             totalPhases: data.totalPhases || null,
             message: data.message
           };
-          store.update('render_queue', item.id, { progress: activeProgress }).catch(() => {});
+          store.update('render_queue', item.id, { status: 'rendering', progress: activeProgress }).catch(() => {});
         }
       });
 
       try {
+        const renderStart = Date.now();
         await renderSingle(item.json_path, { renderId });
+        const renderDuration = Math.round((Date.now() - renderStart) / 1000);
+
+        // Ghost render detection: Wan2GP sometimes exits code 0 without producing
+        // a video (VRAM contention, output already exists, malformed JSON).
+        // A real render takes 8-20+ min; anything under 60s with no output is a no-op.
+        let videoExists = false;
+        if (item.iteration_id) {
+          try {
+            const iter = await store.get('iterations', item.iteration_id);
+            let rp = iter.render_path;
+            if (!rp && iter.json_contents?.output_filename) {
+              rp = join(config.wan2gp_output_dir, `${iter.json_contents.output_filename}.mp4`);
+            }
+            videoExists = !!(rp && existsSync(rp));
+          } catch {}
+        }
+
+        if (renderDuration < 60 && !videoExists) {
+          await store.update('render_queue', item.id, {
+            status: 'failed',
+            completed_at: new Date().toISOString(),
+            error: `Ghost render: Wan2GP exited in ${renderDuration}s without producing a video file. Likely VRAM contention or duplicate output path.`,
+            progress: null
+          });
+          console.warn(`[Queue] Ghost render detected: ${item.clip_name} — ${renderDuration}s, no video output`);
+          if (item.iteration_id) {
+            try { await store.update('iterations', item.iteration_id, { status: 'failed' }); } catch {}
+          }
+        } else {
+        // Real render completed
         await store.update('render_queue', item.id, {
           status: 'complete',
           completed_at: new Date().toISOString(),
           progress: { percent: 100 }
         });
-        console.log(`[Queue] Complete: ${item.clip_name}`);
+        console.log(`[Queue] Complete: ${item.clip_name} (${renderDuration}s)`);
 
         // Update iteration status + extract frames for thumbnail
         if (item.iteration_id) {
           try {
             const iter = await store.get('iterations', item.iteration_id);
             const updates = { status: 'rendered' };
-            if (iter.render_path && existsSync(iter.render_path)) {
+
+            // Derive render_path if not set — check output_filename in JSON + Wan2GP output dir
+            let renderPath = iter.render_path;
+            if (!renderPath && iter.json_contents?.output_filename) {
+              const candidate = join(config.wan2gp_output_dir, `${iter.json_contents.output_filename}.mp4`);
+              if (existsSync(candidate)) {
+                renderPath = candidate;
+                updates.render_path = candidate;
+                console.log(`[Queue] Derived render_path from output_filename: ${candidate}`);
+              }
+            }
+
+            if (renderPath && existsSync(renderPath)) {
               updates.render_duration_seconds = Math.round((Date.now() - new Date(iter.created_at).getTime()) / 1000);
             }
             await store.update('iterations', item.iteration_id, updates);
 
             // Extract 6 key frames immediately for quick preview.
             // Full 32-frame extraction happens lazily on first view.
-            if (iter.render_path && existsSync(iter.render_path)) {
+            if (renderPath && existsSync(renderPath)) {
               try {
+                const frameAbort = new AbortController();
+                const frameTimeout = setTimeout(() => frameAbort.abort(), 90000); // 90s max
                 await fetch(`http://localhost:${config.port || 3847}/api/frames/extract`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ video_path: iter.render_path, iteration_id: item.iteration_id, count: 6 })
+                  body: JSON.stringify({ video_path: renderPath, iteration_id: item.iteration_id, count: 6 }),
+                  signal: frameAbort.signal
                 });
+                clearTimeout(frameTimeout);
                 await store.update('iterations', item.iteration_id, { frames_extracted: false });
                 console.log(`[Queue] 6 key frames extracted for ${item.clip_name} (lazy full extraction pending)`);
               } catch (frameErr) {
@@ -418,6 +472,7 @@ export function createQueueRoutes(store, config) {
             console.log(`[Queue] Iteration update failed: ${e.message}`);
           }
         }
+        } // end ghost render else
       } catch (err) {
         await store.update('render_queue', item.id, {
           status: 'failed',
@@ -434,6 +489,12 @@ export function createQueueRoutes(store, config) {
         activeItem = null;
         activeProgress = null;
       }
+    }
+    } catch (err) {
+      console.error('[Queue] Unhandled error in processQueue — queue stopped:', err.message);
+      queueRunning = false;
+      activeItem = null;
+      activeProgress = null;
     }
   }
 

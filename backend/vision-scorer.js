@@ -10,6 +10,7 @@
 
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
+import sharp from 'sharp';
 import config from './config.js';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
@@ -64,9 +65,9 @@ You MUST respond with ONLY a valid JSON object in this exact format, no other te
     "rope": "rope_N",
     "confidence": "low|medium|high",
     "next_change_description": "Specific description of what single change to make next",
-    "next_change_value": "The specific new value to set in the JSON field (e.g. a new prompt fragment, a number like 6.1, etc.)"
+    "next_change_value": "The LITERAL value to place in that JSON field. Rules by rope: Rope 1/6 = prompt text string only (NO quality/negative terms — those belong in negative_prompt only). Rope 2 = negative_prompt text string. Rope 3 = a single decimal number as a string e.g. '1.0' or '1.1' (NOT prose, NOT 'increase to X'). Rope 4 = a single decimal number e.g. '6.5'. Rope 5 = a new integer seed. Always output the raw value, never a description of the value."
   },
-  "qualitative_notes": "2-3 sentences about what you observed"
+  "qualitative_notes": "REQUIRED — 2-3 sentences about what you observed. Must never be empty."
 }`;
 
 /**
@@ -84,11 +85,28 @@ function getApiKey() {
 }
 
 /**
- * Load an image file as base64
+ * Load an image file as base64, converting to WebP if it exceeds Claude's 5MB base64 limit.
+ * Base64 encoding adds ~33% overhead, so raw files >3.75MB will exceed the limit.
+ * Conversion is lossless in resolution — no spatial downsampling — preserving detail for scoring.
+ * Returns { data, media_type } so callers always get the correct MIME type.
  */
 async function loadImageBase64(filePath) {
-  const buffer = await readFile(filePath);
-  return buffer.toString('base64');
+  let buffer = await readFile(filePath);
+  let media_type = filePath.toLowerCase().endsWith('.png') ? 'image/png'
+    : filePath.toLowerCase().endsWith('.webp') ? 'image/webp'
+    : 'image/jpeg';
+
+  // Claude API limit: 5MB base64 string (~3.75MB raw file).
+  // Convert to WebP q90 (no spatial resize) — shrinks 4MB PNG to ~1.2MB while preserving
+  // full resolution so Claude can still evaluate fine facial details accurately.
+  if (buffer.length > 3_750_000) {
+    buffer = await sharp(buffer, { limitInputPixels: false })
+      .webp({ quality: 90 })
+      .toBuffer();
+    media_type = 'image/webp';
+  }
+
+  return { data: buffer.toString('base64'), media_type };
 }
 
 /**
@@ -109,15 +127,12 @@ export async function scoreFrames(framePaths, context = {}) {
     throw new Error('ANTHROPIC_API_KEY not set. Add it to your environment variables.');
   }
 
-  // Load frames as base64
+  // Load frames as base64 (auto-resize if over Claude's 5MB base64 limit)
   const images = [];
   for (const fp of framePaths) {
     if (!existsSync(fp)) continue;
-    const ext = fp.toLowerCase().endsWith('.png') ? 'image/png'
-      : fp.toLowerCase().endsWith('.webp') ? 'image/webp'
-      : 'image/jpeg';
-    const base64 = await loadImageBase64(fp);
-    images.push({ type: 'image', source: { type: 'base64', media_type: ext, data: base64 } });
+    const { data, media_type } = await loadImageBase64(fp);
+    images.push({ type: 'image', source: { type: 'base64', media_type, data } });
   }
 
   if (images.length === 0) {
@@ -130,11 +145,8 @@ export async function scoreFrames(framePaths, context = {}) {
     for (const refPath of context.referenceImagePaths.slice(0, 3)) { // max 3 reference photos
       try {
         if (existsSync(refPath)) {
-          const ext = refPath.toLowerCase().endsWith('.png') ? 'image/png'
-            : refPath.toLowerCase().endsWith('.webp') ? 'image/webp'
-            : 'image/jpeg';
-          const base64 = await loadImageBase64(refPath);
-          referenceImages.push({ type: 'image', source: { type: 'base64', media_type: ext, data: base64 } });
+          const { data, media_type } = await loadImageBase64(refPath);
+          referenceImages.push({ type: 'image', source: { type: 'base64', media_type, data } });
         }
       } catch {}
     }
@@ -275,34 +287,10 @@ export async function scoreFrames(framePaths, context = {}) {
  */
 export async function checkVisionApi() {
   const apiKey = getApiKey();
+  // Key presence is sufficient — no need to ping the API.
+  // A real call here burned tokens on every frontend status check.
   if (!apiKey) return { available: false, reason: 'ANTHROPIC_API_KEY not set' };
-
-  try {
-    // Quick test — just check auth
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: VISION_MODEL,
-        max_tokens: 10,
-        messages: [{ role: 'user', content: 'ping' }]
-      })
-    });
-
-    if (response.ok || response.status === 200) {
-      return { available: true, model: VISION_MODEL };
-    }
-    if (response.status === 401) {
-      return { available: false, reason: 'Invalid API key' };
-    }
-    return { available: true, model: VISION_MODEL };
-  } catch (err) {
-    return { available: false, reason: err.message };
-  }
+  return { available: true, model: VISION_MODEL };
 }
 
 export default { scoreFrames, checkVisionApi };

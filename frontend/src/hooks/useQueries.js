@@ -101,8 +101,9 @@ export function useVisionStatus(options = {}) {
   return useQuery({
     queryKey: ['vision', 'status'],
     queryFn: api.visionStatus,
-    staleTime: 5 * 60000, // 5 min cache — API key doesn't change mid-session
-    refetchInterval: false, // no polling
+    staleTime: Infinity, // API key doesn't change — never re-check after first load
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
     ...options
   });
 }

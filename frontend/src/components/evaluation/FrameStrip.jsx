@@ -61,7 +61,15 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
     staleTime: 10000,
   });
 
-  const frames = frameData?.frames || [];
+  // When frames_extracted is not true, only show preview frames (WebP).
+  // Prevents old legacy PNG full-extractions from bleeding through when
+  // the iteration is in preview-only mode (lazy extraction pending).
+  const allFrames = frameData?.frames || [];
+  // Only filter to WebP-only when frames_extracted is explicitly false (lazy preview mode).
+  // null = old iteration (show all); true = full extraction done (show all).
+  const frames = iteration?.frames_extracted === false
+    ? allFrames.filter(f => f.toLowerCase().endsWith('.webp'))
+    : allFrames;
   const framesDir = frameData?.frames_dir || null;
   const error = frameError?.message || null;
 
@@ -80,7 +88,7 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
   // On first open we expand to full 32-frame set and persist that status.
   useEffect(() => {
     if (!iterationId || !renderPathProp || !iteration) return;
-    if (iteration.frames_extracted === true) return;
+    if (iteration.frames_extracted !== false) return; // only trigger when queue explicitly set false
     if (lazyRequestedRef.current) return;
 
     lazyRequestedRef.current = true;
@@ -219,7 +227,9 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
                     try {
                       const result = await api.createContactSheet({ frame_id: iterationId });
                       setCsExported(result);
-                    } catch {}
+                    } catch (err) {
+                      alert(`Contact sheet failed: ${err.message}`);
+                    }
                   }}
                   className="h-20 w-16 flex-shrink-0 rounded border border-dashed border-gray-600 hover:border-accent flex items-center justify-center text-gray-600 hover:text-accent transition-colors"
                   title="Generate contact sheet"
@@ -290,7 +300,9 @@ export default function FrameStrip({ iterationId, renderPath: renderPathProp, it
                 setCsExported(result);
                 await navigator.clipboard.writeText(result.path);
                 setTimeout(() => setCsExported(null), 3000);
-              } catch {}
+              } catch (err) {
+                alert(`Contact sheet failed: ${err.message}`);
+              }
             }}
             className={`px-1.5 py-0.5 rounded text-xs font-mono shrink-0 ${
               csExported ? 'bg-score-high/20 text-score-high' : 'bg-surface-overlay text-gray-500 hover:text-gray-300'

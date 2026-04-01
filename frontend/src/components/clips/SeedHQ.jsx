@@ -132,6 +132,11 @@ const BranchNode = memo(function BranchNode({ branch, children, allBranches, bra
         <span className="text-xs font-mono text-gray-600 shrink-0">
           {branch.iteration_count || 0} iter{(branch.iteration_count || 0) !== 1 ? 's' : ''}
         </span>
+        {branch.failed_count > 0 && (
+          <span className="text-xs font-mono text-score-low shrink-0" title={`${branch.failed_count} failed render${branch.failed_count !== 1 ? 's' : ''}`}>
+            {branch.failed_count} failed
+          </span>
+        )}
 
         {/* Best score */}
         <ScoreBadge score={branch.best_score} />

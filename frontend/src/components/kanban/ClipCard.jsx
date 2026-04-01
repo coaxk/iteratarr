@@ -62,6 +62,11 @@ export default function ClipCard({ clip, onClick, onDelete, onArchive, isDraggin
               {clip.fork_count > 0 && <span style={{ color: '#c4b5fd' }}> ⑂{clip.fork_count}</span>}
             </span>
           )}
+          {clip.failed_count > 0 && (
+            <span className="font-mono font-bold text-score-low text-xs" title={`${clip.failed_count} failed render${clip.failed_count !== 1 ? 's' : ''}`}>
+              {clip.failed_count} failed
+            </span>
+          )}
           {clip.unscored_count > 0 && (
             <span className="font-mono font-bold text-amber-400 animate-pulse text-xs" title={`${clip.unscored_count} iteration${clip.unscored_count !== 1 ? 's' : ''} awaiting scoring`}>
               {clip.unscored_count} to score

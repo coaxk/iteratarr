@@ -108,6 +108,7 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
         json_contents: req.body.json_contents || {},
         seed_used: req.body.json_contents?.seed || null,
         model_type: normalizeModelType(req.body.json_contents),
+        render_path: req.body.render_path || null,
         status: 'pending',
         evaluation_id: null,
         parent_iteration_id: req.body.parent_iteration_id || null,

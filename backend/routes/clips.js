@@ -21,8 +21,17 @@ export function createClipRoutes(store) {
       const clipBranches = allBranches.filter(b => b.clip_id === clip.id);
       clip.branch_count = clipBranches.length;
       clip.fork_count = clipBranches.filter(b => b.created_from === 'fork').length;
+      const iterationsWithChildren = new Set(allIterations.filter(i => i.parent_iteration_id).map(i => i.parent_iteration_id));
+      const inactiveBranchIds = new Set(allBranches.filter(b => b.status === 'stalled' || b.status === 'abandoned').map(b => b.id));
       clip.unscored_count = allIterations.filter(i =>
-        i.clip_id === clip.id && i.status === 'rendered' && !i.evaluation && (i.parent_iteration_id || i.iteration_number > 1)
+        i.clip_id === clip.id && i.status === 'rendered' && !i.evaluation &&
+        !iterationsWithChildren.has(i.id) &&
+        !inactiveBranchIds.has(i.branch_id) &&
+        (i.parent_iteration_id || i.iteration_number > 1)
+      ).length;
+      clip.failed_count = allIterations.filter(i =>
+        i.clip_id === clip.id && i.status === 'failed' &&
+        !inactiveBranchIds.has(i.branch_id)
       ).length;
     }
     res.json(clips);

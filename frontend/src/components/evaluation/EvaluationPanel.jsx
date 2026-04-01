@@ -55,6 +55,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
   const [showJsonPatch, setShowJsonPatch] = useState(false);
   const [jsonPatchText, setJsonPatchText] = useState('');
   const [jsonPatchError, setJsonPatchError] = useState(null);
+  const [jsonPatchPromptWarning, setJsonPatchPromptWarning] = useState(null);
 
   const isEvaluated = !!iteration.evaluation;
   const hasChild = !!childIteration;
@@ -190,13 +191,21 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
     }
   };
 
+  const NEGATIVE_QUALITY_TERMS = ['blurry', 'distorted', 'deformed', 'low quality', 'video game', 'CGI', 'over-rendered'];
   const handleJsonPatchChange = (val) => {
     setJsonPatchText(val);
     try {
-      JSON.parse(val);
+      const parsed = JSON.parse(val);
       setJsonPatchError(null);
+      // Warn if positive prompt contains negative quality terms (fields-swapped bug)
+      const prompt = parsed?.prompt || '';
+      const found = NEGATIVE_QUALITY_TERMS.filter(t => prompt.toLowerCase().includes(t.toLowerCase()));
+      setJsonPatchPromptWarning(found.length > 0
+        ? `Positive prompt contains negative quality terms: ${found.join(', ')} — did the negative_prompt get pasted into prompt by mistake?`
+        : null);
     } catch (e) {
       setJsonPatchError(e.message);
+      setJsonPatchPromptWarning(null);
     }
   };
 
@@ -698,7 +707,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         />
 
         {/* Import / Auto-score — between frames and scoring */}
-        {!isReadOnly && !isEvaluated && !aiScores && (
+        {!isReadOnly && !isEvaluated && !aiScores && !hasChild && (
           <div className="flex gap-2">
             <button
               onClick={() => setShowImport(true)}
@@ -706,75 +715,77 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
             >
               Import Evaluation (Claude / manual JSON)
             </button>
-            <div className="flex-1 flex flex-col">
-            <button
-              onClick={async () => {
-                if (!visionAvailable) return;
-                try {
-                  setAutoScoring(true);
-                  const characterName = (typeof clip !== 'undefined' && clip?.characters?.[0]) || null;
-                  const result = await api.visionScore(iteration.id, characterName, visionUseFrames);
-                  // Pre-fill scores like Tenzing import
-                  setAiScores({
-                    identity: { ...result.scores.identity },
-                    location: { ...result.scores.location },
-                    motion: { ...result.scores.motion }
-                  });
-                  setIdentity(prev => ({ ...prev, ...result.scores.identity }));
-                  setLocation(prev => ({ ...prev, ...result.scores.location }));
-                  setMotion(prev => ({ ...prev, ...result.scores.motion }));
-                  if (result.attribution) {
-                    // Map Vision API rope shorthand (rope_1) to full ID (rope_1_prompt_position)
-                    const ropeMap = { rope_1: 'rope_1_prompt_position', rope_2: 'rope_2_attention_weighting', rope_3: 'rope_3_lora_multipliers', rope_4: 'rope_4a_cfg_high', rope_4a: 'rope_4a_cfg_high', rope_4b: 'rope_4b_cfg_low', rope_5: 'rope_5_steps_skipping', rope_6: 'rope_6_alt_prompt' };
-                    const mappedRope = ropeMap[result.attribution.rope] || result.attribution.rope;
-                    const ropeField = ROPES.find(r => r.id === mappedRope)?.field || null;
-                    setAttribution({
-                      ...result.attribution,
-                      rope: mappedRope,
-                      lowest_element: result.attribution.lowest_element || null,
-                      confidence: result.attribution.confidence || 'medium',
-                      next_change_description: result.attribution.next_change_description || result.attribution.description || '',
-                      next_change_json_field: ropeField,
-                      next_change_value: result.attribution.next_change_value || ''
+            <div className={`flex-1 flex flex-col rounded border border-dashed ${
+              visionAvailable === null ? 'border-gray-600' : visionAvailable === false ? 'border-gray-700' : autoScoring ? 'border-blue-400/40' : 'border-purple-400/40'
+            }`}>
+              <button
+                onClick={async () => {
+                  if (!visionAvailable) return;
+                  try {
+                    setAutoScoring(true);
+                    const characterName = (typeof clip !== 'undefined' && clip?.characters?.[0]) || null;
+                    const result = await api.visionScore(iteration.id, characterName, visionUseFrames);
+                    // Pre-fill scores like Tenzing import
+                    setAiScores({
+                      identity: { ...result.scores.identity },
+                      location: { ...result.scores.location },
+                      motion: { ...result.scores.motion }
                     });
+                    setIdentity(prev => ({ ...prev, ...result.scores.identity }));
+                    setLocation(prev => ({ ...prev, ...result.scores.location }));
+                    setMotion(prev => ({ ...prev, ...result.scores.motion }));
+                    if (result.attribution) {
+                      // Map Vision API rope shorthand (rope_1) to full ID (rope_1_prompt_position)
+                      const ropeMap = { rope_1: 'rope_1_prompt_position', rope_2: 'rope_2_attention_weighting', rope_3: 'rope_3_lora_multipliers', rope_4: 'rope_4a_cfg_high', rope_4a: 'rope_4a_cfg_high', rope_4b: 'rope_4b_cfg_low', rope_5: 'rope_5_steps_skipping', rope_6: 'rope_6_alt_prompt' };
+                      const mappedRope = ropeMap[result.attribution.rope] || result.attribution.rope;
+                      const ropeField = ROPES.find(r => r.id === mappedRope)?.field || null;
+                      setAttribution({
+                        ...result.attribution,
+                        rope: mappedRope,
+                        lowest_element: result.attribution.lowest_element || null,
+                        confidence: result.attribution.confidence || 'medium',
+                        next_change_description: result.attribution.next_change_description || result.attribution.description || '',
+                        next_change_json_field: ropeField,
+                        next_change_value: result.attribution.next_change_value || ''
+                      });
+                    }
+                    if (result.qualitative_notes) setNotes(result.qualitative_notes);
+                    setScoringSource('vision_api');
+                    setShowImportConfirm(true);
+                    setTimeout(() => setShowImportConfirm(false), 8000);
+                  } catch (err) {
+                    alert(`Auto-score failed: ${err.message}`);
+                  } finally {
+                    setAutoScoring(false);
                   }
-                  if (result.qualitative_notes) setNotes(result.qualitative_notes);
-                  setScoringSource('vision_api');
-                  setShowImportConfirm(true);
-                  setTimeout(() => setShowImportConfirm(false), 8000);
-                } catch (err) {
-                  alert(`Auto-score failed: ${err.message}`);
-                } finally {
-                  setAutoScoring(false);
-                }
-              }}
-              disabled={autoScoring || visionAvailable !== true}
-              className={`flex-1 py-2.5 border border-dashed rounded text-sm font-mono transition-colors ${
-                visionAvailable === null
-                  ? 'border-gray-600 text-gray-500 cursor-wait'
-                  : visionAvailable === false
-                  ? 'border-gray-700 text-gray-600 cursor-not-allowed'
-                  : autoScoring
-                    ? 'border-blue-400/40 text-blue-400 bg-blue-400/5 animate-pulse'
-                    : 'border-purple-400/40 text-purple-400 hover:bg-purple-400/5 hover:border-purple-400/60'
-              }`}
-              title={visionAvailable === false ? 'Vision API not configured — set ANTHROPIC_API_KEY to enable' : 'Uses Claude Vision API to auto-score frames (~$0.01-0.03 per score)'}
-            >
-              {autoScoring ? 'Scoring with Vision API...' : visionAvailable === null ? 'Connecting...' : visionAvailable === false ? 'Vision API (not configured)' : 'Auto-Score with Vision API'}
-              {!autoScoring && visionAvailable && (
-                <span className="flex items-center justify-center gap-1 text-[10px] mt-0.5" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={(e) => { e.stopPropagation(); setVisionUseFrames(false); }}
+                }}
+                disabled={autoScoring || visionAvailable !== true}
+                className={`flex-1 py-2.5 text-sm font-mono transition-colors rounded-t ${
+                  visionAvailable === null
+                    ? 'text-gray-500 cursor-wait'
+                    : visionAvailable === false
+                    ? 'text-gray-600 cursor-not-allowed'
+                    : autoScoring
+                      ? 'text-blue-400 bg-blue-400/5 animate-pulse'
+                      : 'text-purple-400 hover:bg-purple-400/5'
+                }`}
+                title={visionAvailable === false ? 'Vision API not configured — set ANTHROPIC_API_KEY to enable' : 'Uses Claude Vision API to auto-score frames (~$0.01-0.03 per score)'}
+              >
+                {autoScoring ? 'Scoring with Vision API...' : visionAvailable === null ? 'Connecting...' : visionAvailable === false ? 'Vision API (not configured)' : 'Auto-Score with Vision API'}
+                {visionAvailable === false && <span className="block text-[10px] text-gray-700 mt-0.5">PRO feature — requires API key</span>}
+              </button>
+              {!autoScoring && visionAvailable === true && (
+                <div className="flex items-center justify-center gap-1 text-[10px] border-t border-purple-400/20 py-1">
+                  <button onClick={() => setVisionUseFrames(false)}
                     className={`px-1.5 py-0.5 rounded-l ${!visionUseFrames ? 'bg-purple-400/20 text-purple-400' : 'text-purple-400/30 hover:text-purple-400/50'}`}>
                     Sheet $0.02
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); setVisionUseFrames(true); }}
+                  <button onClick={() => setVisionUseFrames(true)}
                     className={`px-1.5 py-0.5 rounded-r ${visionUseFrames ? 'bg-purple-400/20 text-purple-400' : 'text-purple-400/30 hover:text-purple-400/50'}`}>
                     Frames $0.05
                   </button>
-                </span>
+                </div>
               )}
-              {visionAvailable === false && <span className="block text-[10px] text-gray-700 mt-0.5">PRO feature — requires API key</span>}
-            </button>
             </div>
           </div>
         )}
@@ -844,7 +855,7 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
         {/* Grand total */}
         <div className="border-t border-gray-700 pt-3 flex items-center justify-between">
           <span className="text-sm font-mono text-gray-400 uppercase">Grand Total</span>
-          {isEvaluated || grandTotal !== 45 ? (
+          {isEvaluated || aiScores || grandTotal !== 45 ? (
             <span className={`text-3xl font-mono font-bold ${
               canLock ? 'text-score-high' : grandTotal / GRAND_MAX < 0.5 ? 'text-score-low' : 'text-score-mid'
             }`}>
@@ -967,6 +978,9 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
                 />
                 {jsonPatchError && (
                   <p className="text-xs font-mono text-red-400">Invalid JSON — {jsonPatchError}</p>
+                )}
+                {jsonPatchPromptWarning && (
+                  <p className="text-xs font-mono text-yellow-400">⚠ {jsonPatchPromptWarning}</p>
                 )}
                 {!jsonPatchError && jsonPatchText && (
                   <p className="text-xs font-mono text-score-high">✓ Valid JSON — will be applied on generate</p>

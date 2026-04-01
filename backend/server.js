@@ -19,6 +19,7 @@ import { createGpuRoutes } from './routes/gpu.js';
 import { createAnalyticsRoutes } from './routes/analytics.js';
 import { createVisionRoutes } from './routes/vision.js';
 import { createStorageRoutes } from './routes/storage.js';
+import { createAutopilotRoutes } from './routes/autopilot.js';
 import { createWatcher } from './watcher.js';
 import { createTelemetry } from './telemetry/index.js';
 import config from './config.js';
@@ -66,6 +67,7 @@ app.use('/api/gpu', createGpuRoutes());
 app.use('/api/analytics', createAnalyticsRoutes(store, config));
 app.use('/api/vision', createVisionRoutes(store, config));
 app.use('/api/storage', createStorageRoutes(store, config));
+app.use('/api/autopilot', createAutopilotRoutes(store, config));
 
 // Video file serving — streams MP4 files from allowed directories
 import { resolve, relative, extname } from 'path';

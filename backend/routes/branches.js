@@ -21,6 +21,11 @@ export function createBranchRoutes(store, config = {}) {
     try {
       const branches = await store.list('branches', b => b.clip_id === req.params.clipId);
       branches.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      // Enrich with failed iteration count
+      const allIterations = await store.list('iterations', i => i.clip_id === req.params.clipId);
+      for (const branch of branches) {
+        branch.failed_count = allIterations.filter(i => i.branch_id === branch.id && i.status === 'failed').length;
+      }
       res.json(branches);
     } catch (err) {
       res.status(400).json({ error: err.message });

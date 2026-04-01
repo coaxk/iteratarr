@@ -4,6 +4,7 @@ import { useClipMeta } from '../../hooks/useClipMeta';
 import { useBranchNav } from '../../hooks/useBranchNav';
 import { useIterationState } from '../../hooks/useIterationState';
 import { useViewFilter } from '../../hooks/useViewFilter';
+import { usePromptIntelligence } from '../../hooks/useQueries';
 import { api } from '../../api';
 import ClipHeader from './ClipHeader';
 import IterationLineage from './IterationLineage';
@@ -23,6 +24,7 @@ export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parent
   const nav = useBranchNav(clip.id);
   const iters = useIterationState(clip.id, nav.selectedBranchId, parentUnsavedCallback);
   const view = useViewFilter(iters.iterations);
+  const promptIntel = usePromptIntelligence(nav.selectedBranchId);
   const [showSeedGen, setShowSeedGen] = useState(false);
 
   const status = CLIP_STATUSES[clip.status] || CLIP_STATUSES.not_started;
@@ -168,6 +170,7 @@ export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parent
                     view.setComparisonPreselect(ids);
                     view.setShowComparison(true);
                   }}
+                  promptIntel={promptIntel.data}
                 />
               </div>
             ) : (
@@ -177,6 +180,7 @@ export default function ClipDetail({ clip, onBack, onUnsavedScoresChange: parent
                 onSelect={(iter) => guardNavigation(() => iters.setSelectedIteration(iter))}
                 forkPoints={new Set((nav.branches || []).filter(b => b.source_iteration_id).map(b => b.source_iteration_id))}
                 showBranchId={nav.selectedBranchId === null}
+                promptIntel={promptIntel.data}
               />
             )}
           </div>

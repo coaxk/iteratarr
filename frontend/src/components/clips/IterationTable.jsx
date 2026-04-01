@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { ROPES, IDENTITY_FIELDS, LOCATION_FIELDS, MOTION_FIELDS } from '../../constants';
+import PromptDiffInline from '../common/PromptDiffInline';
 
 // Build a short label lookup: rope_3_lora_multipliers -> "Rope 3"
 const ROPE_SHORT_LABELS = Object.fromEntries(
@@ -47,11 +48,12 @@ const COLUMNS = [
   { key: 'location_total', label: 'Location', width: 'w-20' },
   { key: 'motion_total', label: 'Motion', width: 'w-20' },
   { key: 'rope', label: 'Rope', width: 'w-24' },
+  { key: 'prompt_delta', label: 'Prompt \u0394', width: 'w-32', nosort: true },
   { key: 'scoring_source', label: 'Source', width: 'w-20' },
   { key: 'created_at', label: 'Date', width: 'w-28' },
 ];
 
-export default function IterationTable({ iterations, selectedId, onSelect, comparedIds = [], onComparedChange, onCompareSelected }) {
+export default function IterationTable({ iterations, selectedId, onSelect, comparedIds = [], onComparedChange, onCompareSelected, promptIntel }) {
   const [sortKey, setSortKey] = useState('iteration_number');
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -118,8 +120,8 @@ export default function IterationTable({ iterations, selectedId, onSelect, compa
             {COLUMNS.map(col => (
               <th
                 key={col.key}
-                onClick={() => handleSort(col.key)}
-                className={`${col.width} px-2 py-1.5 text-left text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-300 select-none transition-colors`}
+                onClick={col.nosort ? undefined : () => handleSort(col.key)}
+                className={`${col.width} px-2 py-1.5 text-left text-gray-500 uppercase tracking-wider ${col.nosort ? '' : 'cursor-pointer hover:text-gray-300'} select-none transition-colors`}
               >
                 {col.label}
                 {sortKey === col.key && (
@@ -185,6 +187,15 @@ export default function IterationTable({ iterations, selectedId, onSelect, compa
                 {/* Rope — short label, full name on hover */}
                 <td className="px-2 py-1.5 text-gray-300 truncate max-w-[6rem]" title={row.rope ? ROPE_FULL_LABELS[row.rope] || row.rope : ''}>
                   {row.rope ? ROPE_SHORT_LABELS[row.rope] || row.rope : '\u2014'}
+                </td>
+
+                {/* Prompt delta */}
+                <td className="px-2 py-1.5">
+                  {(() => {
+                    const pi = promptIntel?.iterations?.find(p => p.iteration_number === row.iteration_number);
+                    if (!pi || pi.confidence === 'no_prompt_change') return <span className="text-gray-700">{'\u2014'}</span>;
+                    return <PromptDiffInline diff={pi.prompt_diff} maxPhrases={2} />;
+                  })()}
                 </td>
 
                 {/* Source badge */}

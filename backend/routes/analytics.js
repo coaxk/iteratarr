@@ -1519,5 +1519,28 @@ export function createAnalyticsRoutes(store, config = {}) {
     }
   });
 
+  /**
+   * GET /api/analytics/branch/:branchId/prompt-intelligence
+   * Prompt evolution + phrase effectiveness for a branch.
+   */
+  router.get('/branch/:branchId/prompt-intelligence', async (req, res) => {
+    try {
+      const { aggregatePhraseEffectiveness } = await import('../prompt-diff.js');
+      const iterations = await store.list('iterations', i => i.branch_id === req.params.branchId);
+      iterations.sort((a, b) => (a.iteration_number || 0) - (b.iteration_number || 0));
+
+      for (const iter of iterations) {
+        if (iter.evaluation_id) {
+          try { iter.evaluation = await store.get('evaluations', iter.evaluation_id); } catch {}
+        }
+      }
+
+      const result = aggregatePhraseEffectiveness(iterations);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   return router;
 }

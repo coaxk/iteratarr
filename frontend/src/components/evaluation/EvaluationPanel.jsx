@@ -19,6 +19,7 @@ const defaultScores = (fields) => Object.fromEntries(fields.map(f => [f.key, 3])
 
 // Use shared CopyButton, alias for backward compat with inline usage
 import CopyButton from '../common/CopyButton';
+import PromptDiffInline from '../common/PromptDiffInline';
 const CopyBtn = ({ text }) => <CopyButton text={text} />;
 
 export default function EvaluationPanel({ iteration, childIteration, parentIteration, ancestorChain = [], allIterations = [], onSaved, onNext, onLocked, onGoToIteration, onScoreChange, onUnsavedScoresChange, clipId, clip, onForked, isForkPoint = false }) {
@@ -789,6 +790,71 @@ export default function EvaluationPanel({ iteration, childIteration, parentItera
             </div>
           </div>
         )}
+
+        {/* Prompt Delta — shows what changed in prompt and which scores moved */}
+        {parentIteration?.evaluation && iteration.evaluation && (() => {
+          const tokenize = (p) => (p || '').split(',').map(s => s.trim()).filter(Boolean);
+          const diff = (oldP, newP) => {
+            const oldSet = new Set(tokenize(oldP));
+            const newSet = new Set(tokenize(newP));
+            return {
+              added: tokenize(newP).filter(p => !oldSet.has(p)),
+              removed: tokenize(oldP).filter(p => !newSet.has(p))
+            };
+          };
+
+          const promptDiff = diff(parentIteration.json_contents?.prompt, iteration.json_contents?.prompt);
+          const negDiff = diff(parentIteration.json_contents?.negative_prompt, iteration.json_contents?.negative_prompt);
+          const hasChange = promptDiff.added.length > 0 || promptDiff.removed.length > 0 || negDiff.added.length > 0 || negDiff.removed.length > 0;
+          if (!hasChange) return null;
+
+          const ALL_SCORE_FIELDS = ['face_match','head_shape','jaw','cheekbones','eyes_brow','skin_texture','hair','frame_consistency','location_correct','lighting_correct','wardrobe_correct','geometry_correct','action_executed','smoothness','camera_movement'];
+          const CAT_MAP = { face_match:'identity',head_shape:'identity',jaw:'identity',cheekbones:'identity',eyes_brow:'identity',skin_texture:'identity',hair:'identity',frame_consistency:'identity',location_correct:'location',lighting_correct:'location',wardrobe_correct:'location',geometry_correct:'location',action_executed:'motion',smoothness:'motion',camera_movement:'motion' };
+          const pScores = parentIteration.evaluation.scores;
+          const cScores = iteration.evaluation.scores;
+          const movedFields = ALL_SCORE_FIELDS
+            .map(f => ({ field: f, delta: (cScores[CAT_MAP[f]]?.[f] ?? 0) - (pScores[CAT_MAP[f]]?.[f] ?? 0) }))
+            .filter(d => d.delta !== 0);
+
+          const rope = iteration.evaluation?.attribution?.rope;
+          const isPromptRope = ['rope_1','rope_1_prompt_position','rope_2a_attention_weighting','rope_2b_negative_prompt','rope_6_alt_prompt'].includes(rope);
+          const confidence = isPromptRope ? 'high' : 'mixed';
+
+          return (
+            <details className="border border-gray-700 rounded px-3 py-2" open>
+              <summary className="text-xs font-mono text-gray-400 cursor-pointer hover:text-gray-300">
+                Prompt Delta
+                <span className={`ml-2 text-[10px] px-1.5 rounded ${confidence === 'high' ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-400'}`}>
+                  {confidence === 'high' ? 'high confidence' : 'mixed change'}
+                </span>
+              </summary>
+              <div className="mt-2 space-y-2">
+                {(promptDiff.added.length > 0 || promptDiff.removed.length > 0) && (
+                  <div>
+                    <span className="text-[10px] font-mono text-gray-500 uppercase">prompt</span>
+                    <div className="mt-0.5"><PromptDiffInline diff={promptDiff} maxPhrases={10} /></div>
+                  </div>
+                )}
+                {(negDiff.added.length > 0 || negDiff.removed.length > 0) && (
+                  <div>
+                    <span className="text-[10px] font-mono text-gray-500 uppercase">negative prompt</span>
+                    <div className="mt-0.5"><PromptDiffInline diff={negDiff} maxPhrases={10} /></div>
+                  </div>
+                )}
+                {movedFields.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    <span className="text-[10px] font-mono text-gray-500 uppercase">score impact</span>
+                    {movedFields.map(({ field, delta }) => (
+                      <span key={field} className={`text-[10px] font-mono px-1 rounded ${delta > 0 ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-score-low'}`}>
+                        {field.replace(/_/g, ' ')}: {delta > 0 ? '+' : ''}{delta}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </details>
+          );
+        })()}
 
         {/* Score sliders */}
         <ScoreGroup title="Identity" fields={IDENTITY_FIELDS} scores={identity}

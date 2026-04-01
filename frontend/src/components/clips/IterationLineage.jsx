@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react';
+import PromptDiffInline from '../common/PromptDiffInline';
 
-export default function IterationLineage({ iterations, selectedId, onSelect, forkPoints = new Set(), showBranchId = false }) {
+export default function IterationLineage({ iterations, selectedId, onSelect, forkPoints = new Set(), showBranchId = false, promptIntel }) {
   const scrollRef = useRef(null);
   const selectedRef = useRef(null);
 
@@ -92,6 +93,22 @@ export default function IterationLineage({ iterations, selectedId, onSelect, for
                   <span className="text-[10px] font-mono text-amber-400 animate-pulse" title="Rendered — awaiting scoring">score</span>
                 )}
                 {isLocked && <span className="text-xs text-score-high font-mono font-bold">LOCKED</span>}
+                {promptIntel?.iterations && (() => {
+                  const pi = promptIntel.iterations.find(p => p.iteration_number === iter.iteration_number);
+                  if (!pi || pi.confidence === 'no_prompt_change') return null;
+                  const hasDiff = pi.prompt_diff?.added?.length > 0 || pi.prompt_diff?.removed?.length > 0;
+                  if (!hasDiff) return null;
+                  return (
+                    <div className="mt-0.5">
+                      <PromptDiffInline diff={pi.prompt_diff} maxPhrases={2} />
+                      {pi.grand_total_delta !== null && pi.grand_total_delta !== 0 && (
+                        <span className={`text-[10px] font-mono ml-1 ${pi.grand_total_delta > 0 ? 'text-green-400' : 'text-score-low'}`}>
+                          {pi.grand_total_delta > 0 ? '+' : ''}{pi.grand_total_delta}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </button>
               {i < iterations.length - 1 && (
                 <span className="text-gray-600 mx-1 font-mono">&rarr;</span>

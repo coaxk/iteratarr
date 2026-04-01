@@ -14,6 +14,8 @@ export function createClipRoutes(store) {
       const sceneIds = new Set(scenes.map(s => s.id));
       clips = clips.filter(c => sceneIds.has(c.scene_id));
     }
+    // Sort by sort_order (clips without one sort last, then by created_at)
+    clips.sort((a, b) => (a.sort_order ?? Infinity) - (b.sort_order ?? Infinity) || (a.created_at || '').localeCompare(b.created_at || ''));
     // Batch load branches + iterations once (avoids N+1 queries per clip)
     const allBranches = await store.list('branches');
     const allIterations = await store.list('iterations');
@@ -40,6 +42,9 @@ export function createClipRoutes(store) {
   router.post('/', async (req, res) => {
     try {
       validateClip(req.body);
+      // Assign sort_order: append after the highest existing value
+      const existing = await store.list('clips');
+      const maxOrder = existing.reduce((max, c) => Math.max(max, c.sort_order ?? 0), 0);
       const clip = await store.create('clips', {
         scene_id: req.body.scene_id,
         name: req.body.name,
@@ -48,7 +53,8 @@ export function createClipRoutes(store) {
         status: 'not_started',
         locked_iteration_id: null,
         production_json_path: null,
-        notes: req.body.notes || ''
+        notes: req.body.notes || '',
+        sort_order: maxOrder + 1
       });
       res.status(201).json(clip);
     } catch (err) {
@@ -105,6 +111,19 @@ export function createClipRoutes(store) {
       res.json({ deleted: true, id: req.params.id, cleaned: { iterations: iterations.length, branches: branches.length, seed_screens: screens.length } });
     } catch (err) {
       res.status(err.message.includes('not found') ? 404 : 400).json({ error: err.message });
+    }
+  });
+
+  router.post('/reorder', async (req, res) => {
+    try {
+      const { order } = req.body; // [{ id, sort_order }, ...]
+      if (!Array.isArray(order)) return res.status(400).json({ error: 'order must be an array of { id, sort_order }' });
+      for (const item of order) {
+        await store.update('clips', item.id, { sort_order: item.sort_order });
+      }
+      res.json({ updated: order.length });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
     }
   });
 

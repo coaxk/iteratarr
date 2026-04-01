@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { useQueryClient } from '@tanstack/react-query';
 import { useClips, useInvalidateIterations } from '../../hooks/useQueries';
 import { api } from '../../api';
 import { CLIP_STATUSES } from '../../constants';
@@ -9,6 +10,7 @@ import CreateClipModal from '../forms/CreateClipModal';
 const COLUMNS = ['not_started', 'screening', 'in_progress', 'evaluating', 'locked', 'in_queue'];
 
 export default function EpisodeTracker({ onSelectClip }) {
+  const queryClient = useQueryClient();
   const { data: clips, isLoading: loading, error: queryError, refetch } = useClips();
   const error = queryError?.message || null;
   const [showCreateClip, setShowCreateClip] = useState(false);
@@ -34,19 +36,48 @@ export default function EpisodeTracker({ onSelectClip }) {
     }
   };
 
-  const handleDragEnd = async (result) => {
+  const handleDragEnd = useCallback(async (result) => {
     const { destination, source, draggableId } = result;
     if (!destination) return;
-    if (destination.droppableId === source.droppableId) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
-    const newStatus = destination.droppableId;
-    try {
-      await api.updateClip(draggableId, { status: newStatus });
-      refetch();
-    } catch (err) {
-      console.error('Failed to update clip status:', err);
+    const sameColumn = destination.droppableId === source.droppableId;
+
+    // Optimistic update — reorder in cache immediately
+    const prevClips = queryClient.getQueryData(['clips']);
+    const updatedClips = [...(prevClips || [])];
+
+    if (sameColumn) {
+      // Same-column reorder
+      const colClips = updatedClips.filter(c => (c.status || 'not_started') === source.droppableId);
+      const otherClips = updatedClips.filter(c => (c.status || 'not_started') !== source.droppableId);
+      const [moved] = colClips.splice(source.index, 1);
+      colClips.splice(destination.index, 0, moved);
+      // Reassign sort_order for this column's clips
+      const reordered = colClips.map((c, i) => ({ ...c, sort_order: i }));
+      queryClient.setQueryData(['clips'], [...otherClips, ...reordered]);
+
+      try {
+        await api.reorderClips(reordered.map((c, i) => ({ id: c.id, sort_order: i })));
+      } catch (err) {
+        console.error('Failed to reorder clips:', err);
+        queryClient.setQueryData(['clips'], prevClips);
+      }
+    } else {
+      // Cross-column move
+      const clip = updatedClips.find(c => c.id === draggableId);
+      if (clip) clip.status = destination.droppableId;
+      queryClient.setQueryData(['clips'], updatedClips);
+
+      try {
+        await api.updateClip(draggableId, { status: destination.droppableId });
+        refetch();
+      } catch (err) {
+        console.error('Failed to update clip status:', err);
+        queryClient.setQueryData(['clips'], prevClips);
+      }
     }
-  };
+  }, [queryClient, refetch]);
 
   const handleRestore = async (clipId, toStatus = 'not_started') => {
     setRestoring(clipId);
@@ -74,7 +105,8 @@ export default function EpisodeTracker({ onSelectClip }) {
   const grouped = {};
   for (const col of COLUMNS) grouped[col] = [];
   const archivedClips = [];
-  for (const clip of filtered) {
+  const sorted = [...filtered].sort((a, b) => (a.sort_order ?? Infinity) - (b.sort_order ?? Infinity));
+  for (const clip of sorted) {
     const status = clip.status || 'not_started';
     if (status === 'archived') {
       archivedClips.push(clip);

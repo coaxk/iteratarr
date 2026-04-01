@@ -267,6 +267,17 @@ export function useSeedPersonalityProfileStatus(seed, options = {}) {
   });
 }
 
+/** Prompt intelligence for a branch — phrase diffs + score correlations */
+export function usePromptIntelligence(branchId, options = {}) {
+  return useQuery({
+    queryKey: ['analytics', 'prompt-intelligence', branchId],
+    queryFn: () => api.promptIntelligence(branchId),
+    staleTime: 60000,
+    enabled: !!branchId,
+    ...options
+  });
+}
+
 /** Production queue (legacy locked items) */
 export function useProductionQueue(options = {}) {
   return useQuery({

@@ -10,6 +10,29 @@ import { EVENTS } from '../telemetry/index.js';
  * any field NOT in this set is stripped before writing to disk. This prevents
  * junk fields from parent iterations propagating through the chain.
  */
+/**
+ * Wan2GP fields that must be numeric. Used to coerce string values back to
+ * numbers when they pass through Vision API recommendations or JSON editors.
+ */
+export const WAN2GP_NUMERIC_FIELDS = new Set([
+  'image_mode', 'video_length', 'batch_size', 'seed', 'num_inference_steps',
+  'guidance_scale', 'guidance2_scale', 'switch_threshold', 'guidance_phases',
+  'flow_shift', 'repeat_generation', 'sliding_window_size', 'sliding_window_overlap',
+  'film_grain_intensity', 'film_grain_saturation', 'RIFLEx_setting',
+  'NAG_scale', 'NAG_tau', 'NAG_alpha', 'perturbation_switch',
+  'perturbation_start_perc', 'perturbation_end_perc', 'settings_version'
+]);
+
+/** Coerce known numeric fields from string to number. Mutates in place. */
+export function coerceNumericFields(json) {
+  for (const field of WAN2GP_NUMERIC_FIELDS) {
+    if (field in json && typeof json[field] === 'string') {
+      const parsed = Number(json[field]);
+      if (!isNaN(parsed)) json[field] = parsed;
+    }
+  }
+}
+
 export const WAN2GP_FIELDS = new Set([
   'image_mode', 'prompt', 'alt_prompt', 'negative_prompt', 'resolution',
   'video_length', 'batch_size', 'seed', 'num_inference_steps', 'guidance_scale',
@@ -556,7 +579,13 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
       if (attribution.next_changes && typeof attribution.next_changes === 'object') {
         for (const [field, value] of Object.entries(attribution.next_changes)) {
           if (field in nextJson) {
-            nextJson[field] = value;
+            // Coerce string→number for known numeric fields
+            let val = value;
+            if (WAN2GP_NUMERIC_FIELDS.has(field) && typeof val === 'string') {
+              const parsed = Number(val);
+              if (!isNaN(parsed)) val = parsed;
+            }
+            nextJson[field] = val;
           }
         }
       }
@@ -628,6 +657,9 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
       // Strip any fields not in the Wan2GP whitelist to prevent junk propagation
       Object.keys(nextJson).forEach(k => { if (!WAN2GP_FIELDS.has(k)) delete nextJson[k]; });
 
+      // Safety net: coerce any remaining string→number mismatches before writing
+      coerceNumericFields(nextJson);
+
       // Apply user-supplied JSON overrides AFTER the whitelist strip.
       // These bypass the whitelist intentionally — the user owns the risk on
       // unrecognised fields (Wan2GP silently ignores what it doesn't know).
@@ -644,6 +676,9 @@ export function createIterationRoutes(store, config = { score_lock_threshold: 65
           change_from_parent += ` + manual: ${manualFields.join(', ')}`;
         }
       }
+
+      // Final coercion pass after user overrides (catches string numbers from JSON editor)
+      coerceNumericFields(nextJson);
 
       await mkdir(saveDir, { recursive: true });
       const savePath = join(saveDir, nextFilename);

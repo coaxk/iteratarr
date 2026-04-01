@@ -28,6 +28,7 @@ export const api = {
   createClip: (data) => request('/clips', { method: 'POST', body: data }),
   updateClip: (id, data) => request(`/clips/${id}`, { method: 'PATCH', body: data }),
   deleteClip: (id, force = false) => request(`/clips/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+  reorderClips: (order) => request('/clips/reorder', { method: 'POST', body: { order } }),
   getClipIterations: (id, branchId) => request(`/clips/${id}/iterations${branchId ? `?branch_id=${branchId}` : ''}`),
 
   // Iterations
@@ -134,6 +135,7 @@ export const api = {
   getSeedThumbnails: (clipId) => request(`/analytics/clips/${clipId}/seed-thumbnails`),
   startSeedPersonalityProfile: (seed, data = {}) => request(`/analytics/seeds/${seed}/personality-profile`, { method: 'POST', body: data }),
   getSeedPersonalityProfileStatus: (seed) => request(`/analytics/seeds/${seed}/personality-profile/status`),
+  promptIntelligence: (branchId) => request(`/analytics/branch/${branchId}/prompt-intelligence`),
 
   // Storage
   getStorage: () => request('/storage'),

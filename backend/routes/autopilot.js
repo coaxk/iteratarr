@@ -3,6 +3,9 @@ import { Router } from 'express';
 /**
  * Autopilot — fully automated score → recommend → apply → render loop.
  *
+ * Sessions are persisted to SQLite so they survive server restarts.
+ * On startup, any session marked as running is automatically resumed.
+ *
  * Runs on a branch, iterating unattended until a termination condition:
  * - Target score reached (default 65/75)
  * - Max iterations reached (default 20)
@@ -20,9 +23,41 @@ import { Router } from 'express';
  */
 export function createAutopilotRoutes(store, config) {
   const router = Router();
+  const COLLECTION = 'autopilot_sessions';
 
-  // Active autopilot sessions: branchId → { running, config, log, ... }
-  const sessions = new Map();
+  // In-memory handle to running loops (branchId → { abortController })
+  // The session DATA lives in SQLite; this just tracks the active async loop.
+  const activeLoops = new Map();
+
+  // --- Persistence helpers ---
+
+  async function loadSession(branchId) {
+    try {
+      const sessions = await store.list(COLLECTION, s => s.branch_id === branchId);
+      return sessions.length > 0 ? sessions[0] : null;
+    } catch { return null; }
+  }
+
+  async function saveSession(session) {
+    try {
+      const existing = await loadSession(session.branch_id);
+      if (existing) {
+        await store.update(COLLECTION, existing.id, session);
+      } else {
+        await store.create(COLLECTION, session);
+      }
+    } catch (err) {
+      console.error(`[Autopilot] Failed to persist session ${session.branch_name}:`, err.message);
+    }
+  }
+
+  async function persistPhase(session, phase, extras = {}) {
+    session.phase = phase;
+    Object.assign(session, extras);
+    await saveSession(session);
+  }
+
+  // --- Routes ---
 
   /**
    * POST /api/autopilot/start
@@ -33,7 +68,7 @@ export function createAutopilotRoutes(store, config) {
       const { branch_id, target_score = 65, max_iterations = 20, regression_limit = 3 } = req.body;
       if (!branch_id) return res.status(400).json({ error: 'branch_id required' });
 
-      if (sessions.has(branch_id) && sessions.get(branch_id).running) {
+      if (activeLoops.has(branch_id)) {
         return res.status(409).json({ error: 'Autopilot already running on this branch' });
       }
 
@@ -54,16 +89,9 @@ export function createAutopilotRoutes(store, config) {
         completed_at: null,
         verdict: null
       };
-      sessions.set(branch_id, session);
 
-      // Start the loop (don't await — run in background)
-      runAutopilot(session).catch(err => {
-        session.running = false;
-        session.phase = 'error';
-        session.error = err.message;
-        session.completed_at = new Date().toISOString();
-        console.error(`[Autopilot] Fatal error on ${session.branch_name}:`, err.message);
-      });
+      await saveSession(session);
+      startLoop(session);
 
       res.json({ message: 'Autopilot started', branch_id, config: session.config });
     } catch (err) {
@@ -74,18 +102,20 @@ export function createAutopilotRoutes(store, config) {
   /**
    * GET /api/autopilot/status/:branchId
    */
-  router.get('/status/:branchId', (req, res) => {
-    const session = sessions.get(req.params.branchId);
+  router.get('/status/:branchId', async (req, res) => {
+    const session = await loadSession(req.params.branchId);
     if (!session) return res.json({ running: false });
+    // Reflect actual loop state — session may say running but loop may not be active
+    const loopActive = activeLoops.has(req.params.branchId);
     res.json({
-      running: session.running,
+      running: session.running && loopActive,
       branch_name: session.branch_name,
       phase: session.phase,
       current_iteration: session.current_iteration,
       current_score: session.current_score,
       config: session.config,
       scores: session.scores,
-      log: session.log.slice(-20), // last 20 log entries
+      log: (session.log || []).slice(-20),
       error: session.error,
       started_at: session.started_at,
       completed_at: session.completed_at,
@@ -96,8 +126,8 @@ export function createAutopilotRoutes(store, config) {
   /**
    * POST /api/autopilot/stop/:branchId
    */
-  router.post('/stop/:branchId', (req, res) => {
-    const session = sessions.get(req.params.branchId);
+  router.post('/stop/:branchId', async (req, res) => {
+    const session = await loadSession(req.params.branchId);
     if (!session || !session.running) {
       return res.json({ message: 'No active autopilot on this branch' });
     }
@@ -106,38 +136,86 @@ export function createAutopilotRoutes(store, config) {
     session.completed_at = new Date().toISOString();
     session.verdict = 'Stopped manually';
     addLog(session, 'Autopilot stopped by user');
+    await saveSession(session);
+    // The loop checks session.running from DB each cycle and will stop
+    activeLoops.delete(req.params.branchId);
     res.json({ message: 'Autopilot stopping after current step completes' });
   });
 
   /**
    * GET /api/autopilot/sessions — list all sessions (active and completed)
    */
-  router.get('/sessions', (req, res) => {
-    const all = [];
-    for (const [branchId, session] of sessions) {
-      all.push({
-        branch_id: branchId,
-        branch_name: session.branch_name,
-        running: session.running,
-        phase: session.phase,
-        current_iteration: session.current_iteration,
-        current_score: session.current_score,
-        scores: session.scores,
-        started_at: session.started_at,
-        completed_at: session.completed_at,
-        verdict: session.verdict,
-        error: session.error
-      });
-    }
-    res.json(all);
+  router.get('/sessions', async (req, res) => {
+    const all = await store.list(COLLECTION);
+    res.json(all.map(session => ({
+      branch_id: session.branch_id,
+      branch_name: session.branch_name,
+      running: session.running && activeLoops.has(session.branch_id),
+      phase: session.phase,
+      current_iteration: session.current_iteration,
+      current_score: session.current_score,
+      scores: session.scores,
+      started_at: session.started_at,
+      completed_at: session.completed_at,
+      verdict: session.verdict,
+      error: session.error
+    })));
   });
+
+  // --- Recovery on startup ---
+
+  async function recoverSessions() {
+    try {
+      const sessions = await store.list(COLLECTION, s => s.running === true);
+      for (const session of sessions) {
+        if (activeLoops.has(session.branch_id)) continue;
+        console.log(`[Autopilot] Recovering session: ${session.branch_name} (iter ${session.current_iteration})`);
+        addLog(session, 'Recovered after server restart');
+        await saveSession(session);
+        startLoop(session);
+      }
+      if (sessions.length > 0) {
+        console.log(`[Autopilot] Recovered ${sessions.length} session(s)`);
+      }
+    } catch (err) {
+      console.error('[Autopilot] Recovery failed:', err.message);
+    }
+  }
+
+  // Recover after a short delay to let the server finish booting
+  setTimeout(() => recoverSessions(), 3000);
+
+  // --- Loop management ---
+
+  function startLoop(session) {
+    activeLoops.set(session.branch_id, true);
+    runAutopilot(session).catch(err => {
+      session.running = false;
+      session.phase = 'error';
+      session.error = err.message;
+      session.completed_at = new Date().toISOString();
+      saveSession(session);
+      console.error(`[Autopilot] Fatal error on ${session.branch_name}:`, err.message);
+    }).finally(() => {
+      activeLoops.delete(session.branch_id);
+    });
+  }
 
   // --- Autopilot engine ---
 
   function addLog(session, message) {
     const entry = { time: new Date().toISOString(), message };
+    if (!session.log) session.log = [];
     session.log.push(entry);
+    // Keep log bounded to prevent unbounded DB growth
+    if (session.log.length > 100) session.log = session.log.slice(-50);
     console.log(`[Autopilot] ${session.branch_name}: ${message}`);
+  }
+
+  async function isSessionStillRunning(session) {
+    // Re-read from DB to check if someone stopped it while we were working
+    const fresh = await loadSession(session.branch_id);
+    return fresh && fresh.running;
   }
 
   async function runAutopilot(session) {
@@ -147,12 +225,32 @@ export function createAutopilotRoutes(store, config) {
     const port = config.port || 3847;
     const baseUrl = `http://localhost:${port}`;
 
-    addLog(session, `Starting autopilot — target ${target_score}/75, max ${max_iterations} iterations`);
+    // Rebuild regression tracking from existing scores
+    if (session.scores && session.scores.length > 0) {
+      previousScore = session.scores[session.scores.length - 1].grand_total;
+      // Count trailing regressions
+      for (let i = session.scores.length - 1; i > 0; i--) {
+        if (session.scores[i].grand_total < session.scores[i - 1].grand_total) {
+          consecutiveRegressions++;
+        } else {
+          break;
+        }
+      }
+    }
 
-    while (session.running) {
+    addLog(session, `Starting autopilot — target ${target_score}/75, max ${max_iterations} iterations`);
+    await saveSession(session);
+
+    while (true) {
+      // Check if still running (from DB — survives stop requests across restarts)
+      if (!await isSessionStillRunning(session)) {
+        session.running = false;
+        break;
+      }
+
       try {
         // 1. Find latest iteration on this branch
-        session.phase = 'finding_iteration';
+        await persistPhase(session, 'finding_iteration');
         const iterations = await store.list('iterations', i => i.branch_id === branch_id);
         iterations.sort((a, b) => (a.iteration_number || 0) - (b.iteration_number || 0));
         const latest = iterations[iterations.length - 1];
@@ -167,11 +265,10 @@ export function createAutopilotRoutes(store, config) {
 
         // 2. Wait for render if pending/queued
         if (latest.status === 'pending' || latest.status === 'queued') {
-          session.phase = 'waiting_for_render';
+          await persistPhase(session, 'waiting_for_render');
           addLog(session, 'Waiting for render to complete...');
           await waitForRender(session, latest, baseUrl);
-          if (!session.running) break;
-          // Refetch iteration to get updated status
+          if (!await isSessionStillRunning(session)) { session.running = false; break; }
           continue;
         }
 
@@ -184,12 +281,11 @@ export function createAutopilotRoutes(store, config) {
 
         // 4. Score if not yet evaluated
         if (!latest.evaluation) {
-          session.phase = 'scoring';
+          await persistPhase(session, 'scoring');
           addLog(session, 'Scoring via Vision API...');
 
-          // Wait for frames to be available (queue extracts them post-render)
           await waitForFrames(session, latest.id, baseUrl);
-          if (!session.running) break;
+          if (!await isSessionStillRunning(session)) { session.running = false; break; }
 
           const scoreRes = await fetch(`${baseUrl}/api/vision/score`, {
             method: 'POST',
@@ -202,7 +298,6 @@ export function createAutopilotRoutes(store, config) {
           }
           const scoreResult = await scoreRes.json();
 
-          // Save evaluation
           const evalRes = await fetch(`${baseUrl}/api/iterations/${latest.id}/evaluate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -230,6 +325,7 @@ export function createAutopilotRoutes(store, config) {
           });
 
           addLog(session, `Scored: ${grandTotal}/75 | ${scoreResult.attribution?.rope || 'no rope'} → ${scoreResult.attribution?.next_change_description || 'no recommendation'}`);
+          await saveSession(session);
 
           // 5. Check termination conditions
           if (grandTotal >= target_score) {
@@ -244,7 +340,6 @@ export function createAutopilotRoutes(store, config) {
             break;
           }
 
-          // Check consecutive regressions
           if (previousScore !== null) {
             if (grandTotal < previousScore) {
               consecutiveRegressions++;
@@ -261,7 +356,7 @@ export function createAutopilotRoutes(store, config) {
           previousScore = grandTotal;
 
           // 6. Generate next iteration
-          session.phase = 'generating_next';
+          await persistPhase(session, 'generating_next');
           addLog(session, 'Generating next iteration...');
 
           const nextRes = await fetch(`${baseUrl}/api/iterations/${latest.id}/next`, {
@@ -277,7 +372,7 @@ export function createAutopilotRoutes(store, config) {
           addLog(session, `Created iteration ${nextIter.iteration_number}: ${nextIter.json_filename}`);
 
           // 7. Queue render
-          session.phase = 'queuing_render';
+          await persistPhase(session, 'queuing_render');
           const queueRes = await fetch(`${baseUrl}/api/queue`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -287,7 +382,7 @@ export function createAutopilotRoutes(store, config) {
               iteration_id: nextIter.id,
               seed: nextIter.seed,
               source: 'autopilot',
-              priority: 0 // top priority
+              priority: 0
             })
           });
           if (!queueRes.ok) {
@@ -295,11 +390,9 @@ export function createAutopilotRoutes(store, config) {
             throw new Error(`Queue failed: ${err.error}`);
           }
           addLog(session, `Queued render for iteration ${nextIter.iteration_number}`);
-
-          // Auto-start queue if not running
           await fetch(`${baseUrl}/api/queue/start`, { method: 'POST' }).catch(() => {});
+          await saveSession(session);
 
-          // Loop continues — will wait for render on next cycle
         } else {
           // Already evaluated — check if we need to generate next or if we're at the end
           const grandTotal = latest.evaluation?.scores ?
@@ -308,16 +401,14 @@ export function createAutopilotRoutes(store, config) {
 
           session.current_score = grandTotal;
 
-          // Check if there's already a child iteration
           const children = await store.list('iterations', i => i.parent_iteration_id === latest.id);
           if (children.length > 0) {
-            // Already has a child — continue to that iteration
             addLog(session, `Iteration ${latest.iteration_number} already evaluated (${grandTotal}/75) with child — advancing`);
+            await saveSession(session);
             await sleep(1000);
             continue;
           }
 
-          // No child but evaluated — check termination then generate next
           if (grandTotal >= target_score) {
             session.scores.push({ iteration: latest.iteration_number, iteration_id: latest.id, grand_total: grandTotal });
             session.verdict = `SUCCESS — already at ${grandTotal}/75 (target ${target_score})`;
@@ -329,7 +420,7 @@ export function createAutopilotRoutes(store, config) {
           previousScore = grandTotal;
 
           addLog(session, `Iteration ${latest.iteration_number} already evaluated (${grandTotal}/75) — generating next`);
-          session.phase = 'generating_next';
+          await persistPhase(session, 'generating_next');
 
           const nextRes = await fetch(`${baseUrl}/api/iterations/${latest.id}/next`, {
             method: 'POST',
@@ -343,7 +434,7 @@ export function createAutopilotRoutes(store, config) {
           const nextIter = await nextRes.json();
           addLog(session, `Created iteration ${nextIter.iteration_number}: ${nextIter.json_filename}`);
 
-          session.phase = 'queuing_render';
+          await persistPhase(session, 'queuing_render');
           const queueRes = await fetch(`${baseUrl}/api/queue`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -362,16 +453,17 @@ export function createAutopilotRoutes(store, config) {
           }
           await fetch(`${baseUrl}/api/queue/start`, { method: 'POST' }).catch(() => {});
           addLog(session, `Queued render for iteration ${nextIter.iteration_number}`);
+          await saveSession(session);
         }
 
       } catch (err) {
         addLog(session, `Error: ${err.message}`);
         session.error = err.message;
-        // Don't break on transient errors — retry after delay
         if (err.message.includes('rate limit') || err.message.includes('temporarily unavailable')) {
           addLog(session, 'Transient error — retrying in 30s...');
+          await saveSession(session);
           await sleep(30000);
-          if (!session.running) break;
+          if (!await isSessionStillRunning(session)) { session.running = false; break; }
           continue;
         }
         session.verdict = `ERROR — ${err.message}`;
@@ -383,30 +475,28 @@ export function createAutopilotRoutes(store, config) {
     session.phase = session.verdict ? 'complete' : 'stopped';
     session.completed_at = new Date().toISOString();
     addLog(session, `Autopilot finished: ${session.verdict || 'stopped'}`);
+    await saveSession(session);
   }
 
-  /** Wait for an iteration's render to complete by polling queue status */
   async function waitForRender(session, iteration, baseUrl) {
-    const maxWait = 45 * 60 * 1000; // 45 min max
-    const pollInterval = 15000; // 15s
+    const maxWait = 45 * 60 * 1000;
+    const pollInterval = 15000;
     const start = Date.now();
 
-    while (session.running && (Date.now() - start) < maxWait) {
-      // Check iteration status directly
+    while ((Date.now() - start) < maxWait) {
+      if (!await isSessionStillRunning(session)) return;
+
       try {
         const iter = await store.get('iterations', iteration.id);
         if (iter.status === 'rendered') {
           addLog(session, 'Render complete');
           return;
         }
-        if (iter.status === 'failed') {
-          throw new Error('Render failed');
-        }
+        if (iter.status === 'failed') throw new Error('Render failed');
       } catch (err) {
         if (err.message === 'Render failed') throw err;
       }
 
-      // Check queue status
       try {
         const qRes = await fetch(`${baseUrl}/api/queue/iteration/${iteration.id}`);
         const qs = await qRes.json();
@@ -414,11 +504,10 @@ export function createAutopilotRoutes(store, config) {
           addLog(session, 'Render complete (queue)');
           return;
         }
-        if (qs.status === 'failed') {
-          throw new Error(`Render failed: ${qs.error || 'unknown'}`);
-        }
+        if (qs.status === 'failed') throw new Error(`Render failed: ${qs.error || 'unknown'}`);
         if (qs.progress?.percent) {
           session.phase = `rendering (${qs.progress.percent}%)`;
+          await saveSession(session);
         }
       } catch (err) {
         if (err.message.startsWith('Render failed')) throw err;
@@ -427,16 +516,16 @@ export function createAutopilotRoutes(store, config) {
       await sleep(pollInterval);
     }
 
-    if (session.running) throw new Error('Render timed out after 45 minutes');
+    throw new Error('Render timed out after 45 minutes');
   }
 
-  /** Wait for frames to be extracted (post-render) */
   async function waitForFrames(session, iterationId, baseUrl) {
-    const maxWait = 120000; // 2 min max
+    const maxWait = 120000;
     const pollInterval = 5000;
     const start = Date.now();
 
-    while (session.running && (Date.now() - start) < maxWait) {
+    while ((Date.now() - start) < maxWait) {
+      if (!await isSessionStillRunning(session)) return;
       try {
         const res = await fetch(`${baseUrl}/api/frames/${iterationId}`);
         const data = await res.json();
@@ -444,7 +533,6 @@ export function createAutopilotRoutes(store, config) {
       } catch {}
       await sleep(pollInterval);
     }
-    // Don't throw — scoring might still work if contact sheet exists
     addLog(session, 'Warning: frames not found after 2 min, attempting score anyway');
   }
 

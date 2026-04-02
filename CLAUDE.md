@@ -34,8 +34,11 @@ cd maparr/maparr_charm && go run ./cmd/maparr --api http://localhost:9900
 ## Test Commands
 
 ```bash
-# iteratarr
+# iteratarr backend
 cd iteratarr/backend && npx vitest run
+
+# iteratarr frontend
+cd iteratarr/frontend && npx vitest run
 
 # composearr
 cd composearr && python -m pytest tests/ -v -p no:capture
@@ -53,7 +56,7 @@ cd maparr/maparr_charm && go test ./...
 - `clips.js`, `iterations.js`, `characters.js`, `branches.js`, `projects.js`
 - `render.js`, `queue.js`, `gpu.js`, `vision.js`, `analytics.js`
 - `frames.js`, `browser.js`, `export.js`, `contactsheet.js`, `seedscreen.js`, `templates.js`, `telemetry.js`, `storage.js`
-- `autopilot.js` (vision validation trial engine)
+- `autopilot.js` (vision validation trial engine, sessions persisted to SQLite with restart recovery)
 
 **Supporting modules**: `paths.js` (`getClipPaths`), `watcher.js` (chokidar, detects new JSON in `wan2gp_json_dir`), `wan2gp-bridge.js` + `wan2gp-api.js` (Wan2GP at `C:/pinokio/api/wan2gp.git/app/wgp.py`), `vision-scorer.js` (Anthropic `claude-sonnet-4-6`, reads `ANTHROPIC_API_KEY`), `gpu-monitor.js` (nvidia-smi polling), `seed-templates.js`, `prompt-diff.js` (phrase-level prompt diffing), `iteration-history.js` (chain-aware iteration history for Vision scoring).
 
@@ -63,11 +66,13 @@ cd maparr/maparr_charm && go test ./...
 
 **Frontend** (`iteratarr/frontend/`): React 18 + Vite + TanStack Query. Entry: `src/App.jsx` → `QueryClientProvider` with `React.lazy()` + `Suspense` code splitting for secondary views. API: `src/api.js` (all endpoints). Theme: `src/index.css` (`@theme` tokens: `--color-accent`, `--color-surface`, `--color-score-*`, `--color-status-*`).
 
+**Frontend Tests** (`frontend/src/hooks/__tests__/`): Vitest + jsdom. Config: `frontend/vitest.config.js`, setup: `frontend/src/test-setup.js`. Hook tests: `useClipMeta.test.js`, `useEvalGenerate.test.js`, `useEvalRender.test.js`, `useEvalScoring.test.js`, `useEvalVideo.test.js`.
+
 **Constants** (`src/constants.js`): `ROPES`, `MODEL_TYPES`, `MODEL_ROPE_CONFIG`, `IDENTITY_FIELDS`, `LOCATION_FIELDS`, `MOTION_FIELDS`, `CLIP_STATUSES`, `BRANCH_STATUSES`, `SCORE_LOCK_THRESHOLD=65`, `GRAND_MAX=75`, `SETTINGS_TIERS`, `ROPE_CATEGORY_MAP`, `ROPE_GUIDANCE`.
 
 **Hooks** (`src/hooks/`): `useQueries.js` (all TanStack hooks with dynamic `refetchInterval`), `useAutoRender.js`, `useApi.js`, `useBranchNav.js`, `useClipMeta.js` (useReducer-based clip metadata), `useIterationState.js`, `useViewFilter.js`, `useTimeout.js`, `useEvalScoring.js`, `useEvalRender.js`, `useEvalGenerate.js`, `useEvalVideo.js`.
 
-**Components** (`src/components/`): `kanban/EpisodeTracker`, `clips/ClipDetail`, `clips/IterationLineage`, `characters/CharacterRegistry`, `queue/QueueManager`, `gpu/GpuStatus`, `render/RenderStatus`, `evaluation/EvaluationPanel`, `evaluation/RenderStatusPanel`, `common/PromptDiffInline`, `screening/SeedHQ`, `trends/ScoreTrendChart`, `analytics/CrossClipDashboard`, `storage/StoragePage`.
+**Components** (`src/components/`): `kanban/EpisodeTracker`, `clips/ClipDetail`, `clips/IterationLineage`, `characters/CharacterRegistry`, `queue/QueueManager`, `gpu/GpuStatus`, `render/RenderStatus`, `evaluation/EvaluationPanel`, `evaluation/RenderStatusPanel`, `common/PromptDiffInline`, `common/CopyButton`, `screening/SeedHQ`, `trends/ScoreTrendChart`, `analytics/CrossClipDashboard`, `storage/StoragePage`.
 
 **Data model**: Projects → Scenes → Clips → Branches → Iterations → Evaluations. Evaluations score identity (8: `face_match`, `head_shape`, `jaw`, `cheekbones`, `eyes_brow`, `skin_texture`, `hair`, `frame_consistency`), location (4), motion (3). "Ropes" map params to scoring dimensions.
 
@@ -128,12 +133,20 @@ Training configs: `train_{name}_cloud.yaml` for 6 characters — `belinda`, `mat
 <!-- caliber:managed:pre-commit -->
 ## Before Committing
 
-Run `npx --yes @rely-ai/caliber refresh` before creating git commits to keep docs in sync with code changes.
-After it completes, stage any modified doc files before committing:
+**IMPORTANT:** Before every git commit, you MUST ensure Caliber syncs agent configs with the latest code changes.
 
+First, check if the pre-commit hook is already installed:
 ```bash
-npx --yes @rely-ai/caliber refresh && git add CLAUDE.md .claude/ .cursor/ AGENTS.md CALIBER_LEARNINGS.md 2>/dev/null
+grep -q "caliber" .git/hooks/pre-commit 2>/dev/null && echo "hook-active" || echo "no-hook"
 ```
+
+- If **hook-active**: the hook handles sync automatically — just commit normally. Tell the user: "Caliber will sync your agent configs automatically via the pre-commit hook."
+- If **no-hook**: run Caliber manually before committing:
+  1. Tell the user: "Caliber: Syncing agent configs with your latest changes..."
+  2. Run: `caliber refresh && git add CLAUDE.md .claude/ .cursor/ .cursorrules .github/copilot-instructions.md .github/instructions/ AGENTS.md CALIBER_LEARNINGS.md .agents/ .opencode/ 2>/dev/null`
+  3. After it completes, briefly tell the user what Caliber updated. Then proceed with the commit.
+
+If `caliber` is not found, tell the user: "This project uses Caliber for agent config sync. Run /setup-caliber to get set up."
 <!-- /caliber:managed:pre-commit -->
 
 <!-- caliber:managed:learnings -->
